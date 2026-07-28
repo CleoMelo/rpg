@@ -69,49 +69,23 @@ async function loadRpgs() {
   return RPGS;
 }
 
-function getImgurAlbumId(value) {
-  try {
-    const url = new URL(String(value || '').trim());
-    const host = url.hostname.toLowerCase().replace(/^www\./, '');
-    const match = url.pathname.match(/^\/a\/([a-z0-9]+)\/?$/i);
-    return url.protocol === 'https:' && host === 'imgur.com' ? match?.[1] || null : null;
-  } catch {
-    return null;
-  }
-}
-
-function isImgurAlbumUrl(value) {
-  return Boolean(getImgurAlbumId(value));
-}
-
-function getImgurAlbumEmbedUrl(value) {
-  const albumId = getImgurAlbumId(value);
-  return albumId ? `https://imgur.com/a/${albumId}/embed?pub=true` : '';
-}
-
-function normalizeImgurImageUrl(value, { allowAlbum = false } = {}) {
+function normalizeImgurImageUrl(value) {
   let url;
 
   try {
     url = new URL(String(value || '').trim());
   } catch {
-    throw new Error('Informe um endereço válido do Imgur.');
+    throw new Error('Informe um endereço de imagem válido do Imgur.');
   }
 
-  const host = url.hostname.toLowerCase().replace(/^www\./, '');
-  const directImage = host === 'i.imgur.com' &&
-    /\.(?:jpe?g|png|gif|webp|avif)$/i.test(url.pathname);
+  const directHost = url.hostname.toLowerCase() === 'i.imgur.com';
+  const imageExtension = /\.(?:jpe?g|png|gif|webp|avif)$/i.test(url.pathname);
 
-  if (url.protocol === 'https:' && directImage) return url.href;
+  if (url.protocol !== 'https:' || !directHost || !imageExtension) {
+    throw new Error('Use o endereço direto da imagem iniciado por https://i.imgur.com/.');
+  }
 
-  const albumId = allowAlbum ? getImgurAlbumId(url.href) : null;
-  if (albumId) return `https://imgur.com/a/${albumId}`;
-
-  throw new Error(
-    allowAlbum
-      ? 'Use uma imagem direta https://i.imgur.com/... ou um álbum https://imgur.com/a/....'
-      : 'Use o endereço direto da imagem iniciado por https://i.imgur.com/.'
-  );
+  return url.href;
 }
 
 async function createRpg({ name, description, image, password }) {
@@ -263,8 +237,7 @@ function mapCharacter(row) {
     category: String(row.categoria_id),
     name: row.nome,
     description: row.descricao || '',
-    image: row.imagem_url,
-    visible: row.visivel !== false
+    image: row.imagem_url
   };
 }
 
@@ -362,27 +335,22 @@ function saveLocalCharacters(rpgId, characters) {
   localStorage.setItem(`characters:${rpgId}`, JSON.stringify(characters));
 }
 
-async function loadCharacters(rpgId, token = null) {
-  if (isDefaultRpg(rpgId)) {
-    const characters = getLocalCharacters(rpgId).map(character => ({
-      ...character,
-      visible: character.visible !== false
-    }));
-    return token ? characters : characters.filter(character => character.visible);
-  }
+async function loadCharacters(rpgId) {
+  if (isDefaultRpg(rpgId)) return getLocalCharacters(rpgId);
 
   const client = getSupabaseClient();
-  const { data, error } = await client.rpc('listar_personagens', {
-    p_campanha_id: String(rpgId),
-    p_token: token || null
-  });
+  const { data, error } = await client
+    .from('personagens')
+    .select('id, campanha_id, categoria_id, nome, descricao, imagem_url, criado_em')
+    .eq('campanha_id', String(rpgId))
+    .order('criado_em', { ascending: true });
 
   if (error) throw error;
   return (data || []).map(mapCharacter);
 }
 
-async function createCharacter({ rpgId, token, name, categoryId, description, image, visible = true }) {
-  const imageUrl = normalizeImgurImageUrl(image, { allowAlbum: true });
+async function createCharacter({ rpgId, token, name, categoryId, description, image }) {
+  const imageUrl = normalizeImgurImageUrl(image);
 
   if (isDefaultRpg(rpgId)) {
     const characters = getLocalCharacters(rpgId);
@@ -391,8 +359,7 @@ async function createCharacter({ rpgId, token, name, categoryId, description, im
       name: name.trim(),
       category: String(categoryId),
       description: description.trim(),
-      image: imageUrl,
-      visible: Boolean(visible)
+      image: imageUrl
     };
     characters.push(character);
     saveLocalCharacters(rpgId, characters);
@@ -401,41 +368,18 @@ async function createCharacter({ rpgId, token, name, categoryId, description, im
 
   const client = getSupabaseClient();
   const { data, error } = await client
-    .rpc('criar_personagem_com_visibilidade', {
+    .rpc('criar_personagem', {
       p_campanha_id: String(rpgId),
       p_categoria_id: String(categoryId),
       p_token: token,
       p_nome: name.trim(),
       p_descricao: description.trim(),
-      p_imagem_url: imageUrl,
-      p_visivel: Boolean(visible)
+      p_imagem_url: imageUrl
     })
     .single();
 
   if (error) throw error;
   return mapCharacter(data);
-}
-
-async function setCharacterVisibility({ rpgId, token, characterId, visible }) {
-  if (isDefaultRpg(rpgId)) {
-    const characters = getLocalCharacters(rpgId);
-    const character = characters.find(item => item.id === String(characterId));
-    if (!character || !token) return false;
-    character.visible = Boolean(visible);
-    saveLocalCharacters(rpgId, characters);
-    return true;
-  }
-
-  const client = getSupabaseClient();
-  const { data, error } = await client.rpc('definir_visibilidade_personagem', {
-    p_campanha_id: String(rpgId),
-    p_personagem_id: String(characterId),
-    p_token: token,
-    p_visivel: Boolean(visible)
-  });
-
-  if (error) throw error;
-  return Boolean(data);
 }
 
 async function deleteCharacter({ rpgId, token, characterId }) {
