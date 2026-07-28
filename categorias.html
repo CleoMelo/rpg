@@ -72,7 +72,9 @@
   <script src="data.js"></script>
   <script>
     const rpgId = getSelectedRpg();
-    const role = sessionStorage.getItem('role');
+    const storedRole = sessionStorage.getItem('role');
+    const masterMatchesCampaign = sessionStorage.getItem('masterRpgId') === String(rpgId);
+    const role = storedRole === 'master' && !masterMatchesCampaign ? 'player' : storedRole;
     if (!role) location.href = `acesso.html?rpg=${encodeURIComponent(rpgId)}`;
 
     let selectedCategory = null;
