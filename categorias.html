@@ -70,6 +70,13 @@
             — após enviar, clique com o botão direito na imagem e escolha <strong>Copiar endereço da imagem</strong>.
           </small>
         </div>
+        <div class="form-group visibility-field">
+          <label class="visibility-control" for="characterVisible">
+            <input id="characterVisible" type="checkbox" checked>
+            <span>Visível para jogadores</span>
+          </label>
+          <small>Desmarque para que somente o mestre veja este personagem.</small>
+        </div>
         <div class="form-group">
           <label for="characterDescription">Descrição</label>
           <textarea id="characterDescription" rows="4" maxlength="500" placeholder="Resumo do personagem"></textarea>
@@ -132,6 +139,16 @@
       return String(value ?? '').replace(/[&<>'"]/g, char => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
       })[char]);
+    }
+
+    function formatSupabaseError(error, fallback) {
+      const parts = [
+        error?.message,
+        error?.details,
+        error?.hint,
+        error?.code ? `Código: ${error.code}` : ''
+      ].filter(Boolean);
+      return parts.length ? parts.join(' — ') : fallback;
     }
 
     function showPageMessage(text, type = 'error') {
@@ -230,7 +247,9 @@
         return;
       }
 
-      const filtered = characters.filter(character => character.category === selectedCategory);
+      const filtered = characters.filter(character =>
+        character.category === selectedCategory && (role === 'master' || character.visible !== false)
+      );
       if (!filtered.length) {
         characterGrid.innerHTML = '<div class="empty-state">Nenhum personagem cadastrado nesta categoria.</div>';
         return;
@@ -242,14 +261,27 @@
         card.innerHTML = `
           <img src="${escapeHtml(character.image)}" alt="${escapeHtml(character.name)}">
           <div class="character-body">
+            ${role === 'master' && character.visible === false ? '<span class="visibility-badge">Somente para o mestre</span>' : ''}
             <h3>${escapeHtml(character.name)}</h3>
             <p>${escapeHtml(character.description || 'Sem descrição.')}</p>
-            ${role === 'master' ? `<div class="character-actions"><button class="btn danger" type="button" data-remove="${escapeHtml(character.id)}">Remover</button></div>` : ''}
+            ${role === 'master' ? `
+              <div class="character-actions">
+                <button class="btn secondary" type="button" data-toggle-visibility="${escapeHtml(character.id)}">
+                  ${character.visible === false ? 'Mostrar aos jogadores' : 'Ocultar dos jogadores'}
+                </button>
+                <button class="btn danger" type="button" data-remove="${escapeHtml(character.id)}">Remover</button>
+              </div>
+            ` : ''}
           </div>
         `;
         card.querySelector('img').addEventListener('error', event => {
           event.currentTarget.src = 'https://placehold.co/600x750?text=Imagem+indisponível';
         }, { once: true });
+
+        const visibilityButton = card.querySelector('[data-toggle-visibility]');
+        if (visibilityButton) {
+          visibilityButton.addEventListener('click', () => toggleCharacterVisibility(character.id, visibilityButton));
+        }
 
         const removeButton = card.querySelector('[data-remove]');
         if (removeButton) {
@@ -257,6 +289,40 @@
         }
         characterGrid.appendChild(card);
       });
+    }
+
+    async function toggleCharacterVisibility(characterId, button) {
+      const character = characters.find(item => item.id === String(characterId));
+      if (!character) return;
+
+      const nextVisible = character.visible === false;
+      button.disabled = true;
+      clearPageMessage();
+
+      try {
+        const updated = await setCharacterVisibility({
+          rpgId,
+          token: masterToken,
+          characterId,
+          visible: nextVisible
+        });
+        if (!updated) throw new Error('Acesso do mestre expirado.');
+        character.visible = nextVisible;
+        renderCharacters();
+        showPageMessage(
+          nextVisible
+            ? 'Personagem liberado para os jogadores.'
+            : 'Personagem visível somente para o mestre.',
+          'success'
+        );
+      } catch (error) {
+        console.error(error);
+        showPageMessage(formatSupabaseError(
+          error,
+          'Não foi possível alterar a visibilidade.'
+        ));
+        button.disabled = false;
+      }
     }
 
     async function removeCharacterRecord(characterId, button) {
@@ -293,7 +359,7 @@
           categoryId
         });
         if (!removed) throw new Error('Acesso do mestre expirado.');
-        characters = await loadCharacters(rpgId);
+        characters = await loadCharacters(rpgId, role === 'master' ? masterToken : null);
         if (selectedCategory === String(categoryId)) selectedCategory = null;
         renderCategories();
         renderCharacters();
@@ -336,7 +402,8 @@
           name: document.getElementById('characterName').value,
           categoryId: categorySelect.value,
           description: document.getElementById('characterDescription').value,
-          image: document.getElementById('characterImage').value
+          image: document.getElementById('characterImage').value,
+          visible: document.getElementById('characterVisible').checked
         });
         characters.push(character);
         selectedCategory = character.category;
@@ -346,7 +413,10 @@
       } catch (error) {
         console.error(error);
         formMessage.className = 'message error';
-        formMessage.textContent = error?.message || 'Não foi possível salvar o personagem.';
+        formMessage.textContent = formatSupabaseError(
+          error,
+          'Não foi possível salvar o personagem.'
+        );
       } finally {
         submitButton.disabled = false;
         submitButton.textContent = 'Salvar personagem';
@@ -415,7 +485,7 @@
         currentRpg = await getRpgById(rpgId);
         document.getElementById('campaignName').textContent = currentRpg?.name || 'Campanha';
         await loadCategories(rpgId);
-        characters = await loadCharacters(rpgId);
+        characters = await loadCharacters(rpgId, role === 'master' ? masterToken : null);
 
         if (role === 'master') {
           document.getElementById('addCategoryButton').style.display = 'inline-flex';
