@@ -401,7 +401,7 @@ async function createCharacter({ rpgId, token, name, categoryId, description, im
 
   const client = getSupabaseClient();
   const { data, error } = await client
-    .rpc('criar_personagem', {
+    .rpc('criar_personagem_com_visibilidade', {
       p_campanha_id: String(rpgId),
       p_categoria_id: String(categoryId),
       p_token: token,
