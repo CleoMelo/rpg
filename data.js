@@ -269,10 +269,18 @@ async function loadCategories(rpgId, token = null) {
   }
 
   const client = getSupabaseClient();
-  const { data, error } = await client.rpc('listar_categorias', {
-    p_campanha_id: String(rpgId),
-    p_token: token || null
-  });
+  const functionName = token
+    ? 'listar_categorias_mestre'
+    : 'listar_categorias';
+  const parameters = token
+    ? {
+        p_campanha_id: String(rpgId),
+        p_token: token
+      }
+    : {
+        p_campanha_id: String(rpgId)
+      };
+  const { data, error } = await client.rpc(functionName, parameters);
 
   if (error) throw error;
   CATEGORIES = (data || []).map(mapCategory);
@@ -305,10 +313,18 @@ async function loadSubcategories(rpgId, token = null) {
   }
 
   const client = getSupabaseClient();
-  const { data, error } = await client.rpc('listar_subcategorias', {
-    p_campanha_id: String(rpgId),
-    p_token: token || null
-  });
+  const functionName = token
+    ? 'listar_subcategorias_mestre'
+    : 'listar_subcategorias';
+  const parameters = token
+    ? {
+        p_campanha_id: String(rpgId),
+        p_token: token
+      }
+    : {
+        p_campanha_id: String(rpgId)
+      };
+  const { data, error } = await client.rpc(functionName, parameters);
 
   if (error) throw error;
   SUBCATEGORIES = (data || []).map(mapSubcategory);
@@ -427,6 +443,10 @@ async function updateSubcategory({
   if (error) throw error;
   const updated = mapSubcategory(data);
   await loadSubcategories(rpgId, token);
+  if (!SUBCATEGORIES.some(item => item.id === updated.id)) {
+    SUBCATEGORIES.push(updated);
+    SUBCATEGORIES.sort((left, right) => left.order - right.order);
+  }
   return SUBCATEGORIES.find(item => item.id === updated.id) || updated;
 }
 
