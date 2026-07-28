@@ -10,7 +10,7 @@ Site estático em HTML, CSS e JavaScript integrado ao Supabase.
 - Exclusão de campanha somente pela área do mestre.
 - Categorias personalizadas armazenadas no banco.
 - Personagens armazenados no banco e filtrados por categoria.
-- Upload de imagens de personagens para o Supabase Storage.
+- Imagens de campanhas e personagens por links diretos do Imgur.
 - Campanhas demonstrativas disponíveis para testes locais.
 
 ## Como executar
@@ -43,9 +43,18 @@ O banco utiliza as tabelas:
 - `personagens`
 - `sessoes_mestre`
 
-As imagens enviadas ficam no bucket público `imagens-rpg` do Supabase Storage.
-
 O SQL de configuração deve ser executado separadamente no **Supabase Dashboard > SQL Editor** e não é armazenado neste repositório.
+
+## Imagens no Imgur
+
+1. Abra [o upload do Imgur](https://imgur.com/upload).
+2. Envie a imagem.
+3. Abra a imagem enviada.
+4. Clique nela com o botão direito.
+5. Escolha **Copiar endereço da imagem**.
+6. Cole no site o endereço iniciado por `https://i.imgur.com/`.
+
+Links de páginas como `https://imgur.com/abc123` não são aceitos; utilize o endereço direto da imagem.
 
 ## Campanhas demonstrativas
 
@@ -53,4 +62,4 @@ As campanhas demonstrativas continuam definidas em `data.js`. Categorias e perso
 
 ## Segurança
 
-As operações administrativas das campanhas personalizadas usam funções RPC que validam uma sessão temporária do mestre. As políticas RLS continuam necessárias para controlar as leituras públicas e o upload no Storage. Para um ambiente com múltiplos administradores e recuperação de senha, o próximo passo recomendado é integrar o Supabase Auth.
+As operações administrativas das campanhas personalizadas usam funções RPC que validam uma sessão temporária do mestre. As políticas RLS continuam necessárias para controlar as leituras públicas e as operações administrativas. Para um ambiente com múltiplos administradores e recuperação de senha, o próximo passo recomendado é integrar o Supabase Auth.
