@@ -106,6 +106,30 @@ async function createRpg({ name, description, image, password }) {
   return rpg;
 }
 
+async function updateRpg({ id, token, name, description, image }) {
+  const rpg = RPGS.find(item => item.id === String(id));
+  if (!rpg?.custom || !token) return null;
+
+  const imageUrl = normalizeImgurImageUrl(image);
+  const client = getSupabaseClient();
+  const { data, error } = await client
+    .rpc('editar_campanha', {
+      p_campanha_id: String(id),
+      p_token: token,
+      p_nome: name.trim(),
+      p_descricao: description.trim() || 'Campanha personalizada.',
+      p_imagem_url: imageUrl
+    })
+    .single();
+
+  if (error) throw error;
+
+  const updated = mapCampaign(data);
+  const index = RPGS.findIndex(item => item.id === String(id));
+  if (index >= 0) RPGS[index] = updated;
+  return updated;
+}
+
 function isDefaultRpg(id) {
   return DEFAULT_RPGS.some(rpg => rpg.id === String(id));
 }
@@ -301,6 +325,44 @@ async function createCategory({ rpgId, token, name, description, icon }) {
   return category;
 }
 
+async function updateCategory({
+  rpgId,
+  token,
+  categoryId,
+  name,
+  description,
+  icon
+}) {
+  if (isDefaultRpg(rpgId)) {
+    const category = CATEGORIES.find(item => item.id === String(categoryId));
+    if (!category) return null;
+    category.name = name.trim();
+    category.description = description.trim();
+    category.icon = icon.trim() || '📁';
+    saveLocalCategories(rpgId, CATEGORIES);
+    return category;
+  }
+
+  const client = getSupabaseClient();
+  const { data, error } = await client
+    .rpc('editar_categoria', {
+      p_campanha_id: String(rpgId),
+      p_categoria_id: String(categoryId),
+      p_token: token,
+      p_nome: name.trim(),
+      p_descricao: description.trim(),
+      p_icone: icon.trim() || '📁'
+    })
+    .single();
+
+  if (error) throw error;
+
+  const updated = mapCategory(data);
+  const index = CATEGORIES.findIndex(item => item.id === String(categoryId));
+  if (index >= 0) CATEGORIES[index] = updated;
+  return updated;
+}
+
 async function deleteCategory({ rpgId, token, categoryId }) {
   if (isDefaultRpg(rpgId)) {
     const category = CATEGORIES.find(item => item.id === String(categoryId));
@@ -391,6 +453,46 @@ async function createCharacter({
       p_descricao: description.trim(),
       p_imagem_url: imageUrl,
       p_visivel: Boolean(visible)
+    })
+    .single();
+
+  if (error) throw error;
+  return mapCharacter(data);
+}
+
+async function updateCharacter({
+  rpgId,
+  token,
+  characterId,
+  name,
+  categoryId,
+  description,
+  image
+}) {
+  const imageUrl = normalizeImgurImageUrl(image);
+
+  if (isDefaultRpg(rpgId)) {
+    const characters = getLocalCharacters(rpgId);
+    const character = characters.find(item => item.id === String(characterId));
+    if (!character) return null;
+    character.name = name.trim();
+    character.category = String(categoryId);
+    character.description = description.trim();
+    character.image = imageUrl;
+    saveLocalCharacters(rpgId, characters);
+    return { ...character, visible: character.visible !== false };
+  }
+
+  const client = getSupabaseClient();
+  const { data, error } = await client
+    .rpc('editar_personagem', {
+      p_campanha_id: String(rpgId),
+      p_personagem_id: String(characterId),
+      p_token: token,
+      p_nome: name.trim(),
+      p_categoria_id: String(categoryId),
+      p_descricao: description.trim(),
+      p_imagem_url: imageUrl
     })
     .single();
 
