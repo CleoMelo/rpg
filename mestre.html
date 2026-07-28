@@ -46,11 +46,9 @@
       submitButton.disabled = true;
 
       try {
-        const allowed = await verifyMasterPassword(rpgId, password);
+        const masterToken = await authenticateMaster(rpgId, password);
 
-        if (allowed) {
-          sessionStorage.setItem('role', 'master');
-          sessionStorage.setItem('masterRpgId', String(rpgId));
+        if (masterToken) {
           message.className = 'message success';
           message.textContent = 'Acesso liberado.';
           location.href = `categorias.html?rpg=${encodeURIComponent(rpgId)}`;
