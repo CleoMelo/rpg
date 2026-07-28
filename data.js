@@ -467,7 +467,8 @@ async function updateCharacter({
   name,
   categoryId,
   description,
-  image
+  image,
+  visible
 }) {
   const imageUrl = normalizeImgurImageUrl(image);
 
@@ -479,6 +480,7 @@ async function updateCharacter({
     character.category = String(categoryId);
     character.description = description.trim();
     character.image = imageUrl;
+    character.visible = Boolean(visible);
     saveLocalCharacters(rpgId, characters);
     return { ...character, visible: character.visible !== false };
   }
@@ -492,7 +494,8 @@ async function updateCharacter({
       p_nome: name.trim(),
       p_categoria_id: String(categoryId),
       p_descricao: description.trim(),
-      p_imagem_url: imageUrl
+      p_imagem_url: imageUrl,
+      p_visivel: Boolean(visible)
     })
     .single();
 
