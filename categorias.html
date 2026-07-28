@@ -141,7 +141,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=20260728-4"></script>
   <script src="data.js?v=20260728-11"></script>
-  <script src="media-upload.js?v=20260728-3"></script>
+  <script src="media-upload.js?v=20260728-4"></script>
   <script>
     const rpgId = getSelectedRpg();
     const storedRole = sessionStorage.getItem('role');
@@ -551,6 +551,8 @@
       formMessage.className = 'message';
       formMessage.textContent = '';
 
+      let upload = null;
+      let characterSaved = false;
       try {
         const imageInput = document.getElementById('characterImage');
         const imageFile = imageInput.files?.[0];
@@ -562,7 +564,6 @@
           throw new Error('Selecione uma imagem para o personagem.');
         }
 
-        let upload = null;
         let image = existingCharacter?.image || '';
         if (imageFile) {
           submitButton.textContent = 'Enviando imagem...';
@@ -598,6 +599,7 @@
           characters.push(character);
         }
 
+        characterSaved = true;
         selectedCategory = character.category;
         editingCharacterId = null;
         form.reset();
@@ -606,6 +608,16 @@
         selectCategory(selectedCategory);
         if (upload?.warning) showPageMessage(upload.warning);
       } catch (error) {
+        if (!characterSaved && upload) {
+          await deleteUploadedMedia({
+            rpgId,
+            token: masterToken,
+            imagekitFileId: upload.imagekitFileId,
+            driveFileId: upload.driveFileId
+          }).catch(cleanupError => {
+            console.error('Falha ao remover upload sem personagem:', cleanupError);
+          });
+        }
         console.error(error);
         formMessage.className = 'message error';
         formMessage.textContent = formatSupabaseError(
@@ -667,10 +679,11 @@
       formMessage.className = 'message';
       formMessage.textContent = '';
 
+      let upload = null;
+      let campaignSaved = false;
       try {
         const imageInput = document.getElementById('campaignEditImage');
         const imageFile = imageInput.files?.[0];
-        let upload = null;
         let image = currentRpg.image;
 
         if (imageFile) {
@@ -692,11 +705,22 @@
           image
         });
         if (!updated) throw new Error('Esta campanha não pode ser editada.');
+        campaignSaved = true;
         currentRpg = updated;
         document.getElementById('campaignName').textContent = updated.name;
         closeModal(campaignModal);
         showPageMessage(upload?.warning || 'Campanha atualizada.', upload?.warning ? 'error' : 'success');
       } catch (error) {
+        if (!campaignSaved && upload) {
+          await deleteUploadedMedia({
+            rpgId,
+            token: masterToken,
+            imagekitFileId: upload.imagekitFileId,
+            driveFileId: upload.driveFileId
+          }).catch(cleanupError => {
+            console.error('Falha ao remover upload de edição:', cleanupError);
+          });
+        }
         console.error(error);
         formMessage.className = 'message error';
         formMessage.textContent = formatSupabaseError(

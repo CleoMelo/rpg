@@ -249,7 +249,65 @@ async function deleteImageKitCampaignFiles(campaignId: string) {
     }
   }
 
+  const deleteFolderResponse = await fetch(
+    "https://api.imagekit.io/v1/folder",
+    {
+      method: "DELETE",
+      headers: {
+        authorization,
+        accept: "application/json",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ folderPath: root }),
+    },
+  );
+  const deleteFolderResult = await deleteFolderResponse.json().catch(() => ({}));
+  if (!deleteFolderResponse.ok && deleteFolderResponse.status !== 404) {
+    throw new Error(
+      deleteFolderResult?.message ||
+        "As imagens foram removidas, mas não foi possível excluir a pasta da campanha no ImageKit.",
+    );
+  }
+
   return fileIds.length;
+}
+
+async function deleteUploadedImageKitFile(fileId: string) {
+  if (!fileId) return false;
+
+  const privateKey = requiredSecret("IMAGEKIT_PRIVATE_KEY");
+  const authorization = `Basic ${btoa(`${privateKey}:`)}`;
+  const response = await fetch(
+    `https://api.imagekit.io/v1/files/${encodeURIComponent(fileId)}`,
+    {
+      method: "DELETE",
+      headers: {
+        authorization,
+        accept: "application/json",
+      },
+    },
+  );
+  if (!response.ok && response.status !== 404) {
+    throw new Error("Não foi possível remover a imagem que ficou sem registro.");
+  }
+  return true;
+}
+
+async function deleteUploadedDriveFile(fileId: string) {
+  if (!fileId) return false;
+
+  const accessToken = await getGoogleAccessToken();
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`,
+    {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${accessToken}` },
+    },
+  );
+  if (!response.ok && response.status !== 404) {
+    throw new Error("Não foi possível remover o backup que ficou sem registro.");
+  }
+  return true;
 }
 
 async function deleteDriveCampaignFiles(campaignId: string) {
@@ -305,7 +363,8 @@ Deno.serve(async (req) => {
     const contentType = req.headers.get("content-type") || "";
     if (contentType.includes("application/json")) {
       const payload = await req.json();
-      if (payload?.action !== "delete-campaign") {
+      const action = String(payload?.action || "");
+      if (!["delete-campaign", "delete-upload"].includes(action)) {
         return json(req, { error: "Ação inválida." }, 400);
       }
 
@@ -320,6 +379,25 @@ Deno.serve(async (req) => {
           { error: "Acesso do mestre inválido ou expirado." },
           403,
         );
+      }
+
+      if (action === "delete-upload") {
+        const imagekitFileId = String(payload.imagekitFileId || "").trim();
+        const driveFileId = String(payload.driveFileId || "").trim();
+        if (!imagekitFileId && !driveFileId) {
+          return json(req, { error: "Nenhum arquivo foi informado." }, 400);
+        }
+
+        const [imagekitDeleted, driveDeleted] = await Promise.all([
+          deleteUploadedImageKitFile(imagekitFileId),
+          deleteUploadedDriveFile(driveFileId),
+        ]);
+
+        return json(req, {
+          success: true,
+          imagekitDeleted,
+          driveDeleted,
+        });
       }
 
       const [imagekitDeleted, driveDeleted] = await Promise.all([

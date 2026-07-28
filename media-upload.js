@@ -91,3 +91,38 @@ async function deleteCampaignMedia({ rpgId, token }) {
 
   return payload;
 }
+
+
+async function deleteUploadedMedia({
+  rpgId,
+  token,
+  imagekitFileId = '',
+  driveFileId = ''
+}) {
+  if (!imagekitFileId && !driveFileId) return null;
+
+  const response = await fetch(MEDIA_UPLOAD_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      apikey: window.SUPABASE_CONFIG.anonKey,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      action: 'delete-upload',
+      campaignId: String(rpgId),
+      masterToken: String(token || ''),
+      imagekitFileId: String(imagekitFileId || ''),
+      driveFileId: String(driveFileId || '')
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      payload.error ||
+      'Não foi possível remover a imagem enviada sem registro.'
+    );
+  }
+
+  return payload;
+}
