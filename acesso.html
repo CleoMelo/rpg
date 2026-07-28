@@ -30,12 +30,22 @@
     </section>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
   <script src="data.js"></script>
   <script>
     const rpgId = getSelectedRpg();
     setSelectedRpg(rpgId);
-    const rpg = RPGS.find(item => item.id === rpgId) || RPGS[0];
-    document.getElementById('campaignName').textContent = rpg.name;
+
+    async function initializeAccessPage() {
+      try {
+        const rpg = await getRpgById(rpgId);
+        document.getElementById('campaignName').textContent = rpg?.name || 'Campanha';
+      } catch (error) {
+        console.error(error);
+        document.getElementById('campaignName').textContent = 'Campanha';
+      }
+    }
 
     document.getElementById('playerButton').onclick = () => {
       sessionStorage.setItem('role', 'player');
@@ -45,6 +55,8 @@
     document.getElementById('masterButton').onclick = () => {
       location.href = `mestre.html?rpg=${encodeURIComponent(rpgId)}`;
     };
+
+    initializeAccessPage();
   </script>
 </body>
 </html>
