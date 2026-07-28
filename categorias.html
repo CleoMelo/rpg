@@ -277,6 +277,44 @@
       document.body.classList.remove('sorting-active');
     }
 
+    function handleSortAutoScroll(event) {
+      if (!activeDrag) return;
+
+      const threshold = Math.min(180, window.innerHeight * 0.25);
+      const maximumSpeed = 22;
+      let scrollAmount = 0;
+
+      if (event.clientY < threshold) {
+        const intensity = (threshold - event.clientY) / threshold;
+        scrollAmount = -Math.max(
+          4,
+          Math.ceil(maximumSpeed * intensity)
+        );
+      } else if (
+        event.clientY > window.innerHeight - threshold
+      ) {
+        const intensity = (
+          event.clientY - (window.innerHeight - threshold)
+        ) / threshold;
+        scrollAmount = Math.max(
+          4,
+          Math.ceil(maximumSpeed * intensity)
+        );
+      }
+
+      if (scrollAmount) {
+        window.scrollBy({
+          top: scrollAmount,
+          behavior: 'auto'
+        });
+      }
+    }
+
+    document.addEventListener(
+      'dragover',
+      handleSortAutoScroll
+    );
+
     function attachSortable(element, {
       type,
       id,
