@@ -161,3 +161,41 @@ async function deleteCharacterMedia({ rpgId, token, imageUrls = [] }) {
 
   return payload;
 }
+
+
+async function deleteReplacedMedia({
+  rpgId,
+  token,
+  kind,
+  imageUrl
+}) {
+  const previousUrl = String(imageUrl || '').trim();
+  if (!previousUrl) {
+    return { success: true, imagekitDeleted: 0, driveDeleted: 0 };
+  }
+
+  const response = await fetch(MEDIA_UPLOAD_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      apikey: window.SUPABASE_CONFIG.anonKey,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      action: 'delete-replaced-media',
+      campaignId: String(rpgId),
+      masterToken: String(token || ''),
+      kind: kind === 'campaign' ? 'campaign' : 'character',
+      imageUrls: [previousUrl]
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      payload.error ||
+      'A nova imagem foi salva, mas não foi possível remover a anterior.'
+    );
+  }
+
+  return payload;
+}

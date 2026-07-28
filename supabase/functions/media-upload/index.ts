@@ -310,14 +310,15 @@ async function deleteUploadedDriveFile(fileId: string) {
   return true;
 }
 
-function managedCharacterFileNames(
+function managedFileNames(
   campaignId: string,
+  kind: "campaign" | "character",
   imageUrls: string[],
 ) {
   const endpoint = new URL(requiredSecret("IMAGEKIT_URL_ENDPOINT"));
   const endpointPath = endpoint.pathname.replace(/\/+$/, "");
   const expectedPath =
-    `${endpointPath}/portal-rpg/${sanitizeName(campaignId)}/character/`
+    `${endpointPath}/portal-rpg/${sanitizeName(campaignId)}/${kind}/`
       .replace(/\/{2,}/g, "/");
   const names = new Set<string>();
 
@@ -343,12 +344,19 @@ function managedCharacterFileNames(
   return names;
 }
 
-function characterUploadStem(fileName: string) {
-  return fileName.match(/^(.*-character-\d+)/)?.[1] || "";
+function managedUploadStem(
+  fileName: string,
+  kind: "campaign" | "character",
+) {
+  const pattern = kind === "campaign"
+    ? /^(.*-campaign-\d+)/
+    : /^(.*-character-\d+)/;
+  return fileName.match(pattern)?.[1] || "";
 }
 
-async function deleteImageKitCharacterFiles(
+async function deleteImageKitManagedFiles(
   campaignId: string,
+  kind: "campaign" | "character",
   targetNames: Set<string>,
 ) {
   if (!targetNames.size) return 0;
@@ -356,7 +364,7 @@ async function deleteImageKitCharacterFiles(
   const privateKey = requiredSecret("IMAGEKIT_PRIVATE_KEY");
   const authorization = `Basic ${btoa(`${privateKey}:`)}`;
   const query = new URLSearchParams({
-    path: `/portal-rpg/${sanitizeName(campaignId)}/character/`,
+    path: `/portal-rpg/${sanitizeName(campaignId)}/${kind}/`,
     type: "file",
     limit: "1000",
   });
@@ -372,7 +380,7 @@ async function deleteImageKitCharacterFiles(
   const files = await response.json().catch(() => []);
   if (!response.ok) {
     throw new Error(
-      files?.message || "Não foi possível localizar a imagem do personagem.",
+      files?.message || "Não foi possível localizar a imagem anterior.",
     );
   }
 
@@ -393,25 +401,28 @@ async function deleteImageKitCharacterFiles(
       },
     );
     if (!deleteResponse.ok && deleteResponse.status !== 404) {
-      throw new Error("Não foi possível remover a imagem do personagem.");
+      throw new Error("Não foi possível remover a imagem anterior.");
     }
   }));
 
   return fileIds.length;
 }
 
-async function deleteDriveCharacterFiles(
+async function deleteDriveManagedFiles(
   campaignId: string,
+  kind: "campaign" | "character",
   targetNames: Set<string>,
 ) {
   const targetStems = new Set(
-    [...targetNames].map(characterUploadStem).filter(Boolean),
+    [...targetNames]
+      .map((name) => managedUploadStem(name, kind))
+      .filter(Boolean),
   );
   if (!targetStems.size) return 0;
 
   const accessToken = await getGoogleAccessToken();
   const folderId = requiredSecret("GOOGLE_DRIVE_FOLDER_ID");
-  const prefix = `${sanitizeName(campaignId)}-character-`;
+  const prefix = `${sanitizeName(campaignId)}-${kind}-`;
   const query = new URLSearchParams({
     q: `'${folderId}' in parents and name contains '${prefix}' and trashed = false`,
     pageSize: "1000",
@@ -426,12 +437,14 @@ async function deleteDriveCharacterFiles(
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(
-      result.error?.message || "Não foi possível localizar o backup do personagem.",
+      result.error?.message || "Não foi possível localizar o backup anterior.",
     );
   }
 
   const files = (Array.isArray(result.files) ? result.files : [])
-    .filter((file) => targetStems.has(characterUploadStem(String(file.name || ""))));
+    .filter((file) => targetStems.has(
+      managedUploadStem(String(file.name || ""), kind),
+    ));
 
   await Promise.all(files.map(async (file) => {
     const deleteResponse = await fetch(
@@ -442,24 +455,32 @@ async function deleteDriveCharacterFiles(
       },
     );
     if (!deleteResponse.ok && deleteResponse.status !== 404) {
-      throw new Error("Não foi possível remover o backup do personagem.");
+      throw new Error("Não foi possível remover o backup anterior.");
     }
   }));
 
   return files.length;
 }
 
+async function deleteManagedMediaFiles(
+  campaignId: string,
+  kind: "campaign" | "character",
+  imageUrls: string[],
+) {
+  const targetNames = managedFileNames(campaignId, kind, imageUrls);
+  const [imagekitDeleted, driveDeleted] = await Promise.all([
+    deleteImageKitManagedFiles(campaignId, kind, targetNames),
+    deleteDriveManagedFiles(campaignId, kind, targetNames),
+  ]);
+
+  return { imagekitDeleted, driveDeleted };
+}
+
 async function deleteCharacterMediaFiles(
   campaignId: string,
   imageUrls: string[],
 ) {
-  const targetNames = managedCharacterFileNames(campaignId, imageUrls);
-  const [imagekitDeleted, driveDeleted] = await Promise.all([
-    deleteImageKitCharacterFiles(campaignId, targetNames),
-    deleteDriveCharacterFiles(campaignId, targetNames),
-  ]);
-
-  return { imagekitDeleted, driveDeleted };
+  return deleteManagedMediaFiles(campaignId, "character", imageUrls);
 }
 
 async function deleteDriveCampaignFiles(campaignId: string) {
@@ -520,6 +541,7 @@ Deno.serve(async (req) => {
         "delete-campaign",
         "delete-upload",
         "delete-character-media",
+        "delete-replaced-media",
       ].includes(action)) {
         return json(req, { error: "Ação inválida." }, 400);
       }
@@ -556,14 +578,27 @@ Deno.serve(async (req) => {
         });
       }
 
-      if (action === "delete-character-media") {
+      if (
+        action === "delete-character-media" ||
+        action === "delete-replaced-media"
+      ) {
         const imageUrls = Array.isArray(payload.imageUrls)
           ? payload.imageUrls
             .map((value: unknown) => String(value || "").trim())
             .filter(Boolean)
             .slice(0, 1000)
           : [];
-        const deleted = await deleteCharacterMediaFiles(campaignId, imageUrls);
+        const kind = action === "delete-character-media"
+          ? "character"
+          : String(payload.kind || "");
+        if (!["campaign", "character"].includes(kind)) {
+          return json(req, { error: "Tipo de imagem inválido." }, 400);
+        }
+        const deleted = await deleteManagedMediaFiles(
+          campaignId,
+          kind as "campaign" | "character",
+          imageUrls,
+        );
         return json(req, { success: true, ...deleted });
       }
 

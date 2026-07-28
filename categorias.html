@@ -141,7 +141,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=20260728-4"></script>
   <script src="data.js?v=20260728-12"></script>
-  <script src="media-upload.js?v=20260728-5"></script>
+  <script src="media-upload.js?v=20260728-6"></script>
   <script>
     const rpgId = getSelectedRpg();
     const storedRole = sessionStorage.getItem('role');
@@ -561,6 +561,7 @@
 
       let upload = null;
       let characterSaved = false;
+      let replacedMediaWarning = '';
       try {
         const imageInput = document.getElementById('characterImage');
         const imageFile = imageInput.files?.[0];
@@ -608,13 +609,37 @@
         }
 
         characterSaved = true;
+        if (
+          upload &&
+          existingCharacter?.image &&
+          existingCharacter.image !== image
+        ) {
+          try {
+            await deleteReplacedMedia({
+              rpgId,
+              token: masterToken,
+              kind: 'character',
+              imageUrl: existingCharacter.image
+            });
+          } catch (cleanupError) {
+            console.error('Falha ao remover a imagem anterior:', cleanupError);
+            replacedMediaWarning =
+              'A nova imagem foi salva, mas a imagem anterior não pôde ser removida.';
+          }
+        }
         selectedCategory = character.category;
         editingCharacterId = null;
         form.reset();
         closeModal(characterModal);
         renderCategories();
         selectCategory(selectedCategory);
-        if (upload?.warning) showPageMessage(upload.warning);
+        const characterWarnings = [
+          upload?.warning,
+          replacedMediaWarning
+        ].filter(Boolean);
+        if (characterWarnings.length) {
+          showPageMessage(characterWarnings.join(' '));
+        }
       } catch (error) {
         if (!characterSaved && upload) {
           await deleteUploadedMedia({
@@ -689,10 +714,12 @@
 
       let upload = null;
       let campaignSaved = false;
+      let replacedMediaWarning = '';
       try {
         const imageInput = document.getElementById('campaignEditImage');
         const imageFile = imageInput.files?.[0];
-        let image = currentRpg.image;
+        const previousImage = currentRpg.image;
+        let image = previousImage;
 
         if (imageFile) {
           submitButton.textContent = 'Enviando imagem...';
@@ -714,10 +741,31 @@
         });
         if (!updated) throw new Error('Esta campanha não pode ser editada.');
         campaignSaved = true;
+        if (upload && previousImage && previousImage !== image) {
+          try {
+            await deleteReplacedMedia({
+              rpgId,
+              token: masterToken,
+              kind: 'campaign',
+              imageUrl: previousImage
+            });
+          } catch (cleanupError) {
+            console.error('Falha ao remover a imagem anterior:', cleanupError);
+            replacedMediaWarning =
+              'A campanha foi atualizada, mas a imagem anterior não pôde ser removida.';
+          }
+        }
         currentRpg = updated;
         document.getElementById('campaignName').textContent = updated.name;
         closeModal(campaignModal);
-        showPageMessage(upload?.warning || 'Campanha atualizada.', upload?.warning ? 'error' : 'success');
+        const campaignWarnings = [
+          upload?.warning,
+          replacedMediaWarning
+        ].filter(Boolean);
+        showPageMessage(
+          campaignWarnings.join(' ') || 'Campanha atualizada.',
+          campaignWarnings.length ? 'error' : 'success'
+        );
       } catch (error) {
         if (!campaignSaved && upload) {
           await deleteUploadedMedia({
