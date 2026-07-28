@@ -254,14 +254,47 @@ small, .muted { color: var(--muted); }
   transform: none;
 }
 .character-card { padding: 0; }
-.character-card img {
+.character-media {
   width: 100%;
   aspect-ratio: 4 / 5;
   object-fit: cover;
   display: block;
+  border: 0;
   background: #10141d;
 }
+.character-album { color-scheme: dark; }
 .character-body { padding: 17px; }
+.visibility-badge {
+  display: inline-flex;
+  margin-bottom: 10px;
+  padding: 5px 9px;
+  border: 1px solid rgba(251,191,36,.38);
+  border-radius: 999px;
+  color: #fde68a;
+  background: rgba(245,158,11,.12);
+  font-size: .78rem;
+  font-weight: 800;
+}
+.visibility-field {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255,255,255,.025);
+}
+.visibility-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 5px;
+  cursor: pointer;
+}
+.visibility-control input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.visibility-control span { font-weight: 800; }
 .character-body p { color: var(--muted); min-height: 42px; }
 .character-actions { display: flex; gap: 9px; }
 .character-actions button { flex: 1; }
