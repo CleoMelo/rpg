@@ -377,7 +377,12 @@ async function updateCategory({
   return updated;
 }
 
-async function deleteCategory({ rpgId, token, categoryId }) {
+async function deleteCategory({
+  rpgId,
+  token,
+  categoryId,
+  imageUrls = null
+}) {
   if (isDefaultRpg(rpgId)) {
     const category = CATEGORIES.find(item => item.id === String(categoryId));
     if (!category?.custom) return false;
@@ -387,6 +392,20 @@ async function deleteCategory({ rpgId, token, categoryId }) {
     saveLocalCharacters(rpgId, remaining);
     return true;
   }
+
+  let categoryImageUrls = Array.isArray(imageUrls) ? imageUrls : null;
+  if (!categoryImageUrls) {
+    const categoryCharacters = await loadCharacters(rpgId, token);
+    categoryImageUrls = categoryCharacters
+      .filter(character => character.category === String(categoryId))
+      .map(character => character.image);
+  }
+
+  await deleteCharacterMedia({
+    rpgId,
+    token,
+    imageUrls: categoryImageUrls
+  });
 
   const client = getSupabaseClient();
   const { data, error } = await client.rpc('excluir_categoria', {
@@ -539,12 +558,31 @@ async function setCharacterVisibility({ rpgId, token, characterId, visible }) {
   return Boolean(data);
 }
 
-async function deleteCharacter({ rpgId, token, characterId }) {
+async function deleteCharacter({
+  rpgId,
+  token,
+  characterId,
+  imageUrl = null
+}) {
   if (isDefaultRpg(rpgId)) {
     const remaining = getLocalCharacters(rpgId).filter(character => character.id !== String(characterId));
     saveLocalCharacters(rpgId, remaining);
     return true;
   }
+
+  let characterImageUrl = imageUrl;
+  if (!characterImageUrl) {
+    const campaignCharacters = await loadCharacters(rpgId, token);
+    characterImageUrl = campaignCharacters
+      .find(character => character.id === String(characterId))
+      ?.image || null;
+  }
+
+  await deleteCharacterMedia({
+    rpgId,
+    token,
+    imageUrls: characterImageUrl ? [characterImageUrl] : []
+  });
 
   const client = getSupabaseClient();
   const { data, error } = await client.rpc('excluir_personagem', {

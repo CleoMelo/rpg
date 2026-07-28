@@ -140,8 +140,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=20260728-4"></script>
-  <script src="data.js?v=20260728-11"></script>
-  <script src="media-upload.js?v=20260728-4"></script>
+  <script src="data.js?v=20260728-12"></script>
+  <script src="media-upload.js?v=20260728-5"></script>
   <script>
     const rpgId = getSelectedRpg();
     const storedRole = sessionStorage.getItem('role');
@@ -437,10 +437,14 @@
       clearPageMessage();
 
       try {
+        const character = characters.find(
+          item => item.id === String(characterId)
+        );
         const removed = await deleteCharacter({
           rpgId,
           token: masterToken,
-          characterId
+          characterId,
+          imageUrl: character?.image || null
         });
         if (!removed) throw new Error('Acesso do mestre expirado.');
         characters = characters.filter(character => character.id !== String(characterId));
@@ -459,10 +463,14 @@
       clearPageMessage();
 
       try {
+        const imageUrls = characters
+          .filter(character => character.category === String(categoryId))
+          .map(character => character.image);
         const removed = await deleteCategory({
           rpgId,
           token: masterToken,
-          categoryId
+          categoryId,
+          imageUrls
         });
         if (!removed) throw new Error('Acesso do mestre expirado.');
         characters = await loadCharacters(rpgId, role === 'master' ? masterToken : null);

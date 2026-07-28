@@ -310,6 +310,158 @@ async function deleteUploadedDriveFile(fileId: string) {
   return true;
 }
 
+function managedCharacterFileNames(
+  campaignId: string,
+  imageUrls: string[],
+) {
+  const endpoint = new URL(requiredSecret("IMAGEKIT_URL_ENDPOINT"));
+  const endpointPath = endpoint.pathname.replace(/\/+$/, "");
+  const expectedPath =
+    `${endpointPath}/portal-rpg/${sanitizeName(campaignId)}/character/`
+      .replace(/\/{2,}/g, "/");
+  const names = new Set<string>();
+
+  for (const value of imageUrls) {
+    try {
+      const imageUrl = new URL(String(value || "").trim());
+      const decodedPath = decodeURIComponent(imageUrl.pathname);
+      if (
+        imageUrl.protocol !== "https:" ||
+        imageUrl.origin !== endpoint.origin ||
+        !decodedPath.startsWith(expectedPath)
+      ) {
+        continue;
+      }
+
+      const name = decodedPath.split("/").pop()?.trim();
+      if (name) names.add(name);
+    } catch {
+      // Links antigos ou externos não possuem arquivos gerenciados para excluir.
+    }
+  }
+
+  return names;
+}
+
+function characterUploadStem(fileName: string) {
+  return fileName.match(/^(.*-character-\d+)/)?.[1] || "";
+}
+
+async function deleteImageKitCharacterFiles(
+  campaignId: string,
+  targetNames: Set<string>,
+) {
+  if (!targetNames.size) return 0;
+
+  const privateKey = requiredSecret("IMAGEKIT_PRIVATE_KEY");
+  const authorization = `Basic ${btoa(`${privateKey}:`)}`;
+  const query = new URLSearchParams({
+    path: `/portal-rpg/${sanitizeName(campaignId)}/character/`,
+    type: "file",
+    limit: "1000",
+  });
+  const response = await fetch(
+    `https://api.imagekit.io/v1/files?${query.toString()}`,
+    {
+      headers: {
+        authorization,
+        accept: "application/json",
+      },
+    },
+  );
+  const files = await response.json().catch(() => []);
+  if (!response.ok) {
+    throw new Error(
+      files?.message || "Não foi possível localizar a imagem do personagem.",
+    );
+  }
+
+  const fileIds = (Array.isArray(files) ? files : [])
+    .filter((file) => targetNames.has(String(file?.name || "")))
+    .map((file) => String(file.fileId))
+    .filter(Boolean);
+
+  await Promise.all(fileIds.map(async (fileId) => {
+    const deleteResponse = await fetch(
+      `https://api.imagekit.io/v1/files/${encodeURIComponent(fileId)}`,
+      {
+        method: "DELETE",
+        headers: {
+          authorization,
+          accept: "application/json",
+        },
+      },
+    );
+    if (!deleteResponse.ok && deleteResponse.status !== 404) {
+      throw new Error("Não foi possível remover a imagem do personagem.");
+    }
+  }));
+
+  return fileIds.length;
+}
+
+async function deleteDriveCharacterFiles(
+  campaignId: string,
+  targetNames: Set<string>,
+) {
+  const targetStems = new Set(
+    [...targetNames].map(characterUploadStem).filter(Boolean),
+  );
+  if (!targetStems.size) return 0;
+
+  const accessToken = await getGoogleAccessToken();
+  const folderId = requiredSecret("GOOGLE_DRIVE_FOLDER_ID");
+  const prefix = `${sanitizeName(campaignId)}-character-`;
+  const query = new URLSearchParams({
+    q: `'${folderId}' in parents and name contains '${prefix}' and trashed = false`,
+    pageSize: "1000",
+    fields: "files(id,name)",
+  });
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files?${query.toString()}`,
+    {
+      headers: { authorization: `Bearer ${accessToken}` },
+    },
+  );
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      result.error?.message || "Não foi possível localizar o backup do personagem.",
+    );
+  }
+
+  const files = (Array.isArray(result.files) ? result.files : [])
+    .filter((file) => targetStems.has(characterUploadStem(String(file.name || ""))));
+
+  await Promise.all(files.map(async (file) => {
+    const deleteResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(file.id)}`,
+      {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${accessToken}` },
+      },
+    );
+    if (!deleteResponse.ok && deleteResponse.status !== 404) {
+      throw new Error("Não foi possível remover o backup do personagem.");
+    }
+  }));
+
+  return files.length;
+}
+
+async function deleteCharacterMediaFiles(
+  campaignId: string,
+  imageUrls: string[],
+) {
+  const targetNames = managedCharacterFileNames(campaignId, imageUrls);
+  const [imagekitDeleted, driveDeleted] = await Promise.all([
+    deleteImageKitCharacterFiles(campaignId, targetNames),
+    deleteDriveCharacterFiles(campaignId, targetNames),
+  ]);
+
+  return { imagekitDeleted, driveDeleted };
+}
+
 async function deleteDriveCampaignFiles(campaignId: string) {
   const accessToken = await getGoogleAccessToken();
   const folderId = requiredSecret("GOOGLE_DRIVE_FOLDER_ID");
@@ -364,7 +516,11 @@ Deno.serve(async (req) => {
     if (contentType.includes("application/json")) {
       const payload = await req.json();
       const action = String(payload?.action || "");
-      if (!["delete-campaign", "delete-upload"].includes(action)) {
+      if (![
+        "delete-campaign",
+        "delete-upload",
+        "delete-character-media",
+      ].includes(action)) {
         return json(req, { error: "Ação inválida." }, 400);
       }
 
@@ -398,6 +554,17 @@ Deno.serve(async (req) => {
           imagekitDeleted,
           driveDeleted,
         });
+      }
+
+      if (action === "delete-character-media") {
+        const imageUrls = Array.isArray(payload.imageUrls)
+          ? payload.imageUrls
+            .map((value: unknown) => String(value || "").trim())
+            .filter(Boolean)
+            .slice(0, 1000)
+          : [];
+        const deleted = await deleteCharacterMediaFiles(campaignId, imageUrls);
+        return json(req, { success: true, ...deleted });
       }
 
       const [imagekitDeleted, driveDeleted] = await Promise.all([

@@ -126,3 +126,38 @@ async function deleteUploadedMedia({
 
   return payload;
 }
+
+
+async function deleteCharacterMedia({ rpgId, token, imageUrls = [] }) {
+  const uniqueUrls = [...new Set(
+    imageUrls.map(value => String(value || '').trim()).filter(Boolean)
+  )];
+
+  if (!uniqueUrls.length) {
+    return { success: true, imagekitDeleted: 0, driveDeleted: 0 };
+  }
+
+  const response = await fetch(MEDIA_UPLOAD_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      apikey: window.SUPABASE_CONFIG.anonKey,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      action: 'delete-character-media',
+      campaignId: String(rpgId),
+      masterToken: String(token || ''),
+      imageUrls: uniqueUrls
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      payload.error ||
+      'Não foi possível remover as imagens dos personagens.'
+    );
+  }
+
+  return payload;
+}
