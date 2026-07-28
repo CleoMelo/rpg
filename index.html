@@ -9,7 +9,10 @@
 <body>
   <header class="site-header">
     <a class="brand" href="index.html">ARQUIVO <span>RPG</span></a>
-    <nav class="nav-links"><a href="#campanhas">Campanhas</a></nav>
+    <nav class="nav-links">
+      <a href="#campanhas">Campanhas</a>
+      <button id="openCreateRpg" class="nav-button" type="button">+ Criar campanha</button>
+    </nav>
   </header>
 
   <main class="page-shell">
@@ -18,38 +21,172 @@
         <span class="eyebrow">Portal de campanhas</span>
         <h1>Escolha seu mundo.</h1>
         <p class="lead">Acesse personagens, criaturas, aliados e informações organizadas de cada mesa de RPG.</p>
-        <a class="btn" href="#campanhas">Ver RPGs disponíveis</a>
+        <div class="hero-actions">
+          <a class="btn" href="#campanhas">Ver RPGs disponíveis</a>
+          <button id="heroCreateRpg" class="btn secondary" type="button">Criar nova campanha</button>
+        </div>
       </div>
     </section>
 
     <section id="campanhas">
-      <div class="section-title">
-        <h2>RPGs disponíveis</h2>
-        <p>Selecione uma campanha para entrar.</p>
+      <div class="section-title split-title">
+        <div>
+          <h2>RPGs disponíveis</h2>
+          <p>Selecione uma campanha para entrar.</p>
+        </div>
+        <button id="sectionCreateRpg" class="btn" type="button">+ Nova campanha</button>
       </div>
       <div id="rpgGrid" class="grid rpg-grid"></div>
     </section>
   </main>
 
+  <div id="rpgModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="rpgModalTitle">
+    <section class="card modal">
+      <div class="modal-header">
+        <div>
+          <span class="eyebrow">Nova aventura</span>
+          <h2 id="rpgModalTitle">Criar campanha</h2>
+        </div>
+        <button id="closeRpgModal" class="close-button" type="button" aria-label="Fechar">×</button>
+      </div>
+
+      <form id="rpgForm">
+        <div class="form-group">
+          <label for="rpgName">Nome da campanha</label>
+          <input id="rpgName" maxlength="70" required placeholder="Ex.: As Crônicas de Eldoria">
+        </div>
+
+        <div class="form-group">
+          <label for="rpgDescription">Descrição</label>
+          <textarea id="rpgDescription" rows="3" maxlength="220" placeholder="Uma breve descrição da campanha"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="rpgImage">Link da imagem de fundo</label>
+          <input id="rpgImage" type="url" required placeholder="https://i.imgur.com/sua-imagem.jpg">
+          <small>Use um link direto de imagem terminado em .jpg, .png, .webp ou similar.</small>
+        </div>
+
+        <div id="imagePreview" class="campaign-preview">
+          <span>A prévia da imagem aparecerá aqui.</span>
+        </div>
+
+        <p id="rpgMessage" class="message" aria-live="polite"></p>
+        <div class="form-actions">
+          <button id="cancelRpg" class="btn secondary" type="button">Cancelar</button>
+          <button class="btn" type="submit">Criar campanha</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
   <footer class="footer">Portal de RPGs — projeto personalizável</footer>
   <script src="data.js"></script>
   <script>
     const grid = document.getElementById('rpgGrid');
-    RPGS.forEach(rpg => {
-      const card = document.createElement('article');
-      card.className = 'card rpg-card';
-      card.style.backgroundImage = `url('${rpg.image}')`;
-      card.innerHTML = `
-        <h3>${rpg.name}</h3>
-        <p>${rpg.description}</p>
-        <button class="btn" data-rpg="${rpg.id}">Entrar na campanha</button>
-      `;
-      card.querySelector('button').addEventListener('click', () => {
-        setSelectedRpg(rpg.id);
-        location.href = `acesso.html?rpg=${encodeURIComponent(rpg.id)}`;
+    const modal = document.getElementById('rpgModal');
+    const form = document.getElementById('rpgForm');
+    const imageInput = document.getElementById('rpgImage');
+    const preview = document.getElementById('imagePreview');
+    const message = document.getElementById('rpgMessage');
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>'"]/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      })[char]);
+    }
+
+    function renderRpgs() {
+      grid.innerHTML = '';
+
+      RPGS.forEach(rpg => {
+        const card = document.createElement('article');
+        card.className = 'card rpg-card';
+        card.style.backgroundImage = `url("${rpg.image.replace(/"/g, '%22')}")`;
+        card.innerHTML = `
+          ${rpg.custom ? `<button class="campaign-delete" type="button" title="Excluir campanha" aria-label="Excluir ${escapeHtml(rpg.name)}">×</button>` : ''}
+          <h3>${escapeHtml(rpg.name)}</h3>
+          <p>${escapeHtml(rpg.description)}</p>
+          <button class="btn enter-campaign" type="button">Entrar na campanha</button>
+        `;
+
+        card.querySelector('.enter-campaign').addEventListener('click', () => {
+          setSelectedRpg(rpg.id);
+          location.href = `acesso.html?rpg=${encodeURIComponent(rpg.id)}`;
+        });
+
+        const deleteButton = card.querySelector('.campaign-delete');
+        if (deleteButton) {
+          deleteButton.addEventListener('click', () => {
+            if (!confirm(`Excluir a campanha "${rpg.name}" e seus personagens salvos neste navegador?`)) return;
+            deleteRpg(rpg.id);
+            renderRpgs();
+          });
+        }
+
+        grid.appendChild(card);
       });
-      grid.appendChild(card);
+    }
+
+    function openModal() {
+      modal.classList.add('open');
+      document.body.classList.add('modal-open');
+      document.getElementById('rpgName').focus();
+    }
+
+    function closeModal() {
+      modal.classList.remove('open');
+      document.body.classList.remove('modal-open');
+      form.reset();
+      message.textContent = '';
+      message.className = 'message';
+      preview.style.backgroundImage = '';
+      preview.classList.remove('has-image');
+      preview.innerHTML = '<span>A prévia da imagem aparecerá aqui.</span>';
+    }
+
+    ['openCreateRpg', 'heroCreateRpg', 'sectionCreateRpg'].forEach(id => {
+      document.getElementById(id).addEventListener('click', openModal);
     });
+    document.getElementById('closeRpgModal').addEventListener('click', closeModal);
+    document.getElementById('cancelRpg').addEventListener('click', closeModal);
+    modal.addEventListener('click', event => { if (event.target === modal) closeModal(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') closeModal(); });
+
+    imageInput.addEventListener('input', () => {
+      const url = imageInput.value.trim();
+      if (!url) {
+        preview.style.backgroundImage = '';
+        preview.classList.remove('has-image');
+        preview.innerHTML = '<span>A prévia da imagem aparecerá aqui.</span>';
+        return;
+      }
+      preview.innerHTML = '';
+      preview.style.backgroundImage = `linear-gradient(rgba(0,0,0,.12), rgba(0,0,0,.65)), url("${url.replace(/"/g, '%22')}")`;
+      preview.classList.add('has-image');
+    });
+
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      message.textContent = '';
+
+      const name = document.getElementById('rpgName').value.trim();
+      const description = document.getElementById('rpgDescription').value.trim();
+      const image = imageInput.value.trim();
+
+      if (!name || !image) {
+        message.textContent = 'Preencha o nome e o link da imagem.';
+        message.className = 'message error';
+        return;
+      }
+
+      createRpg({ name, description, image });
+      renderRpgs();
+      closeModal();
+      document.getElementById('campanhas').scrollIntoView({ behavior: 'smooth' });
+    });
+
+    renderRpgs();
   </script>
 </body>
 </html>

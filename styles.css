@@ -244,3 +244,70 @@ small, .muted { color: var(--muted); }
   .role-panel { padding: 24px; }
   .page-shell { padding-top: 34px; }
 }
+
+/* Criação e gerenciamento de campanhas */
+body.modal-open { overflow: hidden; }
+.nav-button {
+  border: 1px solid rgba(139,92,246,.5);
+  border-radius: 10px;
+  padding: 9px 13px;
+  background: rgba(139,92,246,.14);
+  color: #e5dcff;
+  font-weight: 800;
+}
+.nav-button:hover { background: rgba(139,92,246,.25); }
+.hero-actions, .form-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.split-title {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+}
+.rpg-card h3 { font-size: 1.45rem; margin-bottom: 8px; }
+.campaign-delete {
+  position: absolute;
+  z-index: 3;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255,255,255,.25);
+  border-radius: 999px;
+  background: rgba(8,10,15,.72);
+  color: #fff;
+  font-size: 1.35rem;
+  line-height: 1;
+  backdrop-filter: blur(8px);
+}
+.campaign-delete:hover { background: var(--danger); }
+.campaign-preview {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  margin: 6px 0 18px;
+  padding: 20px;
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+  color: var(--muted);
+  text-align: center;
+  background-size: cover;
+  background-position: center;
+}
+.campaign-preview.has-image {
+  border-style: solid;
+  min-height: 220px;
+}
+.form-actions { justify-content: flex-end; margin-top: 10px; }
+.modal h2 { margin: 10px 0 0; }
+
+@media (max-width: 680px) {
+  .split-title { align-items: stretch; flex-direction: column; }
+  .split-title .btn { width: 100%; }
+  .hero-actions .btn { width: 100%; }
+  .form-actions .btn { flex: 1; }
+}
