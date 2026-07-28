@@ -391,7 +391,9 @@
         <div class="character-body">
           ${role === 'master' && character.visible === false ? '<span class="visibility-badge">Somente para o mestre</span>' : ''}
           <h3>${escapeHtml(character.name)}</h3>
-          <p>${escapeHtml(character.description || '')}</p>
+          ${String(character.description || '').trim()
+            ? `<p>${escapeHtml(character.description)}</p>`
+            : ''}
           ${role === 'master' ? `
             <div class="character-actions">
               <button class="btn secondary" type="button" data-toggle-visibility="${escapeHtml(character.id)}">
