@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Portal de RPGs</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html">ARQUIVO <span>RPG</span></a>
+    <nav class="nav-links"><a href="#campanhas">Campanhas</a></nav>
+  </header>
+
+  <main class="page-shell">
+    <section class="hero">
+      <div class="hero-content">
+        <span class="eyebrow">Portal de campanhas</span>
+        <h1>Escolha seu mundo.</h1>
+        <p class="lead">Acesse personagens, criaturas, aliados e informações organizadas de cada mesa de RPG.</p>
+        <a class="btn" href="#campanhas">Ver RPGs disponíveis</a>
+      </div>
+    </section>
+
+    <section id="campanhas">
+      <div class="section-title">
+        <h2>RPGs disponíveis</h2>
+        <p>Selecione uma campanha para entrar.</p>
+      </div>
+      <div id="rpgGrid" class="grid rpg-grid"></div>
+    </section>
+  </main>
+
+  <footer class="footer">Portal de RPGs — projeto personalizável</footer>
+  <script src="data.js"></script>
+  <script>
+    const grid = document.getElementById('rpgGrid');
+    RPGS.forEach(rpg => {
+      const card = document.createElement('article');
+      card.className = 'card rpg-card';
+      card.style.backgroundImage = `url('${rpg.image}')`;
+      card.innerHTML = `
+        <h3>${rpg.name}</h3>
+        <p>${rpg.description}</p>
+        <button class="btn" data-rpg="${rpg.id}">Entrar na campanha</button>
+      `;
+      card.querySelector('button').addEventListener('click', () => {
+        setSelectedRpg(rpg.id);
+        location.href = `acesso.html?rpg=${encodeURIComponent(rpg.id)}`;
+      });
+      grid.appendChild(card);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Categorias</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html">ARQUIVO <span>RPG</span></a>
+    <nav class="nav-links">
+      <a id="changeAccess" href="#">Trocar acesso</a>
+      <a href="index.html">Trocar campanha</a>
+    </nav>
+  </header>
+
+  <main class="page-shell">
+    <section class="section-title">
+      <span class="eyebrow" id="roleBadge">Acesso</span>
+      <h1 id="campaignName" style="font-size:clamp(2.4rem,6vw,4.6rem)">Campanha</h1>
+      <p>Selecione uma categoria para visualizar os personagens.</p>
+    </section>
+
+    <section>
+      <div id="categoryGrid" class="grid category-grid"></div>
+    </section>
+
+    <section id="charactersSection" style="margin-top:54px">
+      <div class="toolbar">
+        <div>
+          <h2 id="selectedCategoryTitle">Selecione uma categoria</h2>
+          <p id="selectedCategoryDescription" class="muted"></p>
+        </div>
+        <button id="addCharacterButton" class="btn" style="display:none">+ Adicionar personagem</button>
+      </div>
+      <div id="characterGrid" class="grid character-grid"></div>
+    </section>
+  </main>
+
+  <div id="characterModal" class="modal-backdrop">
+    <section class="card modal">
+      <div class="modal-header">
+        <h2>Novo personagem</h2>
+        <button class="close-button" id="closeModal" aria-label="Fechar">×</button>
+      </div>
+      <form id="characterForm">
+        <div class="form-group">
+          <label for="characterName">Nome</label>
+          <input id="characterName" required placeholder="Nome do personagem">
+        </div>
+        <div class="form-group">
+          <label for="characterCategory">Categoria</label>
+          <select id="characterCategory" required></select>
+        </div>
+        <div class="form-group">
+          <label for="characterImage">URL da imagem no Imgur</label>
+          <input id="characterImage" type="url" required placeholder="https://i.imgur.com/exemplo.jpg">
+          <small>Use o link direto da imagem, normalmente iniciado por i.imgur.com.</small>
+        </div>
+        <div class="form-group">
+          <label for="characterDescription">Descrição</label>
+          <textarea id="characterDescription" rows="4" placeholder="Resumo do personagem"></textarea>
+        </div>
+        <button class="btn full" type="submit">Salvar personagem</button>
+      </form>
+    </section>
+  </div>
+
+  <script src="data.js"></script>
+  <script>
+    const rpgId = getSelectedRpg();
+    const role = sessionStorage.getItem('role');
+    if (!role) location.href = `acesso.html?rpg=${encodeURIComponent(rpgId)}`;
+
+    const rpg = RPGS.find(item => item.id === rpgId) || RPGS[0];
+    let selectedCategory = null;
+    let characters = getCharacters(rpgId);
+
+    const categoryGrid = document.getElementById('categoryGrid');
+    const characterGrid = document.getElementById('characterGrid');
+    const modal = document.getElementById('characterModal');
+    const categorySelect = document.getElementById('characterCategory');
+
+    document.getElementById('campaignName').textContent = rpg.name;
+    document.getElementById('roleBadge').textContent = role === 'master' ? 'Acesso de mestre' : 'Acesso de jogador';
+    document.getElementById('changeAccess').href = `acesso.html?rpg=${encodeURIComponent(rpgId)}`;
+
+    if (role === 'master') document.getElementById('addCharacterButton').style.display = 'inline-flex';
+
+    CATEGORIES.forEach(category => {
+      const option = document.createElement('option');
+      option.value = category.id;
+      option.textContent = category.name;
+      categorySelect.appendChild(option);
+
+      const button = document.createElement('button');
+      button.className = 'category-button';
+      button.dataset.category = category.id;
+      button.innerHTML = `<span class="category-icon">${category.icon}</span><div><strong>${category.name}</strong><p class="muted">${category.description}</p></div>`;
+      button.onclick = () => selectCategory(category.id);
+      categoryGrid.appendChild(button);
+    });
+
+    function selectCategory(categoryId) {
+      selectedCategory = categoryId;
+      const category = CATEGORIES.find(item => item.id === categoryId);
+      document.querySelectorAll('.category-button').forEach(btn => btn.classList.toggle('active', btn.dataset.category === categoryId));
+      document.getElementById('selectedCategoryTitle').textContent = category.name;
+      document.getElementById('selectedCategoryDescription').textContent = category.description;
+      categorySelect.value = categoryId;
+      renderCharacters();
+      document.getElementById('charactersSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function renderCharacters() {
+      characterGrid.innerHTML = '';
+      if (!selectedCategory) {
+        characterGrid.innerHTML = '<div class="empty-state">Escolha uma categoria acima.</div>';
+        return;
+      }
+      const filtered = characters.filter(character => character.category === selectedCategory);
+      if (!filtered.length) {
+        characterGrid.innerHTML = '<div class="empty-state">Nenhum personagem cadastrado nesta categoria.</div>';
+        return;
+      }
+      filtered.forEach(character => {
+        const card = document.createElement('article');
+        card.className = 'card character-card';
+        card.innerHTML = `
+          <img src="${character.image}" alt="${character.name}" onerror="this.src='https://placehold.co/600x750?text=Imagem+indisponível'">
+          <div class="character-body">
+            <h3>${character.name}</h3>
+            <p>${character.description || 'Sem descrição.'}</p>
+            ${role === 'master' ? `<div class="character-actions"><button class="btn danger" data-remove="${character.id}">Remover</button></div>` : ''}
+          </div>
+        `;
+        const removeButton = card.querySelector('[data-remove]');
+        if (removeButton) removeButton.onclick = () => removeCharacter(character.id);
+        characterGrid.appendChild(card);
+      });
+    }
+
+    function removeCharacter(id) {
+      characters = characters.filter(character => character.id !== id);
+      saveCharacters(rpgId, characters);
+      renderCharacters();
+    }
+
+    document.getElementById('addCharacterButton').onclick = () => {
+      if (selectedCategory) categorySelect.value = selectedCategory;
+      modal.classList.add('open');
+    };
+    document.getElementById('closeModal').onclick = () => modal.classList.remove('open');
+    modal.onclick = event => { if (event.target === modal) modal.classList.remove('open'); };
+
+    document.getElementById('characterForm').addEventListener('submit', event => {
+      event.preventDefault();
+      const character = {
+        id: crypto.randomUUID(),
+        name: document.getElementById('characterName').value.trim(),
+        category: categorySelect.value,
+        image: document.getElementById('characterImage').value.trim(),
+        description: document.getElementById('characterDescription').value.trim()
+      };
+      characters.push(character);
+      saveCharacters(rpgId, characters);
+      selectedCategory = character.category;
+      event.target.reset();
+      modal.classList.remove('open');
+      selectCategory(selectedCategory);
+    });
+
+    renderCharacters();
+  </script>
+</body>
+</html>
