@@ -72,9 +72,12 @@
         </div>
 
         <div class="form-group">
-          <label for="rpgImage">Link da imagem de fundo</label>
+          <label for="rpgImage">Link direto da imagem de fundo no Imgur</label>
           <input id="rpgImage" type="url" required placeholder="https://i.imgur.com/sua-imagem.jpg">
-          <small>Use um link direto de imagem terminado em .jpg, .png, .webp ou similar.</small>
+          <small>
+            <a class="inline-link" href="https://imgur.com/upload" target="_blank" rel="noopener noreferrer">Abrir upload do Imgur ↗</a>
+            — após enviar, clique com o botão direito na imagem e escolha <strong>Copiar endereço da imagem</strong>.
+          </small>
         </div>
 
         <div id="imagePreview" class="campaign-preview">
@@ -213,8 +216,8 @@
       } catch (error) {
         console.error(error);
         message.textContent = error?.code === 'PGRST202'
-          ? 'Execute a migração de senha no Supabase antes de criar campanhas.'
-          : 'Não foi possível salvar. Confira a configuração do Supabase e as políticas RLS.';
+          ? 'Execute a atualização SQL no Supabase antes de criar campanhas.'
+          : error?.message || 'Não foi possível salvar a campanha.';
         message.className = 'message error';
       } finally {
         submitButton.disabled = false;
