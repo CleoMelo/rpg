@@ -141,6 +141,16 @@
       })[char]);
     }
 
+    function formatSupabaseError(error, fallback) {
+      const parts = [
+        error?.message,
+        error?.details,
+        error?.hint,
+        error?.code ? `Código: ${error.code}` : ''
+      ].filter(Boolean);
+      return parts.length ? parts.join(' — ') : fallback;
+    }
+
     function showPageMessage(text, type = 'error') {
       pageMessage.className = `message ${type}`;
       pageMessage.textContent = text;
@@ -410,7 +420,10 @@
       } catch (error) {
         console.error(error);
         formMessage.className = 'message error';
-        formMessage.textContent = error?.message || 'Não foi possível salvar o personagem.';
+        formMessage.textContent = formatSupabaseError(
+          error,
+          'Não foi possível salvar o personagem.'
+        );
       } finally {
         submitButton.disabled = false;
         submitButton.textContent = 'Salvar personagem';
