@@ -453,7 +453,9 @@ async function updateSubcategory({
 async function deleteSubcategory({
   rpgId,
   token,
-  subcategoryId
+  subcategoryId,
+  deleteCharacters = false,
+  imageUrls = []
 }) {
   if (isDefaultRpg(rpgId)) {
     const removed = SUBCATEGORIES.find(
@@ -471,21 +473,37 @@ async function deleteSubcategory({
         .forEach(item => { item.order -= 1; });
     }
     saveLocalSubcategories(rpgId, SUBCATEGORIES);
-    const characters = getLocalCharacters(rpgId).map(character => ({
-      ...character,
-      subcategory: character.subcategory === String(subcategoryId)
-        ? null
-        : character.subcategory || null
-    }));
+
+    const savedCharacters = getLocalCharacters(rpgId);
+    const characters = deleteCharacters
+      ? savedCharacters.filter(
+          character =>
+            character.subcategory !== String(subcategoryId)
+        )
+      : savedCharacters.map(character => ({
+          ...character,
+          subcategory: character.subcategory === String(subcategoryId)
+            ? null
+            : character.subcategory || null
+        }));
     saveLocalCharacters(rpgId, characters);
     return true;
+  }
+
+  if (deleteCharacters && imageUrls.length) {
+    await deleteCharacterMedia({
+      rpgId,
+      token,
+      imageUrls
+    });
   }
 
   const client = getSupabaseClient();
   const { data, error } = await client.rpc('excluir_subcategoria', {
     p_campanha_id: String(rpgId),
     p_subcategoria_id: String(subcategoryId),
-    p_token: token
+    p_token: token,
+    p_excluir_personagens: Boolean(deleteCharacters)
   });
 
   if (error) throw error;

@@ -186,7 +186,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=20260728-4"></script>
-  <script src="data.js?v=20260728-16"></script>
+  <script src="data.js?v=20260728-17"></script>
   <script src="media-upload.js?v=20260728-6"></script>
   <script>
     const rpgId = getSelectedRpg();
@@ -391,7 +391,7 @@
         <div class="character-body">
           ${role === 'master' && character.visible === false ? '<span class="visibility-badge">Somente para o mestre</span>' : ''}
           <h3>${escapeHtml(character.name)}</h3>
-          <p>${escapeHtml(character.description || 'Sem descrição.')}</p>
+          <p>${escapeHtml(character.description || '')}</p>
           ${role === 'master' ? `
             <div class="character-actions">
               <button class="btn secondary" type="button" data-toggle-visibility="${escapeHtml(character.id)}">
@@ -647,8 +647,18 @@
         item => item.id === String(subcategoryId)
       );
       if (!subcategory || !confirm(
-        `Excluir o tier "${subcategory.name}"? Os personagens serão movidos para Outros.`
+        `Excluir o tier "${subcategory.name}"?`
       )) return;
+
+      const tierCharacters = characters.filter(
+        character =>
+          character.subcategory === String(subcategoryId)
+      );
+      const deleteCharacters = tierCharacters.length > 0 && confirm(
+        `Este tier possui ${tierCharacters.length} personagem(ns).\n\n` +
+        'OK: apagar também os personagens e suas imagens.\n' +
+        'Cancelar: manter os personagens e movê-los para Outros.'
+      );
 
       button.disabled = true;
       clearPageMessage();
@@ -657,18 +667,34 @@
         const removed = await deleteSubcategory({
           rpgId,
           token: masterToken,
-          subcategoryId
+          subcategoryId,
+          deleteCharacters,
+          imageUrls: deleteCharacters
+            ? tierCharacters.map(character => character.image)
+            : []
         });
         if (!removed) throw new Error('Acesso do mestre expirado.');
 
-        characters = characters.map(character => ({
-          ...character,
-          subcategory: character.subcategory === String(subcategoryId)
-            ? null
-            : character.subcategory
-        }));
+        characters = deleteCharacters
+          ? characters.filter(
+              character =>
+                character.subcategory !== String(subcategoryId)
+            )
+          : characters.map(character => ({
+              ...character,
+              subcategory: character.subcategory === String(subcategoryId)
+                ? null
+                : character.subcategory
+            }));
+
         populateSubcategorySelect(selectedCategory);
         renderCharacters();
+        showPageMessage(
+          deleteCharacters
+            ? 'Tier, personagens e imagens excluídos.'
+            : 'Tier excluído. Os personagens foram movidos para Outros.',
+          'success'
+        );
       } catch (error) {
         console.error(error);
         showPageMessage(formatSupabaseError(
