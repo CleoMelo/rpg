@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Categorias</title>
-  <link rel="stylesheet" href="styles.css?v=20260728-11">
+  <link rel="stylesheet" href="styles.css?v=20260728-12">
 </head>
 <body>
   <header class="site-header">
@@ -378,8 +378,11 @@
     }
 
     function buildCharacterCard(character) {
+      const description = String(character.description || '').trim();
       const card = document.createElement('article');
-      card.className = 'card character-card';
+      card.className = role === 'player'
+        ? 'card character-card player-character-card'
+        : 'card character-card master-character-card';
       card.innerHTML = `
         ${role === 'master' ? `
           <div class="entity-controls character-entity-controls">
@@ -391,9 +394,11 @@
         <div class="character-body">
           ${role === 'master' && character.visible === false ? '<span class="visibility-badge">Somente para o mestre</span>' : ''}
           <h3>${escapeHtml(character.name)}</h3>
-          ${String(character.description || '').trim()
-            ? `<p>${escapeHtml(character.description)}</p>`
-            : ''}
+          ${description
+            ? `<p>${escapeHtml(description)}</p>`
+            : role === 'player'
+              ? '<p class="empty-description" aria-hidden="true"></p>'
+              : ''}
           ${role === 'master' ? `
             <div class="character-actions">
               <button class="btn secondary" type="button" data-toggle-visibility="${escapeHtml(character.id)}">
