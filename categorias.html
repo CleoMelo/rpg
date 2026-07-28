@@ -67,13 +67,14 @@
     </section>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
   <script src="data.js"></script>
   <script>
     const rpgId = getSelectedRpg();
     const role = sessionStorage.getItem('role');
     if (!role) location.href = `acesso.html?rpg=${encodeURIComponent(rpgId)}`;
 
-    const rpg = RPGS.find(item => item.id === rpgId) || RPGS[0];
     let selectedCategory = null;
     let characters = getCharacters(rpgId);
 
@@ -82,7 +83,16 @@
     const modal = document.getElementById('characterModal');
     const categorySelect = document.getElementById('characterCategory');
 
-    document.getElementById('campaignName').textContent = rpg.name;
+    async function loadCampaignName() {
+      try {
+        const rpg = await getRpgById(rpgId);
+        document.getElementById('campaignName').textContent = rpg?.name || 'Campanha';
+      } catch (error) {
+        console.error(error);
+        document.getElementById('campaignName').textContent = 'Campanha';
+      }
+    }
+    loadCampaignName();
     document.getElementById('roleBadge').textContent = role === 'master' ? 'Acesso de mestre' : 'Acesso de jogador';
     document.getElementById('changeAccess').href = `acesso.html?rpg=${encodeURIComponent(rpgId)}`;
 
