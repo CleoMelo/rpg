@@ -346,6 +346,48 @@
       });
     }
 
+    function openCharacterEditor(characterId) {
+      const character = characters.find(item => item.id === String(characterId));
+      if (!character) return;
+
+      editingCharacterId = String(characterId);
+      const form = document.getElementById('characterForm');
+      form.reset();
+      document.getElementById('characterModalTitle').textContent = 'Editar personagem';
+      document.getElementById('characterName').value = character.name;
+      categorySelect.value = character.category;
+      document.getElementById('characterImage').value = character.image;
+      document.getElementById('characterVisible').checked = character.visible !== false;
+      document.getElementById('characterDescription').value = character.description || '';
+      form.querySelector('button[type="submit"]').textContent = 'Salvar alterações';
+      openModal(characterModal);
+    }
+
+    function openCategoryEditor(categoryId) {
+      const category = CATEGORIES.find(item => item.id === String(categoryId));
+      if (!category) return;
+
+      editingCategoryId = String(categoryId);
+      const form = document.getElementById('categoryForm');
+      form.reset();
+      document.getElementById('categoryModalTitle').textContent = 'Editar categoria';
+      document.getElementById('categoryName').value = category.name;
+      document.getElementById('categoryIcon').value = category.icon;
+      document.getElementById('categoryDescription').value = category.description || '';
+      form.querySelector('button[type="submit"]').textContent = 'Salvar alterações';
+      openModal(categoryModal);
+    }
+
+    function openCampaignEditor() {
+      if (!currentRpg?.custom) return;
+      const form = document.getElementById('campaignForm');
+      form.reset();
+      document.getElementById('campaignEditName').value = currentRpg.name;
+      document.getElementById('campaignEditDescription').value = currentRpg.description || '';
+      document.getElementById('campaignEditImage').value = currentRpg.image;
+      openModal(campaignModal);
+    }
+
     async function toggleCharacterVisibility(characterId, button) {
       const character = characters.find(item => item.id === String(characterId));
       if (!character) return;
@@ -430,13 +472,30 @@
         showPageMessage('Crie uma categoria antes de adicionar personagens.');
         return;
       }
+
+      editingCharacterId = null;
+      const form = document.getElementById('characterForm');
+      form.reset();
+      document.getElementById('characterModalTitle').textContent = 'Novo personagem';
+      form.querySelector('button[type="submit"]').textContent = 'Salvar personagem';
       if (selectedCategory) categorySelect.value = selectedCategory;
       openModal(characterModal);
     });
 
-    document.getElementById('addCategoryButton').addEventListener('click', () => openModal(categoryModal));
+    document.getElementById('addCategoryButton').addEventListener('click', () => {
+      editingCategoryId = null;
+      const form = document.getElementById('categoryForm');
+      form.reset();
+      document.getElementById('categoryModalTitle').textContent = 'Nova categoria';
+      form.querySelector('button[type="submit"]').textContent = 'Criar categoria';
+      openModal(categoryModal);
+    });
+
+    document.getElementById('editCampaignButton').addEventListener('click', openCampaignEditor);
+    document.getElementById('closeCampaignModal').addEventListener('click', () => closeModal(campaignModal));
     document.getElementById('closeCharacterModal').addEventListener('click', () => closeModal(characterModal));
     document.getElementById('closeCategoryModal').addEventListener('click', () => closeModal(categoryModal));
+    campaignModal.addEventListener('click', event => { if (event.target === campaignModal) closeModal(campaignModal); });
     characterModal.addEventListener('click', event => { if (event.target === characterModal) closeModal(characterModal); });
     categoryModal.addEventListener('click', event => { if (event.target === categoryModal) closeModal(categoryModal); });
 
@@ -451,7 +510,7 @@
       formMessage.textContent = '';
 
       try {
-        const character = await createCharacter({
+        const values = {
           rpgId,
           token: masterToken,
           name: document.getElementById('characterName').value,
@@ -459,11 +518,26 @@
           description: document.getElementById('characterDescription').value,
           image: document.getElementById('characterImage').value,
           visible: document.getElementById('characterVisible').checked
-        });
-        characters.push(character);
+        };
+
+        let character;
+        if (editingCharacterId) {
+          character = await updateCharacter({
+            ...values,
+            characterId: editingCharacterId
+          });
+          const index = characters.findIndex(item => item.id === editingCharacterId);
+          if (index >= 0) characters[index] = character;
+        } else {
+          character = await createCharacter(values);
+          characters.push(character);
+        }
+
         selectedCategory = character.category;
+        editingCharacterId = null;
         form.reset();
         closeModal(characterModal);
+        renderCategories();
         selectCategory(selectedCategory);
       } catch (error) {
         console.error(error);
@@ -488,13 +562,22 @@
       formMessage.textContent = '';
 
       try {
-        const category = await createCategory({
+        const values = {
           rpgId,
           token: masterToken,
           name: document.getElementById('categoryName').value,
           description: document.getElementById('categoryDescription').value,
           icon: document.getElementById('categoryIcon').value
-        });
+        };
+
+        const category = editingCategoryId
+          ? await updateCategory({
+              ...values,
+              categoryId: editingCategoryId
+            })
+          : await createCategory(values);
+
+        editingCategoryId = null;
         form.reset();
         closeModal(categoryModal);
         renderCategories();
@@ -505,6 +588,42 @@
         formMessage.textContent = error?.message || 'Não foi possível criar a categoria.';
       } finally {
         submitButton.disabled = false;
+      }
+    });
+
+    document.getElementById('campaignForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const submitButton = form.querySelector('button[type="submit"]');
+      const formMessage = document.getElementById('campaignMessage');
+      submitButton.disabled = true;
+      submitButton.textContent = 'Salvando...';
+      formMessage.className = 'message';
+      formMessage.textContent = '';
+
+      try {
+        const updated = await updateRpg({
+          id: rpgId,
+          token: masterToken,
+          name: document.getElementById('campaignEditName').value,
+          description: document.getElementById('campaignEditDescription').value,
+          image: document.getElementById('campaignEditImage').value
+        });
+        if (!updated) throw new Error('Esta campanha não pode ser editada.');
+        currentRpg = updated;
+        document.getElementById('campaignName').textContent = updated.name;
+        closeModal(campaignModal);
+        showPageMessage('Campanha atualizada.', 'success');
+      } catch (error) {
+        console.error(error);
+        formMessage.className = 'message error';
+        formMessage.textContent = formatSupabaseError(
+          error,
+          'Não foi possível editar a campanha.'
+        );
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Salvar alterações';
       }
     });
 
@@ -546,6 +665,7 @@
           document.getElementById('addCategoryButton').style.display = 'inline-flex';
           document.getElementById('addCharacterButton').style.display = 'inline-flex';
           if (currentRpg?.custom) {
+            document.getElementById('editCampaignButton').style.display = 'inline-flex';
             document.getElementById('deleteCampaignButton').style.display = 'inline-flex';
           }
         }
