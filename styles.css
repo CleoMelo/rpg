@@ -173,6 +173,13 @@ input, select, textarea {
 }
 input:focus, select:focus, textarea:focus { border-color: var(--accent-2); }
 small, .muted { color: var(--muted); }
+.inline-link {
+  color: var(--accent-2);
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.inline-link:hover { color: #a5f3fc; }
 .message { margin-top: 14px; min-height: 24px; font-weight: 700; }
 .message.error { color: #fca5a5; }
 .message.success { color: #86efac; }
@@ -233,19 +240,6 @@ small, .muted { color: var(--muted); }
   opacity: .6;
   transform: none;
 }
-input[type="file"] {
-  padding: 9px;
-}
-input[type="file"]::file-selector-button {
-  margin-right: 12px;
-  border: 0;
-  border-radius: 9px;
-  padding: 9px 12px;
-  background: var(--panel-2);
-  color: var(--text);
-  cursor: pointer;
-}
-
 .character-card { padding: 0; }
 .character-card img {
   width: 100%;
