@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Categorias</title>
-  <link rel="stylesheet" href="styles.css?v=20260728-10">
+  <link rel="stylesheet" href="styles.css?v=20260728-11">
 </head>
 <body>
   <header class="site-header">
@@ -42,7 +42,10 @@
           <h2 id="selectedCategoryTitle">Selecione uma categoria</h2>
           <p id="selectedCategoryDescription" class="muted"></p>
         </div>
-        <button id="addCharacterButton" class="btn" type="button" style="display:none">+ Adicionar personagem</button>
+        <div class="master-toolbar">
+          <button id="addSubcategoryButton" class="btn secondary" type="button" style="display:none">+ Criar tier</button>
+          <button id="addCharacterButton" class="btn" type="button" style="display:none">+ Adicionar personagem</button>
+        </div>
       </div>
       <div id="characterGrid" class="grid character-grid"></div>
     </section>
@@ -89,6 +92,13 @@
         <div class="form-group">
           <label for="characterCategory">Categoria</label>
           <select id="characterCategory" required></select>
+        </div>
+        <div class="form-group">
+          <label for="characterSubcategory">Tier / grupo</label>
+          <select id="characterSubcategory">
+            <option value="">Outros (sem tier)</option>
+          </select>
+          <small>Use os tiers para organizar líderes, funcionários e participantes.</small>
         </div>
         <div class="form-group">
           <label for="characterImage">Imagem do personagem</label>
@@ -138,9 +148,31 @@
     </section>
   </div>
 
+  <div id="subcategoryModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="subcategoryModalTitle">
+    <section class="card modal">
+      <div class="modal-header">
+        <h2 id="subcategoryModalTitle">Novo tier</h2>
+        <button class="close-button" id="closeSubcategoryModal" type="button" aria-label="Fechar">×</button>
+      </div>
+      <form id="subcategoryForm">
+        <div class="form-group">
+          <label for="subcategoryName">Nome do tier</label>
+          <input id="subcategoryName" maxlength="50" required placeholder="Ex.: Líderes">
+        </div>
+        <div class="form-group">
+          <label for="subcategoryOrder">Ordem de exibição</label>
+          <input id="subcategoryOrder" type="number" min="0" max="9999" required value="0">
+          <small>Valores menores aparecem primeiro.</small>
+        </div>
+        <p id="subcategoryMessage" class="message" aria-live="polite"></p>
+        <button class="btn full" type="submit">Salvar tier</button>
+      </form>
+    </section>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=20260728-4"></script>
-  <script src="data.js?v=20260728-12"></script>
+  <script src="data.js?v=20260728-13"></script>
   <script src="media-upload.js?v=20260728-6"></script>
   <script>
     const rpgId = getSelectedRpg();
@@ -156,13 +188,16 @@
     let currentRpg = null;
     let editingCategoryId = null;
     let editingCharacterId = null;
+    let editingSubcategoryId = null;
 
     const categoryGrid = document.getElementById('categoryGrid');
     const characterGrid = document.getElementById('characterGrid');
     const categorySelect = document.getElementById('characterCategory');
+    const subcategorySelect = document.getElementById('characterSubcategory');
     const campaignModal = document.getElementById('campaignModal');
     const characterModal = document.getElementById('characterModal');
     const categoryModal = document.getElementById('categoryModal');
+    const subcategoryModal = document.getElementById('subcategoryModal');
     const pageMessage = document.getElementById('pageMessage');
 
     function escapeHtml(value) {
@@ -211,6 +246,26 @@
         option.textContent = `${category.icon} ${category.name}`;
         categorySelect.appendChild(option);
       });
+    }
+
+    function populateSubcategorySelect(categoryId, selectedId = '') {
+      const categoryTiers = SUBCATEGORIES
+        .filter(item => item.category === String(categoryId))
+        .sort((left, right) => left.order - right.order);
+
+      subcategorySelect.innerHTML =
+        '<option value="">Outros (sem tier)</option>';
+
+      categoryTiers.forEach(subcategory => {
+        const option = document.createElement('option');
+        option.value = subcategory.id;
+        option.textContent = subcategory.name;
+        subcategorySelect.appendChild(option);
+      });
+
+      subcategorySelect.value = categoryTiers.some(
+        item => item.id === String(selectedId)
+      ) ? String(selectedId) : '';
     }
 
     function renderCategories() {
@@ -281,69 +336,159 @@
       document.getElementById('selectedCategoryTitle').textContent = category.name;
       document.getElementById('selectedCategoryDescription').textContent = category.description;
       categorySelect.value = selectedCategory;
+      populateSubcategorySelect(selectedCategory);
+      if (role === 'master') {
+        document.getElementById('addSubcategoryButton').style.display = 'inline-flex';
+      }
       renderCharacters();
       document.getElementById('charactersSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function buildCharacterCard(character) {
+      const card = document.createElement('article');
+      card.className = 'card character-card';
+      card.innerHTML = `
+        ${role === 'master' ? `
+          <div class="entity-controls character-entity-controls">
+            <button class="entity-icon-button edit" type="button" data-edit="${escapeHtml(character.id)}" title="Editar personagem" aria-label="Editar ${escapeHtml(character.name)}">✎</button>
+            <button class="entity-icon-button remove" type="button" data-remove="${escapeHtml(character.id)}" title="Excluir personagem" aria-label="Excluir ${escapeHtml(character.name)}">×</button>
+          </div>
+        ` : ''}
+        <img src="${escapeHtml(character.image)}" alt="${escapeHtml(character.name)}">
+        <div class="character-body">
+          ${role === 'master' && character.visible === false ? '<span class="visibility-badge">Somente para o mestre</span>' : ''}
+          <h3>${escapeHtml(character.name)}</h3>
+          <p>${escapeHtml(character.description || 'Sem descrição.')}</p>
+          ${role === 'master' ? `
+            <div class="character-actions">
+              <button class="btn secondary" type="button" data-toggle-visibility="${escapeHtml(character.id)}">
+                ${character.visible === false ? 'Mostrar aos jogadores' : 'Ocultar dos jogadores'}
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      card.querySelector('img').addEventListener('error', event => {
+        event.currentTarget.src =
+          'https://placehold.co/600x750?text=Imagem+indisponível';
+      }, { once: true });
+
+      card.querySelector('[data-edit]')?.addEventListener(
+        'click',
+        () => openCharacterEditor(character.id)
+      );
+      card.querySelector('[data-toggle-visibility]')?.addEventListener(
+        'click',
+        event => toggleCharacterVisibility(character.id, event.currentTarget)
+      );
+      card.querySelector('[data-remove]')?.addEventListener(
+        'click',
+        event => removeCharacterRecord(character.id, event.currentTarget)
+      );
+
+      return card;
     }
 
     function renderCharacters() {
       characterGrid.innerHTML = '';
 
       if (!selectedCategory) {
-        characterGrid.innerHTML = '<div class="empty-state">Escolha uma categoria acima.</div>';
+        characterGrid.innerHTML =
+          '<div class="empty-state">Escolha uma categoria acima.</div>';
         return;
       }
 
       const filtered = characters.filter(character =>
-        character.category === selectedCategory && (role === 'master' || character.visible !== false)
+        character.category === selectedCategory &&
+        (role === 'master' || character.visible !== false)
       );
-      if (!filtered.length) {
-        characterGrid.innerHTML = '<div class="empty-state">Nenhum personagem cadastrado nesta categoria.</div>';
+      const categoryTiers = SUBCATEGORIES
+        .filter(item => item.category === selectedCategory)
+        .sort((left, right) => left.order - right.order);
+      const tierIds = new Set(categoryTiers.map(item => item.id));
+      const groups = categoryTiers.map(tier => ({
+        tier,
+        characters: filtered.filter(
+          character => character.subcategory === tier.id
+        )
+      }));
+      const withoutTier = filtered.filter(
+        character => !character.subcategory ||
+          !tierIds.has(String(character.subcategory))
+      );
+
+      if (withoutTier.length || !categoryTiers.length) {
+        groups.push({ tier: null, characters: withoutTier });
+      }
+
+      const visibleGroups = role === 'master'
+        ? groups
+        : groups.filter(group => group.characters.length);
+
+      if (!visibleGroups.length) {
+        characterGrid.innerHTML =
+          '<div class="empty-state">Nenhum personagem cadastrado nesta categoria.</div>';
         return;
       }
 
-      filtered.forEach(character => {
-        const card = document.createElement('article');
-        card.className = 'card character-card';
-        card.innerHTML = `
-          ${role === 'master' ? `
-            <div class="entity-controls character-entity-controls">
-              <button class="entity-icon-button edit" type="button" data-edit="${escapeHtml(character.id)}" title="Editar personagem" aria-label="Editar ${escapeHtml(character.name)}">✎</button>
-              <button class="entity-icon-button remove" type="button" data-remove="${escapeHtml(character.id)}" title="Excluir personagem" aria-label="Excluir ${escapeHtml(character.name)}">×</button>
-            </div>
-          ` : ''}
-          <img src="${escapeHtml(character.image)}" alt="${escapeHtml(character.name)}">
-          <div class="character-body">
-            ${role === 'master' && character.visible === false ? '<span class="visibility-badge">Somente para o mestre</span>' : ''}
-            <h3>${escapeHtml(character.name)}</h3>
-            <p>${escapeHtml(character.description || 'Sem descrição.')}</p>
-            ${role === 'master' ? `
-              <div class="character-actions">
-                <button class="btn secondary" type="button" data-toggle-visibility="${escapeHtml(character.id)}">
-                  ${character.visible === false ? 'Mostrar aos jogadores' : 'Ocultar dos jogadores'}
-                </button>
-              </div>
-            ` : ''}
+      visibleGroups.forEach(group => {
+        const section = document.createElement('section');
+        section.className = 'tier-section';
+
+        const header = document.createElement('div');
+        header.className = 'tier-header';
+        header.innerHTML = `
+          <div>
+            <span class="tier-order">${group.tier ? `Tier ${group.tier.order}` : 'Sem tier'}</span>
+            <h3>${escapeHtml(group.tier?.name || 'Outros')}</h3>
           </div>
+          <span class="tier-count">${group.characters.length} personagem(ns)</span>
         `;
-        card.querySelector('img').addEventListener('error', event => {
-          event.currentTarget.src = 'https://placehold.co/600x750?text=Imagem+indisponível';
-        }, { once: true });
 
-        const editButton = card.querySelector('[data-edit]');
-        if (editButton) {
-          editButton.addEventListener('click', () => openCharacterEditor(character.id));
+        if (role === 'master' && group.tier) {
+          const controls = document.createElement('div');
+          controls.className = 'tier-controls';
+
+          const editButton = document.createElement('button');
+          editButton.className = 'entity-icon-button edit';
+          editButton.type = 'button';
+          editButton.title = 'Editar tier';
+          editButton.textContent = '✎';
+          editButton.addEventListener(
+            'click',
+            () => openSubcategoryEditor(group.tier.id)
+          );
+
+          const removeButton = document.createElement('button');
+          removeButton.className = 'entity-icon-button remove';
+          removeButton.type = 'button';
+          removeButton.title = 'Excluir tier';
+          removeButton.textContent = '×';
+          removeButton.addEventListener(
+            'click',
+            () => removeSubcategory(group.tier.id, removeButton)
+          );
+
+          controls.append(editButton, removeButton);
+          header.appendChild(controls);
         }
 
-        const visibilityButton = card.querySelector('[data-toggle-visibility]');
-        if (visibilityButton) {
-          visibilityButton.addEventListener('click', () => toggleCharacterVisibility(character.id, visibilityButton));
+        section.appendChild(header);
+
+        const grid = document.createElement('div');
+        grid.className = 'tier-character-grid';
+        if (group.characters.length) {
+          group.characters.forEach(character => {
+            grid.appendChild(buildCharacterCard(character));
+          });
+        } else {
+          grid.innerHTML =
+            '<div class="empty-state compact">Nenhum personagem neste tier.</div>';
         }
 
-        const removeButton = card.querySelector('[data-remove]');
-        if (removeButton) {
-          removeButton.addEventListener('click', () => removeCharacterRecord(character.id, removeButton));
-        }
-        characterGrid.appendChild(card);
+        section.appendChild(grid);
+        characterGrid.appendChild(section);
       });
     }
 
@@ -357,6 +502,7 @@
       document.getElementById('characterModalTitle').textContent = 'Editar personagem';
       document.getElementById('characterName').value = character.name;
       categorySelect.value = character.category;
+      populateSubcategorySelect(character.category, character.subcategory);
       document.getElementById('characterVisible').checked = character.visible !== false;
       document.getElementById('characterDescription').value = character.description || '';
       setFilePreview(
@@ -381,6 +527,58 @@
       document.getElementById('categoryDescription').value = category.description || '';
       form.querySelector('button[type="submit"]').textContent = 'Salvar alterações';
       openModal(categoryModal);
+    }
+
+    function openSubcategoryEditor(subcategoryId) {
+      const subcategory = SUBCATEGORIES.find(
+        item => item.id === String(subcategoryId)
+      );
+      if (!subcategory) return;
+
+      editingSubcategoryId = String(subcategoryId);
+      const form = document.getElementById('subcategoryForm');
+      form.reset();
+      document.getElementById('subcategoryModalTitle').textContent = 'Editar tier';
+      document.getElementById('subcategoryName').value = subcategory.name;
+      document.getElementById('subcategoryOrder').value = subcategory.order;
+      openModal(subcategoryModal);
+    }
+
+    async function removeSubcategory(subcategoryId, button) {
+      const subcategory = SUBCATEGORIES.find(
+        item => item.id === String(subcategoryId)
+      );
+      if (!subcategory || !confirm(
+        `Excluir o tier "${subcategory.name}"? Os personagens serão movidos para Outros.`
+      )) return;
+
+      button.disabled = true;
+      clearPageMessage();
+
+      try {
+        const removed = await deleteSubcategory({
+          rpgId,
+          token: masterToken,
+          subcategoryId
+        });
+        if (!removed) throw new Error('Acesso do mestre expirado.');
+
+        characters = characters.map(character => ({
+          ...character,
+          subcategory: character.subcategory === String(subcategoryId)
+            ? null
+            : character.subcategory
+        }));
+        populateSubcategorySelect(selectedCategory);
+        renderCharacters();
+      } catch (error) {
+        console.error(error);
+        showPageMessage(formatSupabaseError(
+          error,
+          'Não foi possível excluir o tier.'
+        ));
+        button.disabled = false;
+      }
     }
 
     function openCampaignEditor() {
@@ -500,7 +698,33 @@
         document.getElementById('characterImagePreview')
       );
       if (selectedCategory) categorySelect.value = selectedCategory;
+      populateSubcategorySelect(categorySelect.value);
       openModal(characterModal);
+    });
+
+    document.getElementById('addSubcategoryButton').addEventListener('click', () => {
+      if (!selectedCategory) {
+        showPageMessage('Selecione uma categoria antes de criar um tier.');
+        return;
+      }
+
+      editingSubcategoryId = null;
+      const form = document.getElementById('subcategoryForm');
+      form.reset();
+      const categoryTiers = SUBCATEGORIES.filter(
+        item => item.category === selectedCategory
+      );
+      const nextOrder = categoryTiers.length
+        ? Math.max(...categoryTiers.map(item => item.order)) + 1
+        : 1;
+      document.getElementById('subcategoryOrder').value = nextOrder;
+      document.getElementById('subcategoryModalTitle').textContent = 'Novo tier';
+      document.getElementById('subcategoryMessage').textContent = '';
+      openModal(subcategoryModal);
+    });
+
+    categorySelect.addEventListener('change', () => {
+      populateSubcategorySelect(categorySelect.value);
     });
 
     document.getElementById('addCategoryButton').addEventListener('click', () => {
@@ -545,9 +769,11 @@
     document.getElementById('closeCampaignModal').addEventListener('click', () => closeModal(campaignModal));
     document.getElementById('closeCharacterModal').addEventListener('click', () => closeModal(characterModal));
     document.getElementById('closeCategoryModal').addEventListener('click', () => closeModal(categoryModal));
+    document.getElementById('closeSubcategoryModal').addEventListener('click', () => closeModal(subcategoryModal));
     campaignModal.addEventListener('click', event => { if (event.target === campaignModal) closeModal(campaignModal); });
     characterModal.addEventListener('click', event => { if (event.target === characterModal) closeModal(characterModal); });
     categoryModal.addEventListener('click', event => { if (event.target === categoryModal) closeModal(categoryModal); });
+    subcategoryModal.addEventListener('click', event => { if (event.target === subcategoryModal) closeModal(subcategoryModal); });
 
     document.getElementById('characterForm').addEventListener('submit', async event => {
       event.preventDefault();
@@ -590,6 +816,7 @@
           token: masterToken,
           name: document.getElementById('characterName').value,
           categoryId: categorySelect.value,
+          subcategoryId: subcategorySelect.value || null,
           description: document.getElementById('characterDescription').value,
           image,
           visible: document.getElementById('characterVisible').checked
@@ -660,6 +887,49 @@
       } finally {
         submitButton.disabled = false;
         submitButton.textContent = 'Salvar personagem';
+      }
+    });
+
+    document.getElementById('subcategoryForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const submitButton = form.querySelector('button[type="submit"]');
+      const formMessage = document.getElementById('subcategoryMessage');
+      submitButton.disabled = true;
+      formMessage.className = 'message';
+      formMessage.textContent = '';
+
+      try {
+        const values = {
+          rpgId,
+          token: masterToken,
+          categoryId: selectedCategory,
+          name: document.getElementById('subcategoryName').value,
+          order: document.getElementById('subcategoryOrder').value
+        };
+
+        const subcategory = editingSubcategoryId
+          ? await updateSubcategory({
+              ...values,
+              subcategoryId: editingSubcategoryId
+            })
+          : await createSubcategory(values);
+
+        if (!subcategory) throw new Error('Não foi possível salvar o tier.');
+        editingSubcategoryId = null;
+        form.reset();
+        closeModal(subcategoryModal);
+        populateSubcategorySelect(selectedCategory, subcategory.id);
+        renderCharacters();
+      } catch (error) {
+        console.error(error);
+        formMessage.className = 'message error';
+        formMessage.textContent = formatSupabaseError(
+          error,
+          'Não foi possível salvar o tier.'
+        );
+      } finally {
+        submitButton.disabled = false;
       }
     });
 
@@ -824,6 +1094,7 @@
         currentRpg = await getRpgById(rpgId);
         document.getElementById('campaignName').textContent = currentRpg?.name || 'Campanha';
         await loadCategories(rpgId);
+        await loadSubcategories(rpgId);
         characters = await loadCharacters(rpgId, role === 'master' ? masterToken : null);
 
         if (role === 'master') {
