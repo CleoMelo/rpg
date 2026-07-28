@@ -93,7 +93,11 @@ h2 { font-size: clamp(1.8rem, 4vw, 3rem); }
 .grid { display: grid; gap: 22px; }
 .rpg-grid { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
 .category-grid { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
-.character-grid { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.character-grid {
+  grid-template-columns: repeat(auto-fill, minmax(210px, 280px));
+  justify-content: start;
+  align-items: start;
+}
 
 .card {
   position: relative;
@@ -303,6 +307,7 @@ small, .muted { color: var(--muted); }
   .role-options { grid-template-columns: 1fr; }
   .role-panel { padding: 24px; }
   .page-shell { padding-top: 34px; }
+  .character-grid { grid-template-columns: 1fr; }
 }
 
 /* Criação e gerenciamento de campanhas */
