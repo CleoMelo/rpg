@@ -363,7 +363,7 @@ async function createSubcategory({
 
   if (error) throw error;
   const subcategory = mapSubcategory(data);
-  await loadSubcategories(rpgId);
+  await loadSubcategories(rpgId, token);
   return SUBCATEGORIES.find(item => item.id === subcategory.id) || subcategory;
 }
 
@@ -426,7 +426,7 @@ async function updateSubcategory({
 
   if (error) throw error;
   const updated = mapSubcategory(data);
-  await loadSubcategories(rpgId);
+  await loadSubcategories(rpgId, token);
   return SUBCATEGORIES.find(item => item.id === updated.id) || updated;
 }
 
@@ -469,7 +469,7 @@ async function deleteSubcategory({
   });
 
   if (error) throw error;
-  if (data) await loadSubcategories(rpgId);
+  if (data) await loadSubcategories(rpgId, token);
   return Boolean(data);
 }
 
