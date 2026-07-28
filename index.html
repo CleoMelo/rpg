@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Portal de RPGs</title>
-  <link rel="stylesheet" href="styles.css?v=20260728-9">
+  <link rel="stylesheet" href="styles.css?v=20260728-10">
 </head>
 <body>
   <header class="site-header">
@@ -72,15 +72,12 @@
         </div>
 
         <div class="form-group">
-          <label for="rpgImage">Link direto da imagem de fundo no Imgur</label>
-          <input id="rpgImage" type="url" required placeholder="https://i.imgur.com/sua-imagem.jpg">
-          <small>
-            <a class="inline-link" href="https://imgur.com/upload" target="_blank" rel="noopener noreferrer">Abrir upload do Imgur ↗</a>
-            — após enviar, clique com o botão direito na imagem e escolha <strong>Copiar endereço da imagem</strong>.
-          </small>
+          <label for="rpgImage">Imagem de fundo</label>
+          <input id="rpgImage" type="file" required accept="image/jpeg,image/png,image/webp,image/avif">
+          <small>JPG, PNG, WebP ou AVIF, com no máximo 5 MB. O arquivo será salvo no ImageKit e terá uma cópia de segurança no Google Drive.</small>
         </div>
 
-        <div id="imagePreview" class="campaign-preview">
+        <div id="imagePreview" class="campaign-preview upload-preview">
           <span>A prévia da imagem aparecerá aqui.</span>
         </div>
 
@@ -96,7 +93,8 @@
   <footer class="footer">Portal de RPGs — projeto personalizável</footer>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=20260728-4"></script>
-  <script src="data.js?v=20260728-9"></script>
+  <script src="data.js?v=20260728-10"></script>
+  <script src="media-upload.js?v=20260728-1"></script>
   <script>
     const grid = document.getElementById('rpgGrid');
     const modal = document.getElementById('rpgModal');
@@ -150,7 +148,6 @@
       form.reset();
       message.textContent = '';
       message.className = 'message';
-      preview.style.backgroundImage = '';
       preview.classList.remove('has-image');
       preview.innerHTML = '<span>A prévia da imagem aparecerá aqui.</span>';
     }
@@ -163,17 +160,19 @@
     modal.addEventListener('click', event => { if (event.target === modal) closeModal(); });
     document.addEventListener('keydown', event => { if (event.key === 'Escape') closeModal(); });
 
-    imageInput.addEventListener('input', () => {
-      const url = imageInput.value.trim();
-      if (!url) {
-        preview.style.backgroundImage = '';
-        preview.classList.remove('has-image');
-        preview.innerHTML = '<span>A prévia da imagem aparecerá aqui.</span>';
-        return;
+    imageInput.addEventListener('change', () => {
+      try {
+        const file = imageInput.files?.[0];
+        if (file) validateImageFile(file);
+        setFilePreview(imageInput, preview);
+        message.className = 'message';
+        message.textContent = '';
+      } catch (error) {
+        imageInput.value = '';
+        setFilePreview(imageInput, preview);
+        message.className = 'message error';
+        message.textContent = error.message;
       }
-      preview.innerHTML = '';
-      preview.style.backgroundImage = `linear-gradient(rgba(0,0,0,.12), rgba(0,0,0,.65)), url("${url.replace(/"/g, '%22')}")`;
-      preview.classList.add('has-image');
     });
 
     form.addEventListener('submit', async event => {
@@ -184,10 +183,10 @@
       const description = document.getElementById('rpgDescription').value.trim();
       const password = document.getElementById('rpgPassword').value;
       const passwordConfirmation = document.getElementById('rpgPasswordConfirmation').value;
-      const image = imageInput.value.trim();
+      const imageFile = imageInput.files?.[0];
 
-      if (!name || !image) {
-        message.textContent = 'Preencha o nome e o link da imagem.';
+      if (!name || !imageFile) {
+        message.textContent = 'Preencha o nome e selecione uma imagem.';
         message.className = 'message error';
         return;
       }
@@ -208,13 +207,45 @@
       submitButton.disabled = true;
       submitButton.textContent = 'Salvando...';
 
+      let createdRpg = null;
+      let token = null;
+
       try {
-        await createRpg({ name, description, image, password });
+        validateImageFile(imageFile);
+        createdRpg = await createRpg({
+          name,
+          description,
+          image: 'https://i.imgur.com/removed.png',
+          password
+        });
+        token = await authenticateMaster(createdRpg.id, password);
+        if (!token) throw new Error('Não foi possível autenticar a nova campanha.');
+
+        submitButton.textContent = 'Enviando imagem...';
+        const upload = await uploadMediaImage({
+          file: imageFile,
+          rpgId: createdRpg.id,
+          token,
+          kind: 'campaign'
+        });
+
+        await updateRpg({
+          id: createdRpg.id,
+          token,
+          name,
+          description,
+          image: upload.url
+        });
+
         renderRpgs();
         closeModal();
         document.getElementById('campanhas').scrollIntoView({ behavior: 'smooth' });
+        if (upload.warning) console.warn(upload.warning);
       } catch (error) {
         console.error(error);
+        if (createdRpg && token) {
+          await deleteRpg(createdRpg.id, token).catch(cleanupError => console.error(cleanupError));
+        }
         message.textContent = error?.code === 'PGRST202'
           ? 'Execute a atualização SQL no Supabase antes de criar campanhas.'
           : error?.message || 'Não foi possível salvar a campanha.';

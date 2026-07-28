@@ -78,11 +78,15 @@ function normalizeImgurImageUrl(value) {
     throw new Error('Informe um endereço de imagem válido do Imgur.');
   }
 
-  const directHost = url.hostname.toLowerCase() === 'i.imgur.com';
+  const hostname = url.hostname.toLowerCase();
   const imageExtension = /\.(?:jpe?g|png|gif|webp|avif)$/i.test(url.pathname);
+  const legacyImgur = hostname === 'i.imgur.com' && imageExtension;
+  const imageKit = hostname === 'ik.imagekit.io' &&
+    url.pathname.startsWith('/apirpgs/') &&
+    imageExtension;
 
-  if (url.protocol !== 'https:' || !directHost || !imageExtension) {
-    throw new Error('Use o endereço direto da imagem iniciado por https://i.imgur.com/.');
+  if (url.protocol !== 'https:' || (!legacyImgur && !imageKit)) {
+    throw new Error('A imagem precisa ter sido enviada pelo Portal de RPGs.');
   }
 
   return url.href;

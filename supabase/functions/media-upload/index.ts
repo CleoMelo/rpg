@@ -1,0 +1,270 @@
+Exit code: 0
+Wall time: 0.7 seconds
+Output:
+const ALLOWED_ORIGINS = new Set([
+  "https://cleomelo.github.io",
+  "http://localhost:5500",
+  "http://127.0.0.1:5500",
+]);
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/avif",
+]);
+
+function corsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  return {
+    "access-control-allow-origin": ALLOWED_ORIGINS.has(origin)
+      ? origin
+      : "https://cleomelo.github.io",
+    "access-control-allow-headers":
+      "authorization, x-client-info, apikey, content-type",
+    "access-control-allow-methods": "POST, OPTIONS",
+    "vary": "Origin",
+  };
+}
+
+function json(req: Request, data: unknown, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      ...corsHeaders(req),
+      "content-type": "application/json; charset=utf-8",
+    },
+  });
+}
+
+function requiredSecret(name: string) {
+  const value = Deno.env.get(name)?.trim();
+  if (!value) throw new Error(`Secret ausente: ${name}`);
+  return value;
+}
+
+function sanitizeName(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9.-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 90) || "imagem";
+}
+
+async function verifyMaster(campaignId: string, masterToken: string) {
+  if (
+    ["reinos-partidos", "neon-abyss", "ecos-do-vazio"].includes(campaignId) &&
+    masterToken === `demo:${campaignId}`
+  ) {
+    return true;
+  }
+
+  const supabaseUrl = requiredSecret("SUPABASE_URL");
+  const serviceKey = requiredSecret("SUPABASE_SERVICE_ROLE_KEY");
+  const headers = {
+    apikey: serviceKey,
+    authorization: `Bearer ${serviceKey}`,
+    "content-type": "application/json",
+  };
+
+  const campaignResponse = await fetch(
+    `${supabaseUrl}/rest/v1/campanhas?id=eq.${encodeURIComponent(campaignId)}` +
+      "&select=id,nome,descricao,imagem_url&limit=1",
+    { headers },
+  );
+
+  if (!campaignResponse.ok) return false;
+  const campaigns = await campaignResponse.json();
+  const campaign = campaigns?.[0];
+  if (!campaign) return false;
+
+  const verifyResponse = await fetch(
+    `${supabaseUrl}/rest/v1/rpc/editar_campanha`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        p_campanha_id: campaignId,
+        p_token: masterToken,
+        p_nome: campaign.nome,
+        p_descricao: campaign.descricao,
+        p_imagem_url: campaign.imagem_url,
+      }),
+    },
+  );
+
+  return verifyResponse.ok;
+}
+
+async function uploadToImageKit(
+  file: File,
+  campaignId: string,
+  kind: string,
+) {
+  const privateKey = requiredSecret("IMAGEKIT_PRIVATE_KEY");
+  const endpoint = requiredSecret("IMAGEKIT_URL_ENDPOINT").replace(/\/+$/, "");
+  const extension = file.name.includes(".")
+    ? `.${file.name.split(".").pop()?.toLowerCase()}`
+    : "";
+  const fileName =
+    `${sanitizeName(campaignId)}-${kind}-${Date.now()}${extension}`;
+
+  const body = new FormData();
+  body.append("file", file);
+  body.append("fileName", fileName);
+  body.append("folder", `/portal-rpg/${sanitizeName(campaignId)}/${kind}`);
+  body.append("useUniqueFileName", "true");
+  body.append("tags", `portal-rpg,${kind}`);
+
+  const response = await fetch(
+    "https://upload.imagekit.io/api/v1/files/upload",
+    {
+      method: "POST",
+      headers: {
+        authorization: `Basic ${btoa(`${privateKey}:`)}`,
+        accept: "application/json",
+      },
+      body,
+    },
+  );
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.message || "O ImageKit recusou o envio.");
+  }
+
+  const filePath = String(result.filePath || "").replace(/^\/+/, "");
+  return {
+    fileId: result.fileId as string,
+    fileName,
+    url: filePath ? `${endpoint}/${filePath}` : result.url as string,
+  };
+}
+
+async function getGoogleAccessToken() {
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: requiredSecret("GOOGLE_CLIENT_ID"),
+      client_secret: requiredSecret("GOOGLE_CLIENT_SECRET"),
+      refresh_token: requiredSecret("GOOGLE_REFRESH_TOKEN"),
+      grant_type: "refresh_token",
+    }),
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.access_token) {
+    throw new Error(result.error_description || "Falha ao acessar o Google Drive.");
+  }
+  return result.access_token as string;
+}
+
+async function uploadToDrive(file: File, fileName: string) {
+  const accessToken = await getGoogleAccessToken();
+  const boundary = `portal_rpg_${crypto.randomUUID()}`;
+  const metadata = JSON.stringify({
+    name: fileName,
+    parents: [requiredSecret("GOOGLE_DRIVE_FOLDER_ID")],
+    description: "Backup automÃ¡tico criado pelo Portal de RPGs",
+  });
+
+  const body = new Blob([
+    `--${boundary}\r\n` +
+      "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+      `${metadata}\r\n` +
+      `--${boundary}\r\n` +
+      `Content-Type: ${file.type}\r\n\r\n`,
+    file,
+    `\r\n--${boundary}--`,
+  ]);
+
+  const response = await fetch(
+    "https://www.googleapis.com/upload/drive/v3/files" +
+      "?uploadType=multipart&fields=id,name",
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": `multipart/related; boundary=${boundary}`,
+      },
+      body,
+    },
+  );
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      result.error?.message || "NÃ£o foi possÃ­vel criar o backup no Drive.",
+    );
+  }
+  return result.id as string;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders(req) });
+  }
+  if (req.method !== "POST") {
+    return json(req, { error: "MÃ©todo nÃ£o permitido." }, 405);
+  }
+
+  try {
+    const form = await req.formData();
+    const file = form.get("file");
+    const campaignId = String(form.get("campaignId") || "").trim();
+    const masterToken = String(form.get("masterToken") || "").trim();
+    const kind = String(form.get("kind") || "").trim();
+
+    if (!(file instanceof File)) {
+      return json(req, { error: "Selecione uma imagem." }, 400);
+    }
+    if (!campaignId || !masterToken) {
+      return json(req, { error: "Acesso do mestre ausente." }, 401);
+    }
+    if (!["campaign", "character"].includes(kind)) {
+      return json(req, { error: "Tipo de imagem invÃ¡lido." }, 400);
+    }
+    if (!ALLOWED_TYPES.has(file.type)) {
+      return json(req, { error: "Use uma imagem JPG, PNG, WebP ou AVIF." }, 415);
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      return json(req, { error: "A imagem deve ter no mÃ¡ximo 5 MB." }, 413);
+    }
+    if (!(await verifyMaster(campaignId, masterToken))) {
+      return json(req, { error: "Acesso do mestre invÃ¡lido ou expirado." }, 403);
+    }
+
+    const imageKit = await uploadToImageKit(file, campaignId, kind);
+    let driveFileId: string | null = null;
+    let backupStatus = "completed";
+    let warning: string | null = null;
+
+    try {
+      driveFileId = await uploadToDrive(file, imageKit.fileName);
+    } catch (error) {
+      console.error("Google Drive backup failed", error);
+      backupStatus = "failed";
+      warning =
+        "Imagem salva no ImageKit, mas o backup no Google Drive falhou.";
+    }
+
+    return json(req, {
+      url: imageKit.url,
+      imagekitFileId: imageKit.fileId,
+      driveFileId,
+      backupStatus,
+      warning,
+    });
+  } catch (error) {
+    console.error(error);
+    return json(req, {
+      error: error instanceof Error
+        ? error.message
+        : "NÃ£o foi possÃ­vel enviar a imagem.",
+    }, 500);
+  }
+});
+

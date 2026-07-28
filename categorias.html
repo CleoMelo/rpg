@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Categorias</title>
-  <link rel="stylesheet" href="styles.css?v=20260728-9">
+  <link rel="stylesheet" href="styles.css?v=20260728-10">
 </head>
 <body>
   <header class="site-header">
@@ -64,9 +64,11 @@
           <textarea id="campaignEditDescription" rows="4" maxlength="220"></textarea>
         </div>
         <div class="form-group">
-          <label for="campaignEditImage">Link direto da imagem no Imgur</label>
-          <input id="campaignEditImage" type="url" required placeholder="https://i.imgur.com/exemplo.png">
+          <label for="campaignEditImage">Substituir imagem de fundo</label>
+          <input id="campaignEditImage" type="file" accept="image/jpeg,image/png,image/webp,image/avif">
+          <small>Opcional. JPG, PNG, WebP ou AVIF, com no máximo 5 MB.</small>
         </div>
+        <div id="campaignEditPreview" class="campaign-preview upload-preview"></div>
         <p id="campaignMessage" class="message" aria-live="polite"></p>
         <button class="btn full" type="submit">Salvar alterações</button>
       </form>
@@ -89,13 +91,11 @@
           <select id="characterCategory" required></select>
         </div>
         <div class="form-group">
-          <label for="characterImage">Link direto da imagem no Imgur</label>
-          <input id="characterImage" type="url" required placeholder="https://i.imgur.com/exemplo.png">
-          <small>
-            <a class="inline-link" href="https://imgur.com/upload" target="_blank" rel="noopener noreferrer">Abrir upload do Imgur ↗</a>
-            — após enviar, clique com o botão direito na imagem e escolha <strong>Copiar endereço da imagem</strong>.
-          </small>
+          <label for="characterImage">Imagem do personagem</label>
+          <input id="characterImage" type="file" accept="image/jpeg,image/png,image/webp,image/avif">
+          <small>JPG, PNG, WebP ou AVIF, com no máximo 5 MB. Ao editar, deixe vazio para manter a imagem atual.</small>
         </div>
+        <div id="characterImagePreview" class="campaign-preview upload-preview"></div>
         <div class="form-group visibility-field">
           <label class="visibility-control" for="characterVisible">
             <input id="characterVisible" type="checkbox" checked>
@@ -140,7 +140,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=20260728-4"></script>
-  <script src="data.js?v=20260728-9"></script>
+  <script src="data.js?v=20260728-10"></script>
+  <script src="media-upload.js?v=20260728-1"></script>
   <script>
     const rpgId = getSelectedRpg();
     const storedRole = sessionStorage.getItem('role');
@@ -356,9 +357,13 @@
       document.getElementById('characterModalTitle').textContent = 'Editar personagem';
       document.getElementById('characterName').value = character.name;
       categorySelect.value = character.category;
-      document.getElementById('characterImage').value = character.image;
       document.getElementById('characterVisible').checked = character.visible !== false;
       document.getElementById('characterDescription').value = character.description || '';
+      setFilePreview(
+        document.getElementById('characterImage'),
+        document.getElementById('characterImagePreview'),
+        character.image
+      );
       form.querySelector('button[type="submit"]').textContent = 'Salvar alterações';
       openModal(characterModal);
     }
@@ -384,7 +389,11 @@
       form.reset();
       document.getElementById('campaignEditName').value = currentRpg.name;
       document.getElementById('campaignEditDescription').value = currentRpg.description || '';
-      document.getElementById('campaignEditImage').value = currentRpg.image;
+      setFilePreview(
+        document.getElementById('campaignEditImage'),
+        document.getElementById('campaignEditPreview'),
+        currentRpg.image
+      );
       openModal(campaignModal);
     }
 
@@ -478,6 +487,10 @@
       form.reset();
       document.getElementById('characterModalTitle').textContent = 'Novo personagem';
       form.querySelector('button[type="submit"]').textContent = 'Salvar personagem';
+      setFilePreview(
+        document.getElementById('characterImage'),
+        document.getElementById('characterImagePreview')
+      );
       if (selectedCategory) categorySelect.value = selectedCategory;
       openModal(characterModal);
     });
@@ -489,6 +502,35 @@
       document.getElementById('categoryModalTitle').textContent = 'Nova categoria';
       form.querySelector('button[type="submit"]').textContent = 'Criar categoria';
       openModal(categoryModal);
+    });
+
+    document.getElementById('characterImage').addEventListener('change', event => {
+      const input = event.currentTarget;
+      try {
+        if (input.files?.[0]) validateImageFile(input.files[0]);
+        const current = editingCharacterId
+          ? characters.find(item => item.id === editingCharacterId)?.image || ''
+          : '';
+        setFilePreview(input, document.getElementById('characterImagePreview'), current);
+      } catch (error) {
+        input.value = '';
+        setFilePreview(input, document.getElementById('characterImagePreview'));
+        document.getElementById('characterMessage').className = 'message error';
+        document.getElementById('characterMessage').textContent = error.message;
+      }
+    });
+
+    document.getElementById('campaignEditImage').addEventListener('change', event => {
+      const input = event.currentTarget;
+      try {
+        if (input.files?.[0]) validateImageFile(input.files[0]);
+        setFilePreview(input, document.getElementById('campaignEditPreview'), currentRpg?.image || '');
+      } catch (error) {
+        input.value = '';
+        setFilePreview(input, document.getElementById('campaignEditPreview'), currentRpg?.image || '');
+        document.getElementById('campaignMessage').className = 'message error';
+        document.getElementById('campaignMessage').textContent = error.message;
+      }
     });
 
     document.getElementById('editCampaignButton').addEventListener('click', openCampaignEditor);
@@ -510,13 +552,36 @@
       formMessage.textContent = '';
 
       try {
+        const imageInput = document.getElementById('characterImage');
+        const imageFile = imageInput.files?.[0];
+        const existingCharacter = editingCharacterId
+          ? characters.find(item => item.id === editingCharacterId)
+          : null;
+
+        if (!imageFile && !existingCharacter) {
+          throw new Error('Selecione uma imagem para o personagem.');
+        }
+
+        let upload = null;
+        let image = existingCharacter?.image || '';
+        if (imageFile) {
+          submitButton.textContent = 'Enviando imagem...';
+          upload = await uploadMediaImage({
+            file: imageFile,
+            rpgId,
+            token: masterToken,
+            kind: 'character'
+          });
+          image = upload.url;
+        }
+
         const values = {
           rpgId,
           token: masterToken,
           name: document.getElementById('characterName').value,
           categoryId: categorySelect.value,
           description: document.getElementById('characterDescription').value,
-          image: document.getElementById('characterImage').value,
+          image,
           visible: document.getElementById('characterVisible').checked
         };
 
@@ -539,6 +604,7 @@
         closeModal(characterModal);
         renderCategories();
         selectCategory(selectedCategory);
+        if (upload?.warning) showPageMessage(upload.warning);
       } catch (error) {
         console.error(error);
         formMessage.className = 'message error';
@@ -602,18 +668,34 @@
       formMessage.textContent = '';
 
       try {
+        const imageInput = document.getElementById('campaignEditImage');
+        const imageFile = imageInput.files?.[0];
+        let upload = null;
+        let image = currentRpg.image;
+
+        if (imageFile) {
+          submitButton.textContent = 'Enviando imagem...';
+          upload = await uploadMediaImage({
+            file: imageFile,
+            rpgId,
+            token: masterToken,
+            kind: 'campaign'
+          });
+          image = upload.url;
+        }
+
         const updated = await updateRpg({
           id: rpgId,
           token: masterToken,
           name: document.getElementById('campaignEditName').value,
           description: document.getElementById('campaignEditDescription').value,
-          image: document.getElementById('campaignEditImage').value
+          image
         });
         if (!updated) throw new Error('Esta campanha não pode ser editada.');
         currentRpg = updated;
         document.getElementById('campaignName').textContent = updated.name;
         closeModal(campaignModal);
-        showPageMessage('Campanha atualizada.', 'success');
+        showPageMessage(upload?.warning || 'Campanha atualizada.', upload?.warning ? 'error' : 'success');
       } catch (error) {
         console.error(error);
         formMessage.className = 'message error';
