@@ -1,15 +1,17 @@
 # Portal de RPGs
 
-Site estático em HTML, CSS e JavaScript com:
+Site estático em HTML, CSS e JavaScript integrado ao Supabase.
 
-- Página inicial para seleção de campanhas.
-- Escolha de acesso como jogador ou mestre.
-- Tela de senha para mestre.
-- Página de categorias.
-- Galeria de personagens filtrada por categoria.
-- Cadastro e remoção de personagens no acesso de mestre.
-- Imagens por URL direta do Imgur.
-- Dados salvos no navegador usando localStorage.
+## Recursos
+
+- Criação e seleção de campanhas.
+- Senha própria do mestre por campanha.
+- Sessão temporária do mestre para operações administrativas.
+- Exclusão de campanha somente pela área do mestre.
+- Categorias personalizadas armazenadas no banco.
+- Personagens armazenados no banco e filtrados por categoria.
+- Upload de imagens de personagens para o Supabase Storage.
+- Campanhas demonstrativas disponíveis para testes locais.
 
 ## Como executar
 
@@ -17,32 +19,13 @@ Abra `index.html` diretamente no navegador ou use uma extensão como Live Server
 
 ## Senha do mestre
 
-Cada campanha criada recebe uma senha própria, definida no formulário de criação. As campanhas demonstrativas continuam usando `mestre123`.
+Cada campanha criada recebe uma senha própria. A senha é armazenada somente como hash no Supabase. As campanhas demonstrativas continuam usando `mestre123`.
 
-## Personalização
+Após a autenticação, o navegador mantém um token temporário na sessão da aba. O token é necessário para criar ou excluir categorias e personagens e para excluir a campanha.
 
-Edite `data.js` para alterar campanhas e categorias.
+## Supabase
 
-## Observação de segurança
-
-As senhas das campanhas personalizadas são armazenadas somente como hash no Supabase e verificadas por funções do banco. A senha das campanhas demonstrativas continua no JavaScript apenas para fins de demonstração.
-
-
-## Configurar campanhas no Supabase
-
-Antes de usar a senha por campanha, execute o arquivo `supabase-master-password.sql` no **Supabase Dashboard > SQL Editor**. A migração adiciona a coluna de hash e as funções RPC de criação e verificação.
-
-O projeto está configurado para a tabela `campanhas`, com os campos:
-
-```text
-id
-nome
-descricao
-imagem_url
-criado_em
-```
-
-As credenciais públicas do frontend ficam em `supabase-config.js`.
+A configuração pública do frontend fica em `supabase-config.js`:
 
 ```js
 window.SUPABASE_CONFIG = {
@@ -51,16 +34,23 @@ window.SUPABASE_CONFIG = {
 };
 ```
 
-Use apenas a chave `anon`/`publishable`. Nunca coloque a chave `service_role` no GitHub.
+Use somente a chave `anon`/`publishable`. Nunca coloque a chave `service_role` no GitHub.
 
-A página inicial passa a:
-- buscar campanhas da tabela `campanhas`;
-- criar campanhas no banco;
-- excluir campanhas personalizadas do banco;
-- usar a URL informada como imagem de fundo do botão.
+O banco utiliza as tabelas:
 
-As três campanhas demonstrativas continuam definidas em `data.js`. Para removê-las, deixe `DEFAULT_RPGS` como um array vazio.
+- `campanhas`
+- `categorias`
+- `personagens`
+- `sessoes_mestre`
 
-### Segurança
+As imagens enviadas ficam no bucket público `imagens-rpg` do Supabase Storage.
 
-As políticas RLS precisam permitir `SELECT` e `INSERT` para a criação funcionar. A exclusão também exige uma política de `DELETE`. Para um site público real, conecte o acesso de mestre ao Supabase Auth e restrinja `INSERT` e `DELETE` a usuários autenticados autorizados.
+O SQL de configuração deve ser executado separadamente no **Supabase Dashboard > SQL Editor** e não é armazenado neste repositório.
+
+## Campanhas demonstrativas
+
+As campanhas demonstrativas continuam definidas em `data.js`. Categorias e personagens criados nessas campanhas são mantidos no navegador. Para removê-las, deixe `DEFAULT_RPGS` como um array vazio.
+
+## Segurança
+
+As operações administrativas das campanhas personalizadas usam funções RPC que validam uma sessão temporária do mestre. As políticas RLS continuam necessárias para controlar as leituras públicas e o upload no Storage. Para um ambiente com múltiplos administradores e recuperação de senha, o próximo passo recomendado é integrar o Supabase Auth.
