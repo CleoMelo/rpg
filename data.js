@@ -209,6 +209,7 @@ function mapCategory(row) {
     name: row.nome,
     description: row.descricao || '',
     icon: row.icone || '📁',
+    visible: row.visivel !== false,
     custom: true
   };
 }
@@ -219,7 +220,8 @@ function mapSubcategory(row) {
     campaignId: String(row.campanha_id),
     category: String(row.categoria_id),
     name: row.nome,
-    order: Number(row.ordem) || 0
+    order: Number(row.ordem) || 0,
+    visible: row.visivel !== false
   };
 }
 
@@ -254,18 +256,23 @@ function saveLocalCategories(rpgId, categories) {
   localStorage.setItem(`categories:${rpgId}`, JSON.stringify(categories));
 }
 
-async function loadCategories(rpgId) {
+async function loadCategories(rpgId, token = null) {
   if (isDefaultRpg(rpgId)) {
-    CATEGORIES = getLocalCategories(rpgId);
+    const categories = getLocalCategories(rpgId).map(category => ({
+      ...category,
+      visible: category.visible !== false
+    }));
+    CATEGORIES = token
+      ? categories
+      : categories.filter(category => category.visible);
     return CATEGORIES;
   }
 
   const client = getSupabaseClient();
-  const { data, error } = await client
-    .from('categorias')
-    .select('id, campanha_id, nome, descricao, icone, criado_em')
-    .eq('campanha_id', String(rpgId))
-    .order('criado_em', { ascending: true });
+  const { data, error } = await client.rpc('listar_categorias', {
+    p_campanha_id: String(rpgId),
+    p_token: token || null
+  });
 
   if (error) throw error;
   CATEGORIES = (data || []).map(mapCategory);
@@ -283,20 +290,25 @@ function saveLocalSubcategories(rpgId, subcategories) {
   );
 }
 
-async function loadSubcategories(rpgId) {
+async function loadSubcategories(rpgId, token = null) {
   if (isDefaultRpg(rpgId)) {
-    SUBCATEGORIES = getLocalSubcategories(rpgId)
+    const subcategories = getLocalSubcategories(rpgId)
+      .map(subcategory => ({
+        ...subcategory,
+        visible: subcategory.visible !== false
+      }))
       .sort((left, right) => left.order - right.order);
+    SUBCATEGORIES = token
+      ? subcategories
+      : subcategories.filter(subcategory => subcategory.visible);
     return SUBCATEGORIES;
   }
 
   const client = getSupabaseClient();
-  const { data, error } = await client
-    .from('subcategorias')
-    .select('id, campanha_id, categoria_id, nome, ordem, criado_em')
-    .eq('campanha_id', String(rpgId))
-    .order('ordem', { ascending: true })
-    .order('criado_em', { ascending: true });
+  const { data, error } = await client.rpc('listar_subcategorias', {
+    p_campanha_id: String(rpgId),
+    p_token: token || null
+  });
 
   if (error) throw error;
   SUBCATEGORIES = (data || []).map(mapSubcategory);
@@ -308,7 +320,8 @@ async function createSubcategory({
   token,
   categoryId,
   name,
-  order
+  order,
+  visible = true
 }) {
   if (isDefaultRpg(rpgId)) {
     const siblings = SUBCATEGORIES.filter(
@@ -327,7 +340,8 @@ async function createSubcategory({
       campaignId: String(rpgId),
       category: String(categoryId),
       name: name.trim(),
-      order: position
+      order: position,
+      visible: Boolean(visible)
     };
     SUBCATEGORIES.push(subcategory);
     SUBCATEGORIES.sort((left, right) => left.order - right.order);
@@ -342,7 +356,8 @@ async function createSubcategory({
       p_categoria_id: String(categoryId),
       p_token: token,
       p_nome: name.trim(),
-      p_ordem: Number(order) || 0
+      p_ordem: Number(order) || 0,
+      p_visivel: Boolean(visible)
     })
     .single();
 
@@ -357,7 +372,8 @@ async function updateSubcategory({
   token,
   subcategoryId,
   name,
-  order
+  order,
+  visible = true
 }) {
   if (isDefaultRpg(rpgId)) {
     const subcategory = SUBCATEGORIES.find(
@@ -390,6 +406,7 @@ async function updateSubcategory({
 
     subcategory.name = name.trim();
     subcategory.order = nextOrder;
+    subcategory.visible = Boolean(visible);
     SUBCATEGORIES.sort((left, right) => left.order - right.order);
     saveLocalSubcategories(rpgId, SUBCATEGORIES);
     return subcategory;
@@ -402,7 +419,8 @@ async function updateSubcategory({
       p_subcategoria_id: String(subcategoryId),
       p_token: token,
       p_nome: name.trim(),
-      p_ordem: Number(order) || 0
+      p_ordem: Number(order) || 0,
+      p_visivel: Boolean(visible)
     })
     .single();
 
@@ -455,13 +473,21 @@ async function deleteSubcategory({
   return Boolean(data);
 }
 
-async function createCategory({ rpgId, token, name, description, icon }) {
+async function createCategory({
+  rpgId,
+  token,
+  name,
+  description,
+  icon,
+  visible = true
+}) {
   if (isDefaultRpg(rpgId)) {
     const category = {
       id: crypto.randomUUID(),
       name: name.trim(),
       description: description.trim(),
       icon: icon.trim() || '📁',
+      visible: Boolean(visible),
       custom: true
     };
     CATEGORIES.push(category);
@@ -476,7 +502,8 @@ async function createCategory({ rpgId, token, name, description, icon }) {
       p_token: token,
       p_nome: name.trim(),
       p_descricao: description.trim(),
-      p_icone: icon.trim() || '📁'
+      p_icone: icon.trim() || '📁',
+      p_visivel: Boolean(visible)
     })
     .single();
 
@@ -492,7 +519,8 @@ async function updateCategory({
   categoryId,
   name,
   description,
-  icon
+  icon,
+  visible = true
 }) {
   if (isDefaultRpg(rpgId)) {
     const category = CATEGORIES.find(item => item.id === String(categoryId));
@@ -500,6 +528,7 @@ async function updateCategory({
     category.name = name.trim();
     category.description = description.trim();
     category.icon = icon.trim() || '📁';
+    category.visible = Boolean(visible);
     saveLocalCategories(rpgId, CATEGORIES);
     return category;
   }
@@ -512,7 +541,8 @@ async function updateCategory({
       p_token: token,
       p_nome: name.trim(),
       p_descricao: description.trim(),
-      p_icone: icon.trim() || '📁'
+      p_icone: icon.trim() || '📁',
+      p_visivel: Boolean(visible)
     })
     .single();
 

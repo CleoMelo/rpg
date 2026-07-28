@@ -132,15 +132,22 @@
       <form id="categoryForm">
         <div class="form-group">
           <label for="categoryName">Nome</label>
-          <input id="categoryName" maxlength="50" required placeholder="Ex.: Deuses antigos">
+          <input id="categoryName" maxlength="50" required placeholder="Nome da categoria">
         </div>
         <div class="form-group">
           <label for="categoryIcon">Ícone</label>
-          <input id="categoryIcon" maxlength="8" placeholder="Ex.: 🐉">
+          <input id="categoryIcon" maxlength="8" placeholder="📁">
         </div>
         <div class="form-group">
           <label for="categoryDescription">Descrição</label>
           <textarea id="categoryDescription" rows="3" maxlength="180" placeholder="O que pertence a esta categoria?"></textarea>
+        </div>
+        <div class="form-group visibility-field">
+          <label class="visibility-control" for="categoryVisible">
+            <input id="categoryVisible" type="checkbox" checked>
+            <span>Visível para os jogadores</span>
+          </label>
+          <small>Desmarque para deixar a categoria e todo o conteúdo dela visíveis somente para o mestre.</small>
         </div>
         <p id="categoryMessage" class="message" aria-live="polite"></p>
         <button class="btn full" type="submit">Criar categoria</button>
@@ -157,12 +164,19 @@
       <form id="subcategoryForm">
         <div class="form-group">
           <label for="subcategoryName">Nome do tier</label>
-          <input id="subcategoryName" maxlength="50" required placeholder="Ex.: Líderes">
+          <input id="subcategoryName" maxlength="50" required placeholder="Nome do tier">
         </div>
         <div class="form-group">
           <label for="subcategoryOrder">Posição</label>
           <select id="subcategoryOrder" required></select>
           <small>Os outros tiers serão reorganizados automaticamente.</small>
+        </div>
+        <div class="form-group visibility-field">
+          <label class="visibility-control" for="subcategoryVisible">
+            <input id="subcategoryVisible" type="checkbox" checked>
+            <span>Visível para os jogadores</span>
+          </label>
+          <small>Personagens deste tier ficam ocultos dos jogadores enquanto o tier estiver escondido.</small>
         </div>
         <p id="subcategoryMessage" class="message" aria-live="polite"></p>
         <button class="btn full" type="submit">Salvar tier</button>
@@ -172,7 +186,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=20260728-4"></script>
-  <script src="data.js?v=20260728-14"></script>
+  <script src="data.js?v=20260728-15"></script>
   <script src="media-upload.js?v=20260728-6"></script>
   <script>
     const rpgId = getSelectedRpg();
@@ -272,12 +286,16 @@
       categoryGrid.innerHTML = '';
       populateCategorySelect();
 
-      if (!CATEGORIES.length) {
-        categoryGrid.innerHTML = '<div class="empty-state">Nenhuma categoria criada.</div>';
+      const visibleCategories = role === 'master'
+        ? CATEGORIES
+        : CATEGORIES.filter(category => category.visible !== false);
+
+      if (!visibleCategories.length) {
+        categoryGrid.innerHTML = '<div class="empty-state">Nenhuma categoria disponível.</div>';
         return;
       }
 
-      CATEGORIES.forEach(category => {
+      visibleCategories.forEach(category => {
         const wrapper = document.createElement('div');
         wrapper.className = 'category-item';
 
@@ -287,6 +305,7 @@
         button.innerHTML = `
           <span class="category-icon">${escapeHtml(category.icon)}</span>
           <div>
+            ${role === 'master' && category.visible === false ? '<span class="visibility-badge">Somente para o mestre</span>' : ''}
             <strong>${escapeHtml(category.name)}</strong>
             <p class="muted">${escapeHtml(category.description)}</p>
           </div>
@@ -297,6 +316,20 @@
         if (role === 'master') {
           const controls = document.createElement('div');
           controls.className = 'entity-controls';
+
+          const visibilityButton = document.createElement('button');
+          visibilityButton.className = 'entity-icon-button visibility';
+          visibilityButton.type = 'button';
+          visibilityButton.title = category.visible === false
+            ? 'Mostrar categoria aos jogadores'
+            : 'Ocultar categoria dos jogadores';
+          visibilityButton.setAttribute('aria-label', visibilityButton.title);
+          visibilityButton.textContent = category.visible === false ? '◉' : '◌';
+          visibilityButton.addEventListener(
+            'click',
+            () => toggleCategoryVisibility(category.id, visibilityButton)
+          );
+          controls.appendChild(visibilityButton);
 
           const editButton = document.createElement('button');
           editButton.className = 'entity-icon-button edit';
@@ -404,7 +437,10 @@
         (role === 'master' || character.visible !== false)
       );
       const categoryTiers = SUBCATEGORIES
-        .filter(item => item.category === selectedCategory)
+        .filter(item =>
+          item.category === selectedCategory &&
+          (role === 'master' || item.visible !== false)
+        )
         .sort((left, right) => left.order - right.order);
       const tierIds = new Set(categoryTiers.map(item => item.id));
       const groups = categoryTiers.map(tier => ({
@@ -413,9 +449,9 @@
           character => character.subcategory === tier.id
         )
       }));
-      const withoutTier = filtered.filter(
-        character => !character.subcategory ||
-          !tierIds.has(String(character.subcategory))
+      const withoutTier = filtered.filter(character =>
+        !character.subcategory ||
+        (role === 'master' && !tierIds.has(String(character.subcategory)))
       );
 
       if (withoutTier.length || !categoryTiers.length) {
@@ -440,7 +476,7 @@
         header.className = 'tier-header';
         header.innerHTML = `
           <div>
-            <span class="tier-order">${group.tier ? `Tier ${group.tier.order}` : 'Sem tier'}</span>
+            ${role === 'master' && group.tier?.visible === false ? '<span class="visibility-badge">Somente para o mestre</span>' : ''}
             <h3>${escapeHtml(group.tier?.name || 'Outros')}</h3>
           </div>
           <span class="tier-count">${group.characters.length} personagem(ns)</span>
@@ -449,6 +485,19 @@
         if (role === 'master' && group.tier) {
           const controls = document.createElement('div');
           controls.className = 'tier-controls';
+
+          const visibilityButton = document.createElement('button');
+          visibilityButton.className = 'entity-icon-button visibility';
+          visibilityButton.type = 'button';
+          visibilityButton.title = group.tier.visible === false
+            ? 'Mostrar tier aos jogadores'
+            : 'Ocultar tier dos jogadores';
+          visibilityButton.setAttribute('aria-label', visibilityButton.title);
+          visibilityButton.textContent = group.tier.visible === false ? '◉' : '◌';
+          visibilityButton.addEventListener(
+            'click',
+            () => toggleSubcategoryVisibility(group.tier.id, visibilityButton)
+          );
 
           const editButton = document.createElement('button');
           editButton.className = 'entity-icon-button edit';
@@ -470,7 +519,7 @@
             () => removeSubcategory(group.tier.id, removeButton)
           );
 
-          controls.append(editButton, removeButton);
+          controls.append(visibilityButton, editButton, removeButton);
           header.appendChild(controls);
         }
 
@@ -525,6 +574,7 @@
       document.getElementById('categoryName').value = category.name;
       document.getElementById('categoryIcon').value = category.icon;
       document.getElementById('categoryDescription').value = category.description || '';
+      document.getElementById('categoryVisible').checked = category.visible !== false;
       form.querySelector('button[type="submit"]').textContent = 'Salvar alterações';
       openModal(categoryModal);
     }
@@ -582,6 +632,8 @@
       form.reset();
       document.getElementById('subcategoryModalTitle').textContent = 'Editar tier';
       document.getElementById('subcategoryName').value = subcategory.name;
+      document.getElementById('subcategoryVisible').checked =
+        subcategory.visible !== false;
       populateSubcategoryOrderOptions(
         subcategory.category,
         subcategory.id,
@@ -622,6 +674,79 @@
         showPageMessage(formatSupabaseError(
           error,
           'Não foi possível excluir o tier.'
+        ));
+        button.disabled = false;
+      }
+    }
+
+    async function toggleCategoryVisibility(categoryId, button) {
+      const category = CATEGORIES.find(item => item.id === String(categoryId));
+      if (!category) return;
+
+      button.disabled = true;
+      clearPageMessage();
+
+      try {
+        const updated = await updateCategory({
+          rpgId,
+          token: masterToken,
+          categoryId,
+          name: category.name,
+          description: category.description,
+          icon: category.icon,
+          visible: category.visible === false
+        });
+        if (!updated) throw new Error('Acesso do mestre expirado.');
+        renderCategories();
+        renderCharacters();
+        showPageMessage(
+          updated.visible === false
+            ? 'Categoria visível somente para o mestre.'
+            : 'Categoria liberada para os jogadores.',
+          'success'
+        );
+      } catch (error) {
+        console.error(error);
+        showPageMessage(formatSupabaseError(
+          error,
+          'Não foi possível alterar a visibilidade da categoria.'
+        ));
+        button.disabled = false;
+      }
+    }
+
+    async function toggleSubcategoryVisibility(subcategoryId, button) {
+      const subcategory = SUBCATEGORIES.find(
+        item => item.id === String(subcategoryId)
+      );
+      if (!subcategory) return;
+
+      button.disabled = true;
+      clearPageMessage();
+
+      try {
+        const updated = await updateSubcategory({
+          rpgId,
+          token: masterToken,
+          subcategoryId,
+          name: subcategory.name,
+          order: subcategory.order,
+          visible: subcategory.visible === false
+        });
+        if (!updated) throw new Error('Acesso do mestre expirado.');
+        populateSubcategorySelect(selectedCategory);
+        renderCharacters();
+        showPageMessage(
+          updated.visible === false
+            ? 'Tier visível somente para o mestre.'
+            : 'Tier liberado para os jogadores.',
+          'success'
+        );
+      } catch (error) {
+        console.error(error);
+        showPageMessage(formatSupabaseError(
+          error,
+          'Não foi possível alterar a visibilidade do tier.'
         ));
         button.disabled = false;
       }
@@ -758,6 +883,7 @@
       const form = document.getElementById('subcategoryForm');
       form.reset();
       populateSubcategoryOrderOptions(selectedCategory);
+      document.getElementById('subcategoryVisible').checked = true;
       document.getElementById('subcategoryModalTitle').textContent = 'Novo tier';
       document.getElementById('subcategoryMessage').textContent = '';
       openModal(subcategoryModal);
@@ -772,6 +898,7 @@
       const form = document.getElementById('categoryForm');
       form.reset();
       document.getElementById('categoryModalTitle').textContent = 'Nova categoria';
+      document.getElementById('categoryVisible').checked = true;
       form.querySelector('button[type="submit"]').textContent = 'Criar categoria';
       openModal(categoryModal);
     });
@@ -945,7 +1072,8 @@
           token: masterToken,
           categoryId: selectedCategory,
           name: document.getElementById('subcategoryName').value,
-          order: document.getElementById('subcategoryOrder').value
+          order: document.getElementById('subcategoryOrder').value,
+          visible: document.getElementById('subcategoryVisible').checked
         };
 
         const subcategory = editingSubcategoryId
@@ -988,7 +1116,8 @@
           token: masterToken,
           name: document.getElementById('categoryName').value,
           description: document.getElementById('categoryDescription').value,
-          icon: document.getElementById('categoryIcon').value
+          icon: document.getElementById('categoryIcon').value,
+          visible: document.getElementById('categoryVisible').checked
         };
 
         const category = editingCategoryId
@@ -1101,7 +1230,7 @@
 
     document.getElementById('deleteCampaignButton').addEventListener('click', async event => {
       if (!currentRpg?.custom) {
-        showPageMessage('As campanhas demonstrativas não podem ser excluídas.');
+        showPageMessage('Esta campanha não pode ser excluída.');
         return;
       }
       if (!confirm(`Excluir permanentemente a campanha "${currentRpg.name}"?`)) return;
@@ -1133,8 +1262,8 @@
       try {
         currentRpg = await getRpgById(rpgId);
         document.getElementById('campaignName').textContent = currentRpg?.name || 'Campanha';
-        await loadCategories(rpgId);
-        await loadSubcategories(rpgId);
+        await loadCategories(rpgId, role === 'master' ? masterToken : null);
+        await loadSubcategories(rpgId, role === 'master' ? masterToken : null);
         characters = await loadCharacters(rpgId, role === 'master' ? masterToken : null);
 
         if (role === 'master') {
