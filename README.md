@@ -15,9 +15,9 @@ Site estático em HTML, CSS e JavaScript com:
 
 Abra `index.html` diretamente no navegador ou use uma extensão como Live Server no VS Code.
 
-## Senha de demonstração
+## Senha do mestre
 
-`mestre123`
+Cada campanha criada recebe uma senha própria, definida no formulário de criação. As campanhas demonstrativas continuam usando `mestre123`.
 
 ## Personalização
 
@@ -25,10 +25,12 @@ Edite `data.js` para alterar campanhas e categorias.
 
 ## Observação de segurança
 
-A senha está no JavaScript porque este é um projeto estático. Para uso público real, autenticação, permissões e armazenamento devem ser implementados em um servidor ou serviço como Firebase, Supabase ou outro backend.
+As senhas das campanhas personalizadas são armazenadas somente como hash no Supabase e verificadas por funções do banco. A senha das campanhas demonstrativas continua no JavaScript apenas para fins de demonstração.
 
 
 ## Configurar campanhas no Supabase
+
+Antes de usar a senha por campanha, execute o arquivo `supabase-master-password.sql` no **Supabase Dashboard > SQL Editor**. A migração adiciona a coluna de hash e as funções RPC de criação e verificação.
 
 O projeto está configurado para a tabela `campanhas`, com os campos:
 
