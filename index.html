@@ -121,7 +121,6 @@
         card.className = 'card rpg-card';
         card.style.backgroundImage = `url("${rpg.image.replace(/"/g, '%22')}")`;
         card.innerHTML = `
-          ${rpg.custom ? `<button class="campaign-delete" type="button" title="Excluir campanha" aria-label="Excluir ${escapeHtml(rpg.name)}">×</button>` : ''}
           <h3>${escapeHtml(rpg.name)}</h3>
           <p>${escapeHtml(rpg.description)}</p>
           <button class="btn enter-campaign" type="button">Entrar na campanha</button>
@@ -131,22 +130,6 @@
           setSelectedRpg(rpg.id);
           location.href = `acesso.html?rpg=${encodeURIComponent(rpg.id)}`;
         });
-
-        const deleteButton = card.querySelector('.campaign-delete');
-        if (deleteButton) {
-          deleteButton.addEventListener('click', async () => {
-            if (!confirm(`Excluir a campanha "${rpg.name}" do banco de dados?`)) return;
-            deleteButton.disabled = true;
-            try {
-              await deleteRpg(rpg.id);
-              renderRpgs();
-            } catch (error) {
-              console.error(error);
-              alert('Não foi possível excluir a campanha. Confira as políticas RLS do Supabase.');
-              deleteButton.disabled = false;
-            }
-          });
-        }
 
         grid.appendChild(card);
       });
