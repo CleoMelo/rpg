@@ -200,6 +200,99 @@ async function uploadToDrive(file: File, fileName: string) {
   return result.id as string;
 }
 
+async function deleteImageKitCampaignFiles(campaignId: string) {
+  const privateKey = requiredSecret("IMAGEKIT_PRIVATE_KEY");
+  const authorization = `Basic ${btoa(`${privateKey}:`)}`;
+  const root = `/portal-rpg/${sanitizeName(campaignId)}`;
+  const folders = [`${root}/campaign/`, `${root}/character/`];
+  const fileIds: string[] = [];
+
+  for (const path of folders) {
+    const query = new URLSearchParams({
+      path,
+      type: "file",
+      limit: "1000",
+    });
+    const response = await fetch(
+      `https://api.imagekit.io/v1/files?${query.toString()}`,
+      {
+        headers: {
+          authorization,
+          accept: "application/json",
+        },
+      },
+    );
+    const files = await response.json().catch(() => []);
+    if (!response.ok) {
+      throw new Error(
+        files?.message || "Não foi possível listar as imagens no ImageKit.",
+      );
+    }
+    for (const file of files) {
+      if (file?.fileId) fileIds.push(String(file.fileId));
+    }
+  }
+
+  for (const fileId of fileIds) {
+    const response = await fetch(
+      `https://api.imagekit.io/v1/files/${encodeURIComponent(fileId)}`,
+      {
+        method: "DELETE",
+        headers: {
+          authorization,
+          accept: "application/json",
+        },
+      },
+    );
+    if (!response.ok && response.status !== 404) {
+      throw new Error("Não foi possível remover uma imagem do ImageKit.");
+    }
+  }
+
+  return fileIds.length;
+}
+
+async function deleteDriveCampaignFiles(campaignId: string) {
+  const accessToken = await getGoogleAccessToken();
+  const folderId = requiredSecret("GOOGLE_DRIVE_FOLDER_ID");
+  const prefix = `${sanitizeName(campaignId)}-`;
+  const q =
+    `'${folderId}' in parents and name contains '${prefix}' and trashed = false`;
+  const query = new URLSearchParams({
+    q,
+    pageSize: "1000",
+    fields: "files(id,name)",
+  });
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files?${query.toString()}`,
+    {
+      headers: { authorization: `Bearer ${accessToken}` },
+    },
+  );
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      result.error?.message || "Não foi possível listar os backups no Drive.",
+    );
+  }
+
+  const files = Array.isArray(result.files) ? result.files : [];
+  for (const file of files) {
+    const deleteResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(file.id)}`,
+      {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${accessToken}` },
+      },
+    );
+    if (!deleteResponse.ok && deleteResponse.status !== 404) {
+      throw new Error("Não foi possível remover um backup do Google Drive.");
+    }
+  }
+
+  return files.length;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders(req) });
@@ -209,6 +302,38 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const contentType = req.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const payload = await req.json();
+      if (payload?.action !== "delete-campaign") {
+        return json(req, { error: "Ação inválida." }, 400);
+      }
+
+      const campaignId = String(payload.campaignId || "").trim();
+      const masterToken = String(payload.masterToken || "").trim();
+      if (!campaignId || !masterToken) {
+        return json(req, { error: "Acesso do mestre ausente." }, 401);
+      }
+      if (!(await verifyMaster(campaignId, masterToken))) {
+        return json(
+          req,
+          { error: "Acesso do mestre inválido ou expirado." },
+          403,
+        );
+      }
+
+      const [imagekitDeleted, driveDeleted] = await Promise.all([
+        deleteImageKitCampaignFiles(campaignId),
+        deleteDriveCampaignFiles(campaignId),
+      ]);
+
+      return json(req, {
+        success: true,
+        imagekitDeleted,
+        driveDeleted,
+      });
+    }
+
     const form = await req.formData();
     const file = form.get("file");
     const campaignId = String(form.get("campaignId") || "").trim();

@@ -65,3 +65,29 @@ function setFilePreview(input, preview, existingUrl = '') {
 
   return file;
 }
+
+
+async function deleteCampaignMedia({ rpgId, token }) {
+  const response = await fetch(MEDIA_UPLOAD_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      apikey: window.SUPABASE_CONFIG.anonKey,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      action: 'delete-campaign',
+      campaignId: String(rpgId),
+      masterToken: String(token || '')
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      payload.error ||
+      'Não foi possível remover as imagens da campanha.'
+    );
+  }
+
+  return payload;
+}

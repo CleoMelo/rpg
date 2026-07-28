@@ -184,6 +184,8 @@ async function deleteRpg(id, token) {
   const rpg = RPGS.find(item => item.id === String(id));
   if (!rpg?.custom || !token) return false;
 
+  await deleteCampaignMedia({ rpgId: String(id), token });
+
   const client = getSupabaseClient();
   const { data, error } = await client.rpc('excluir_campanha', {
     p_campanha_id: String(id),
@@ -457,7 +459,7 @@ async function createCharacter({
 
   const client = getSupabaseClient();
   const { data, error } = await client
-    .rpc('criar_personagem_com_visibilidade', {
+    .rpc('criar_personagem_imagekit', {
       p_campanha_id: String(rpgId),
       p_categoria_id: String(categoryId),
       p_token: token,
@@ -499,7 +501,7 @@ async function updateCharacter({
 
   const client = getSupabaseClient();
   const { data, error } = await client
-    .rpc('editar_personagem', {
+    .rpc('editar_personagem_imagekit', {
       p_campanha_id: String(rpgId),
       p_personagem_id: String(characterId),
       p_token: token,

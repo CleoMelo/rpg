@@ -140,8 +140,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=20260728-4"></script>
-  <script src="data.js?v=20260728-10"></script>
-  <script src="media-upload.js?v=20260728-2"></script>
+  <script src="data.js?v=20260728-11"></script>
+  <script src="media-upload.js?v=20260728-3"></script>
   <script>
     const rpgId = getSelectedRpg();
     const storedRole = sessionStorage.getItem('role');
@@ -726,7 +726,10 @@
         location.href = 'index.html';
       } catch (error) {
         console.error(error);
-        showPageMessage('Não foi possível excluir a campanha. Entre novamente como mestre.');
+        showPageMessage(formatSupabaseError(
+          error,
+          'Não foi possível excluir a campanha e suas imagens.'
+        ));
         button.disabled = false;
       }
     });
