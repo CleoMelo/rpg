@@ -81,6 +81,8 @@
   </div>
 
   <footer class="footer">Portal de RPGs — projeto personalizável</footer>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
   <script src="data.js"></script>
   <script>
     const grid = document.getElementById('rpgGrid');
@@ -98,6 +100,11 @@
 
     function renderRpgs() {
       grid.innerHTML = '';
+
+      if (!RPGS.length) {
+        grid.innerHTML = '<div class="empty-state">Nenhuma campanha encontrada.</div>';
+        return;
+      }
 
       RPGS.forEach(rpg => {
         const card = document.createElement('article');
@@ -117,10 +124,17 @@
 
         const deleteButton = card.querySelector('.campaign-delete');
         if (deleteButton) {
-          deleteButton.addEventListener('click', () => {
-            if (!confirm(`Excluir a campanha "${rpg.name}" e seus personagens salvos neste navegador?`)) return;
-            deleteRpg(rpg.id);
-            renderRpgs();
+          deleteButton.addEventListener('click', async () => {
+            if (!confirm(`Excluir a campanha "${rpg.name}" do banco de dados?`)) return;
+            deleteButton.disabled = true;
+            try {
+              await deleteRpg(rpg.id);
+              renderRpgs();
+            } catch (error) {
+              console.error(error);
+              alert('Não foi possível excluir a campanha. Confira as políticas RLS do Supabase.');
+              deleteButton.disabled = false;
+            }
           });
         }
 
@@ -166,7 +180,7 @@
       preview.classList.add('has-image');
     });
 
-    form.addEventListener('submit', event => {
+    form.addEventListener('submit', async event => {
       event.preventDefault();
       message.textContent = '';
 
@@ -180,13 +194,40 @@
         return;
       }
 
-      createRpg({ name, description, image });
-      renderRpgs();
-      closeModal();
-      document.getElementById('campanhas').scrollIntoView({ behavior: 'smooth' });
+      const submitButton = form.querySelector('button[type="submit"]');
+      submitButton.disabled = true;
+      submitButton.textContent = 'Salvando...';
+
+      try {
+        await createRpg({ name, description, image });
+        renderRpgs();
+        closeModal();
+        document.getElementById('campanhas').scrollIntoView({ behavior: 'smooth' });
+      } catch (error) {
+        console.error(error);
+        message.textContent = 'Não foi possível salvar. Confira a configuração, a tabela campanhas e as políticas RLS.';
+        message.className = 'message error';
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Criar campanha';
+      }
     });
 
-    renderRpgs();
+    async function initializePage() {
+      grid.innerHTML = '<div class="empty-state">Carregando campanhas...</div>';
+      try {
+        await loadRpgs();
+        renderRpgs();
+      } catch (error) {
+        renderRpgs();
+        const warning = document.createElement('div');
+        warning.className = 'message error';
+        warning.textContent = 'Supabase não configurado ou indisponível. As campanhas padrão foram exibidas.';
+        grid.before(warning);
+      }
+    }
+
+    initializePage();
   </script>
 </body>
 </html>
