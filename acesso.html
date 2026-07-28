@@ -49,6 +49,7 @@
 
     document.getElementById('playerButton').onclick = () => {
       sessionStorage.setItem('role', 'player');
+      sessionStorage.removeItem('masterRpgId');
       location.href = `categorias.html?rpg=${encodeURIComponent(rpgId)}`;
     };
 
