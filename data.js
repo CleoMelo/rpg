@@ -268,12 +268,20 @@ function mapCharacter(row) {
 
 function getLocalCategories(rpgId) {
   const saved = JSON.parse(localStorage.getItem(`categories:${rpgId}`) || '[]');
-  return [...DEFAULT_CATEGORIES.map(category => ({ ...category })), ...saved];
+  const savedById = new Map(saved.map(category => [String(category.id), category]));
+  const defaults = DEFAULT_CATEGORIES.map(category => ({
+    ...category,
+    ...(savedById.get(String(category.id)) || {}),
+    custom: false
+  }));
+  const custom = saved.filter(category =>
+    !DEFAULT_CATEGORIES.some(defaultCategory => defaultCategory.id === String(category.id))
+  );
+  return [...defaults, ...custom];
 }
 
 function saveLocalCategories(rpgId, categories) {
-  const custom = categories.filter(category => category.custom);
-  localStorage.setItem(`categories:${rpgId}`, JSON.stringify(custom));
+  localStorage.setItem(`categories:${rpgId}`, JSON.stringify(categories));
 }
 
 async function loadCategories(rpgId) {
