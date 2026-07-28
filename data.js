@@ -69,24 +69,9 @@ async function loadRpgs() {
   return RPGS;
 }
 
-function slugifyRpgName(name) {
-  const base = name
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'campanha';
-
-  const unique = typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID().slice(0, 8)
-    : Date.now().toString(36);
-  return `${base}-${unique}`;
-}
-
 async function createRpg({ name, description, image }) {
   const client = getSupabaseClient();
   const payload = {
-    id: slugifyRpgName(name),
     nome: name.trim(),
     descricao: description.trim() || 'Campanha personalizada.',
     imagem_url: image.trim()
