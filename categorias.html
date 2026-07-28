@@ -249,19 +249,18 @@
       );
     }
 
-    function moveOrderedId(ids, sourceId, targetId, placeAfter) {
+    function moveOrderedId(ids, sourceId, targetId) {
       const nextIds = ids.map(String);
       const source = String(sourceId);
       const target = String(targetId);
       if (source === target) return nextIds;
 
       const sourceIndex = nextIds.indexOf(source);
-      if (sourceIndex < 0) return nextIds;
-      nextIds.splice(sourceIndex, 1);
-
       const targetIndex = nextIds.indexOf(target);
-      if (targetIndex < 0) return ids.map(String);
-      nextIds.splice(targetIndex + (placeAfter ? 1 : 0), 0, source);
+      if (sourceIndex < 0 || targetIndex < 0) return nextIds;
+
+      nextIds.splice(sourceIndex, 1);
+      nextIds.splice(targetIndex, 0, source);
       return nextIds;
     }
 
@@ -375,21 +374,11 @@
 
         event.preventDefault();
         const sourceId = activeDrag.id;
-        const rectangle = element.getBoundingClientRect();
-        const horizontalDistance = Math.abs(
-          event.clientX - (rectangle.left + rectangle.width / 2)
-        );
-        const verticalDistance = Math.abs(
-          event.clientY - (rectangle.top + rectangle.height / 2)
-        );
-        const placeAfter = horizontalDistance > verticalDistance
-          ? event.clientX > rectangle.left + rectangle.width / 2
-          : event.clientY > rectangle.top + rectangle.height / 2;
 
         activeDrag = null;
         suppressSortClickUntil = Date.now() + 300;
         clearDragStyles();
-        void onReorder(sourceId, String(id), placeAfter);
+        void onReorder(sourceId, String(id));
       });
 
       element.addEventListener('dragend', () => {
@@ -401,16 +390,14 @@
 
     async function handleCategoryReorder(
       sourceId,
-      targetId,
-      placeAfter
+      targetId
     ) {
       const currentIds = orderedByPosition(CATEGORIES)
         .map(category => category.id);
       const orderedIds = moveOrderedId(
         currentIds,
         sourceId,
-        targetId,
-        placeAfter
+        targetId
       );
       if (orderedIds.join('|') === currentIds.join('|')) return;
 
@@ -450,8 +437,7 @@
 
     async function handleTierReorder(
       sourceId,
-      targetId,
-      placeAfter
+      targetId
     ) {
       const currentTiers = orderedByPosition(
         SUBCATEGORIES.filter(
@@ -462,26 +448,31 @@
       const orderedIds = moveOrderedId(
         currentIds,
         sourceId,
-        targetId,
-        placeAfter
+        targetId
       );
       if (orderedIds.join('|') === currentIds.join('|')) return;
 
       clearPageMessage();
       try {
-        const saved = await reorderSubcategories({
+        const sourceTier = currentTiers.find(
+          tier => tier.id === String(sourceId)
+        );
+        const targetOrder =
+          orderedIds.indexOf(String(sourceId)) + 1;
+        if (!sourceTier || targetOrder < 1) {
+          throw new Error('Tier de origem não encontrado.');
+        }
+
+        const saved = await updateSubcategory({
           rpgId,
           token: masterToken,
-          orderedIds
+          subcategoryId: sourceTier.id,
+          name: sourceTier.name,
+          order: targetOrder,
+          visible: sourceTier.visible !== false
         });
         if (!saved) throw new Error('Acesso do mestre expirado.');
 
-        const positions = new Map(
-          orderedIds.map((id, index) => [String(id), index + 1])
-        );
-        currentTiers.forEach(tier => {
-          tier.order = positions.get(tier.id) || tier.order;
-        });
         populateSubcategorySelect(selectedCategory);
         renderCharacters();
         showPageMessage('Ordem dos tiers atualizada.', 'success');
@@ -498,8 +489,7 @@
 
     async function handleCharacterReorder(
       sourceId,
-      targetId,
-      placeAfter
+      targetId
     ) {
       const source = characters.find(
         character => character.id === String(sourceId)
@@ -517,8 +507,7 @@
       const orderedIds = moveOrderedId(
         currentIds,
         sourceId,
-        targetId,
-        placeAfter
+        targetId
       );
       if (orderedIds.join('|') === currentIds.join('|')) return;
 
