@@ -229,11 +229,22 @@ small, .muted { color: var(--muted); }
   display: none;
   place-items: center;
   padding: 18px;
+  overflow-y: auto;
   background: rgba(0,0,0,.82);
   backdrop-filter: blur(5px);
 }
 .modal-backdrop.open { display: grid; }
-.modal { width: min(540px, 100%); padding: 28px; background: #171c27; opacity: 1; }
+.modal {
+  width: min(540px, 100%);
+  max-height: calc(100vh - 36px);
+  max-height: calc(100dvh - 36px);
+  padding: 28px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  background: #171c27;
+  opacity: 1;
+}
 .modal-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .close-button { border: 0; background: transparent; color: var(--muted); font-size: 1.5rem; }
 
