@@ -160,9 +160,9 @@
           <input id="subcategoryName" maxlength="50" required placeholder="Ex.: Líderes">
         </div>
         <div class="form-group">
-          <label for="subcategoryOrder">Ordem de exibição</label>
-          <input id="subcategoryOrder" type="number" min="0" max="9999" required value="0">
-          <small>Valores menores aparecem primeiro.</small>
+          <label for="subcategoryOrder">Posição</label>
+          <select id="subcategoryOrder" required></select>
+          <small>Os outros tiers serão reorganizados automaticamente.</small>
         </div>
         <p id="subcategoryMessage" class="message" aria-live="polite"></p>
         <button class="btn full" type="submit">Salvar tier</button>
@@ -172,7 +172,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=20260728-4"></script>
-  <script src="data.js?v=20260728-13"></script>
+  <script src="data.js?v=20260728-14"></script>
   <script src="media-upload.js?v=20260728-6"></script>
   <script>
     const rpgId = getSelectedRpg();
@@ -529,6 +529,48 @@
       openModal(categoryModal);
     }
 
+    function populateSubcategoryOrderOptions(
+      categoryId,
+      currentId = null,
+      selectedPosition = null
+    ) {
+      const siblings = SUBCATEGORIES
+        .filter(item =>
+          item.category === String(categoryId) &&
+          item.id !== String(currentId || '')
+        )
+        .sort((left, right) => left.order - right.order);
+      const maximumPosition = siblings.length + 1;
+      const requestedPosition = Number(selectedPosition);
+      const position = Math.max(
+        1,
+        Math.min(
+          Number.isFinite(requestedPosition)
+            ? requestedPosition
+            : maximumPosition,
+          maximumPosition
+        )
+      );
+      const select = document.getElementById('subcategoryOrder');
+      select.innerHTML = '';
+
+      for (
+        let optionPosition = 1;
+        optionPosition <= maximumPosition;
+        optionPosition += 1
+      ) {
+        const option = document.createElement('option');
+        const nextTier = siblings[optionPosition - 1];
+        option.value = String(optionPosition);
+        option.textContent = nextTier
+          ? `${optionPosition} — Antes de ${nextTier.name}`
+          : `${optionPosition} — No final`;
+        select.appendChild(option);
+      }
+
+      select.value = String(position);
+    }
+
     function openSubcategoryEditor(subcategoryId) {
       const subcategory = SUBCATEGORIES.find(
         item => item.id === String(subcategoryId)
@@ -540,7 +582,11 @@
       form.reset();
       document.getElementById('subcategoryModalTitle').textContent = 'Editar tier';
       document.getElementById('subcategoryName').value = subcategory.name;
-      document.getElementById('subcategoryOrder').value = subcategory.order;
+      populateSubcategoryOrderOptions(
+        subcategory.category,
+        subcategory.id,
+        subcategory.order
+      );
       openModal(subcategoryModal);
     }
 
@@ -711,13 +757,7 @@
       editingSubcategoryId = null;
       const form = document.getElementById('subcategoryForm');
       form.reset();
-      const categoryTiers = SUBCATEGORIES.filter(
-        item => item.category === selectedCategory
-      );
-      const nextOrder = categoryTiers.length
-        ? Math.max(...categoryTiers.map(item => item.order)) + 1
-        : 1;
-      document.getElementById('subcategoryOrder').value = nextOrder;
+      populateSubcategoryOrderOptions(selectedCategory);
       document.getElementById('subcategoryModalTitle').textContent = 'Novo tier';
       document.getElementById('subcategoryMessage').textContent = '';
       openModal(subcategoryModal);

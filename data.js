@@ -1,26 +1,4 @@
-const DEFAULT_RPGS = [
-  {
-    id: "reinos-partidos",
-    name: "Reinos Partidos",
-    description: "Fantasia medieval, intrigas políticas e grandes batalhas.",
-    image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80",
-    custom: false
-  },
-  {
-    id: "neon-abyss",
-    name: "Neon Abyss",
-    description: "Uma campanha cyberpunk em uma metrópole dominada por corporações.",
-    image: "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1200&q=80",
-    custom: false
-  },
-  {
-    id: "ecos-do-vazio",
-    name: "Ecos do Vazio",
-    description: "Terror cósmico, mistérios antigos e exploração sobrenatural.",
-    image: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80",
-    custom: false
-  }
-];
+const DEFAULT_RPGS = [];
 
 let RPGS = [];
 let supabaseClient = null;
@@ -205,45 +183,19 @@ async function deleteRpg(id, token) {
 
 async function getRpgById(id) {
   if (!RPGS.length) await loadRpgs();
-  return RPGS.find(item => item.id === String(id)) || RPGS[0];
+  return RPGS.find(item => item.id === String(id)) || RPGS[0] || null;
 }
 
-const DEFAULT_CATEGORIES = [
-  { id: 'herois', name: 'Heróis', icon: '⚔️', description: 'Personagens principais e protagonistas.', custom: false },
-  { id: 'aliados', name: 'Aliados', icon: '🛡️', description: 'Companheiros, mentores e contatos.', custom: false },
-  { id: 'vilões', name: 'Vilões', icon: '☠️', description: 'Antagonistas e ameaças importantes.', custom: false },
-  { id: 'npc', name: 'NPCs', icon: '🎭', description: 'Mercadores, moradores e figuras secundárias.', custom: false },
-  { id: 'criaturas', name: 'Criaturas', icon: '🐉', description: 'Monstros, feras e entidades.', custom: false },
-  { id: 'historicos', name: 'Históricos', icon: '📜', description: 'Personagens do passado da campanha.', custom: false }
-];
+const DEFAULT_CATEGORIES = [];
 
 let CATEGORIES = [];
 let SUBCATEGORIES = [];
 
-const DEFAULT_CHARACTERS = {
-  'reinos-partidos': [
-    {
-      id: crypto.randomUUID(),
-      name: 'Alyra Valemont',
-      category: 'herois',
-      description: 'Cavaleira juramentada da Coroa de Cinzas.',
-      image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=900&q=80'
-    },
-    {
-      id: crypto.randomUUID(),
-      name: 'Lorde Kael',
-      category: 'vilões',
-      description: 'Nobre exilado que busca tomar o trono.',
-      image: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=900&q=80'
-    }
-  ],
-  'neon-abyss': [],
-  'ecos-do-vazio': []
-};
+const DEFAULT_CHARACTERS = {};
 
 function getSelectedRpg() {
   const params = new URLSearchParams(location.search);
-  return params.get('rpg') || localStorage.getItem('selectedRpg') || DEFAULT_RPGS[0].id;
+  return params.get('rpg') || localStorage.getItem('selectedRpg') || '';
 }
 
 function setSelectedRpg(id) {
@@ -359,12 +311,23 @@ async function createSubcategory({
   order
 }) {
   if (isDefaultRpg(rpgId)) {
+    const siblings = SUBCATEGORIES.filter(
+      item => item.category === String(categoryId)
+    );
+    const position = Math.max(
+      1,
+      Math.min(Number(order) || siblings.length + 1, siblings.length + 1)
+    );
+    siblings
+      .filter(item => item.order >= position)
+      .forEach(item => { item.order += 1; });
+
     const subcategory = {
       id: crypto.randomUUID(),
       campaignId: String(rpgId),
       category: String(categoryId),
       name: name.trim(),
-      order: Number(order) || 0
+      order: position
     };
     SUBCATEGORIES.push(subcategory);
     SUBCATEGORIES.sort((left, right) => left.order - right.order);
@@ -385,9 +348,8 @@ async function createSubcategory({
 
   if (error) throw error;
   const subcategory = mapSubcategory(data);
-  SUBCATEGORIES.push(subcategory);
-  SUBCATEGORIES.sort((left, right) => left.order - right.order);
-  return subcategory;
+  await loadSubcategories(rpgId);
+  return SUBCATEGORIES.find(item => item.id === subcategory.id) || subcategory;
 }
 
 async function updateSubcategory({
@@ -402,8 +364,32 @@ async function updateSubcategory({
       item => item.id === String(subcategoryId)
     );
     if (!subcategory) return null;
+    const previousOrder = subcategory.order;
+    const siblings = SUBCATEGORIES.filter(
+      item => item.category === subcategory.category &&
+        item.id !== subcategory.id
+    );
+    const nextOrder = Math.max(
+      1,
+      Math.min(Number(order) || previousOrder, siblings.length + 1)
+    );
+
+    if (nextOrder < previousOrder) {
+      siblings
+        .filter(item =>
+          item.order >= nextOrder && item.order < previousOrder
+        )
+        .forEach(item => { item.order += 1; });
+    } else if (nextOrder > previousOrder) {
+      siblings
+        .filter(item =>
+          item.order > previousOrder && item.order <= nextOrder
+        )
+        .forEach(item => { item.order -= 1; });
+    }
+
     subcategory.name = name.trim();
-    subcategory.order = Number(order) || 0;
+    subcategory.order = nextOrder;
     SUBCATEGORIES.sort((left, right) => left.order - right.order);
     saveLocalSubcategories(rpgId, SUBCATEGORIES);
     return subcategory;
@@ -422,12 +408,8 @@ async function updateSubcategory({
 
   if (error) throw error;
   const updated = mapSubcategory(data);
-  const index = SUBCATEGORIES.findIndex(
-    item => item.id === String(subcategoryId)
-  );
-  if (index >= 0) SUBCATEGORIES[index] = updated;
-  SUBCATEGORIES.sort((left, right) => left.order - right.order);
-  return updated;
+  await loadSubcategories(rpgId);
+  return SUBCATEGORIES.find(item => item.id === updated.id) || updated;
 }
 
 async function deleteSubcategory({
@@ -436,9 +418,20 @@ async function deleteSubcategory({
   subcategoryId
 }) {
   if (isDefaultRpg(rpgId)) {
+    const removed = SUBCATEGORIES.find(
+      item => item.id === String(subcategoryId)
+    );
     SUBCATEGORIES = SUBCATEGORIES.filter(
       item => item.id !== String(subcategoryId)
     );
+    if (removed) {
+      SUBCATEGORIES
+        .filter(item =>
+          item.category === removed.category &&
+          item.order > removed.order
+        )
+        .forEach(item => { item.order -= 1; });
+    }
     saveLocalSubcategories(rpgId, SUBCATEGORIES);
     const characters = getLocalCharacters(rpgId).map(character => ({
       ...character,
@@ -458,11 +451,7 @@ async function deleteSubcategory({
   });
 
   if (error) throw error;
-  if (data) {
-    SUBCATEGORIES = SUBCATEGORIES.filter(
-      item => item.id !== String(subcategoryId)
-    );
-  }
+  if (data) await loadSubcategories(rpgId);
   return Boolean(data);
 }
 
