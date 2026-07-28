@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Categorias</title>
-  <link rel="stylesheet" href="styles.css?v=20260728-12">
+  <link rel="stylesheet" href="styles.css?v=20260728-13">
 </head>
 <body>
   <header class="site-header">
@@ -383,6 +383,9 @@
       card.className = role === 'player'
         ? 'card character-card player-character-card'
         : 'card character-card master-character-card';
+      card.classList.add(
+        description ? 'has-description' : 'no-description'
+      );
       card.innerHTML = `
         ${role === 'master' ? `
           <div class="entity-controls character-entity-controls">
