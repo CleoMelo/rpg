@@ -372,15 +372,11 @@ async function loadCharacters(rpgId, token = null) {
   }
 
   const client = getSupabaseClient();
-  let query = client
-    .from('personagens')
-    .select('id, campanha_id, categoria_id, nome, descricao, imagem_url, visivel, criado_em')
-    .eq('campanha_id', String(rpgId))
-    .order('criado_em', { ascending: true });
+  const { data, error } = await client.rpc('listar_personagens', {
+    p_campanha_id: String(rpgId),
+    p_token: token || null
+  });
 
-  if (!token) query = query.eq('visivel', true);
-
-  const { data, error } = await query;
   if (error) throw error;
   return (data || []).map(mapCharacter);
 }
