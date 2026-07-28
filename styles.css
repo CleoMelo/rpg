@@ -172,6 +172,15 @@ input, select, textarea {
   outline: none;
 }
 input:focus, select:focus, textarea:focus { border-color: var(--accent-2); }
+select { color-scheme: dark; }
+select option {
+  background: var(--panel);
+  color: var(--text);
+}
+select option:checked {
+  background: #2563d4;
+  color: #fff;
+}
 small, .muted { color: var(--muted); }
 .inline-link {
   color: var(--accent-2);
