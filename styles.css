@@ -289,9 +289,11 @@ body.sorting-active {
   opacity: .38;
 }
 
-.sortable-item.sortable-over {
+.sortable-item.sortable-over,
+.tier-section.sortable-over {
   outline: 2px solid var(--accent-2);
   outline-offset: 4px;
+  box-shadow: 0 0 0 4px rgba(34, 211, 238, .12);
 }
 
 .category-item.sortable-over,
