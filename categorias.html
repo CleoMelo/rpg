@@ -262,10 +262,12 @@
       clearPageMessage();
 
       try {
+        const targetCharacter = characters.find(character => character.id === String(characterId));
         const removed = await deleteCharacter({
           rpgId,
           token: masterToken,
-          characterId
+          characterId,
+          image: targetCharacter?.image
         });
         if (!removed) throw new Error('Acesso do mestre expirado.');
         characters = characters.filter(character => character.id !== String(characterId));
