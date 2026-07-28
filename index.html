@@ -62,6 +62,16 @@
         </div>
 
         <div class="form-group">
+          <label for="rpgPassword">Senha do mestre</label>
+          <input id="rpgPassword" type="password" minlength="6" maxlength="72" required autocomplete="new-password" placeholder="Mínimo de 6 caracteres">
+        </div>
+
+        <div class="form-group">
+          <label for="rpgPasswordConfirmation">Confirmar senha</label>
+          <input id="rpgPasswordConfirmation" type="password" minlength="6" maxlength="72" required autocomplete="new-password" placeholder="Digite a senha novamente">
+        </div>
+
+        <div class="form-group">
           <label for="rpgImage">Link da imagem de fundo</label>
           <input id="rpgImage" type="url" required placeholder="https://i.imgur.com/sua-imagem.jpg">
           <small>Use um link direto de imagem terminado em .jpg, .png, .webp ou similar.</small>
@@ -186,10 +196,24 @@
 
       const name = document.getElementById('rpgName').value.trim();
       const description = document.getElementById('rpgDescription').value.trim();
+      const password = document.getElementById('rpgPassword').value;
+      const passwordConfirmation = document.getElementById('rpgPasswordConfirmation').value;
       const image = imageInput.value.trim();
 
       if (!name || !image) {
         message.textContent = 'Preencha o nome e o link da imagem.';
+        message.className = 'message error';
+        return;
+      }
+
+      if (password.length < 6) {
+        message.textContent = 'A senha do mestre precisa ter pelo menos 6 caracteres.';
+        message.className = 'message error';
+        return;
+      }
+
+      if (password !== passwordConfirmation) {
+        message.textContent = 'As senhas informadas não coincidem.';
         message.className = 'message error';
         return;
       }
@@ -199,13 +223,15 @@
       submitButton.textContent = 'Salvando...';
 
       try {
-        await createRpg({ name, description, image });
+        await createRpg({ name, description, image, password });
         renderRpgs();
         closeModal();
         document.getElementById('campanhas').scrollIntoView({ behavior: 'smooth' });
       } catch (error) {
         console.error(error);
-        message.textContent = 'Não foi possível salvar. Confira a configuração, a tabela campanhas e as políticas RLS.';
+        message.textContent = error?.code === 'PGRST202'
+          ? 'Execute a migração de senha no Supabase antes de criar campanhas.'
+          : 'Não foi possível salvar. Confira a configuração do Supabase e as políticas RLS.';
         message.className = 'message error';
       } finally {
         submitButton.disabled = false;
