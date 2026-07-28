@@ -137,6 +137,12 @@ async function deleteRpg(id, token) {
   if (!rpg?.custom || !token) return false;
 
   const client = getSupabaseClient();
+  try {
+    await removeCampaignUploads({ rpgId: id, token });
+  } catch (storageError) {
+    console.warn('Não foi possível remover todas as imagens da campanha.', storageError);
+  }
+
   const { data, error } = await client.rpc('excluir_campanha', {
     p_campanha_id: String(id),
     p_token: token
@@ -380,6 +386,40 @@ async function uploadCharacterImage({ rpgId, token, file }) {
   return client.storage.from('imagens-rpg').getPublicUrl(path).data.publicUrl;
 }
 
+function storagePathFromPublicUrl(publicUrl) {
+  const marker = '/storage/v1/object/public/imagens-rpg/';
+  const markerIndex = String(publicUrl || '').indexOf(marker);
+  if (markerIndex < 0) return null;
+  return decodeURIComponent(String(publicUrl).slice(markerIndex + marker.length));
+}
+
+async function removeUploadedImage({ rpgId, token, publicUrl }) {
+  if (isDefaultRpg(rpgId)) return;
+  const path = storagePathFromPublicUrl(publicUrl);
+  if (!path) return;
+
+  const client = getSupabaseClient();
+  const { error } = await client.storage.from('imagens-rpg').remove([path]);
+  if (error) throw error;
+}
+
+async function removeCampaignUploads({ rpgId, token }) {
+  if (isDefaultRpg(rpgId)) return;
+  const client = getSupabaseClient();
+  const tokenHash = await sha256(token);
+  const folder = `${tokenHash}/${String(rpgId)}/personagens`;
+  const { data, error } = await client.storage.from('imagens-rpg').list(folder, { limit: 1000 });
+  if (error) throw error;
+
+  const paths = (data || [])
+    .filter(file => file.id)
+    .map(file => `${folder}/${file.name}`);
+
+  if (!paths.length) return;
+  const { error: removeError } = await client.storage.from('imagens-rpg').remove(paths);
+  if (removeError) throw removeError;
+}
+
 async function createCharacter({ rpgId, token, name, categoryId, description, file }) {
   const image = await uploadCharacterImage({ rpgId, token, file });
 
@@ -413,7 +453,7 @@ async function createCharacter({ rpgId, token, name, categoryId, description, fi
   return mapCharacter(data);
 }
 
-async function deleteCharacter({ rpgId, token, characterId }) {
+async function deleteCharacter({ rpgId, token, characterId, image }) {
   if (isDefaultRpg(rpgId)) {
     const remaining = getLocalCharacters(rpgId).filter(character => character.id !== String(characterId));
     saveLocalCharacters(rpgId, remaining);
@@ -428,6 +468,13 @@ async function deleteCharacter({ rpgId, token, characterId }) {
   });
 
   if (error) throw error;
+  if (data && image) {
+    try {
+      await removeUploadedImage({ rpgId, token, publicUrl: image });
+    } catch (storageError) {
+      console.warn('Não foi possível remover a imagem do personagem.', storageError);
+    }
+  }
   return Boolean(data);
 }
 
