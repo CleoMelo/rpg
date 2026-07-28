@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Categorias</title>
-  <link rel="stylesheet" href="styles.css?v=20260728-13">
+  <link rel="stylesheet" href="styles.css?v=20260728-14">
 </head>
 <body>
   <header class="site-header">
@@ -186,7 +186,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=20260728-4"></script>
-  <script src="data.js?v=20260728-17"></script>
+  <script src="data.js?v=20260728-18"></script>
   <script src="media-upload.js?v=20260728-6"></script>
   <script>
     const rpgId = getSelectedRpg();
@@ -240,6 +240,282 @@
       pageMessage.textContent = '';
     }
 
+    let activeDrag = null;
+    let suppressSortClickUntil = 0;
+
+    function orderedByPosition(items) {
+      return [...items].sort((left, right) =>
+        (Number(left.order) || 0) - (Number(right.order) || 0)
+      );
+    }
+
+    function moveOrderedId(ids, sourceId, targetId, placeAfter) {
+      const nextIds = ids.map(String);
+      const source = String(sourceId);
+      const target = String(targetId);
+      if (source === target) return nextIds;
+
+      const sourceIndex = nextIds.indexOf(source);
+      if (sourceIndex < 0) return nextIds;
+      nextIds.splice(sourceIndex, 1);
+
+      const targetIndex = nextIds.indexOf(target);
+      if (targetIndex < 0) return ids.map(String);
+      nextIds.splice(targetIndex + (placeAfter ? 1 : 0), 0, source);
+      return nextIds;
+    }
+
+    function clearDragStyles() {
+      document.querySelectorAll(
+        '.sortable-dragging, .sortable-over'
+      ).forEach(element => {
+        element.classList.remove(
+          'sortable-dragging',
+          'sortable-over'
+        );
+      });
+      document.body.classList.remove('sorting-active');
+    }
+
+    function attachSortable(element, {
+      type,
+      id,
+      scope,
+      onReorder
+    }) {
+      if (role !== 'master') return;
+
+      element.draggable = true;
+      element.classList.add('sortable-item');
+      element.title = 'Arraste para mudar a posição';
+
+      element.addEventListener('dragstart', event => {
+        if (event.target.closest('.entity-controls, .character-actions')) {
+          event.preventDefault();
+          return;
+        }
+
+        activeDrag = {
+          type,
+          id: String(id),
+          scope: String(scope)
+        };
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', String(id));
+        element.classList.add('sortable-dragging');
+        document.body.classList.add('sorting-active');
+      });
+
+      element.addEventListener('dragover', event => {
+        if (
+          !activeDrag ||
+          activeDrag.type !== type ||
+          activeDrag.scope !== String(scope) ||
+          activeDrag.id === String(id)
+        ) return;
+
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        element.classList.add('sortable-over');
+      });
+
+      element.addEventListener('dragleave', event => {
+        if (!element.contains(event.relatedTarget)) {
+          element.classList.remove('sortable-over');
+        }
+      });
+
+      element.addEventListener('drop', event => {
+        if (
+          !activeDrag ||
+          activeDrag.type !== type ||
+          activeDrag.scope !== String(scope) ||
+          activeDrag.id === String(id)
+        ) return;
+
+        event.preventDefault();
+        const sourceId = activeDrag.id;
+        const rectangle = element.getBoundingClientRect();
+        const horizontalDistance = Math.abs(
+          event.clientX - (rectangle.left + rectangle.width / 2)
+        );
+        const verticalDistance = Math.abs(
+          event.clientY - (rectangle.top + rectangle.height / 2)
+        );
+        const placeAfter = horizontalDistance > verticalDistance
+          ? event.clientX > rectangle.left + rectangle.width / 2
+          : event.clientY > rectangle.top + rectangle.height / 2;
+
+        activeDrag = null;
+        suppressSortClickUntil = Date.now() + 300;
+        clearDragStyles();
+        void onReorder(sourceId, String(id), placeAfter);
+      });
+
+      element.addEventListener('dragend', () => {
+        activeDrag = null;
+        suppressSortClickUntil = Date.now() + 300;
+        clearDragStyles();
+      });
+    }
+
+    async function handleCategoryReorder(
+      sourceId,
+      targetId,
+      placeAfter
+    ) {
+      const currentIds = orderedByPosition(CATEGORIES)
+        .map(category => category.id);
+      const orderedIds = moveOrderedId(
+        currentIds,
+        sourceId,
+        targetId,
+        placeAfter
+      );
+      if (orderedIds.join('|') === currentIds.join('|')) return;
+
+      clearPageMessage();
+      try {
+        const saved = await reorderCategories({
+          rpgId,
+          token: masterToken,
+          orderedIds
+        });
+        if (!saved) throw new Error('Acesso do mestre expirado.');
+
+        const positions = new Map(
+          orderedIds.map((id, index) => [String(id), index + 1])
+        );
+        CATEGORIES.forEach(category => {
+          category.order = positions.get(category.id) || category.order;
+        });
+        renderCategories();
+        document.querySelectorAll('.category-button').forEach(button => {
+          button.classList.toggle(
+            'active',
+            button.dataset.category === selectedCategory
+          );
+        });
+        showPageMessage('Ordem das categorias atualizada.', 'success');
+      } catch (error) {
+        console.error(error);
+        showPageMessage(formatSupabaseError(
+          error,
+          'Não foi possível ordenar as categorias.'
+        ));
+        await loadCategories(rpgId, masterToken).catch(console.error);
+        renderCategories();
+      }
+    }
+
+    async function handleTierReorder(
+      sourceId,
+      targetId,
+      placeAfter
+    ) {
+      const currentTiers = orderedByPosition(
+        SUBCATEGORIES.filter(
+          tier => tier.category === selectedCategory
+        )
+      );
+      const currentIds = currentTiers.map(tier => tier.id);
+      const orderedIds = moveOrderedId(
+        currentIds,
+        sourceId,
+        targetId,
+        placeAfter
+      );
+      if (orderedIds.join('|') === currentIds.join('|')) return;
+
+      clearPageMessage();
+      try {
+        const saved = await reorderSubcategories({
+          rpgId,
+          token: masterToken,
+          orderedIds
+        });
+        if (!saved) throw new Error('Acesso do mestre expirado.');
+
+        const positions = new Map(
+          orderedIds.map((id, index) => [String(id), index + 1])
+        );
+        currentTiers.forEach(tier => {
+          tier.order = positions.get(tier.id) || tier.order;
+        });
+        populateSubcategorySelect(selectedCategory);
+        renderCharacters();
+        showPageMessage('Ordem dos tiers atualizada.', 'success');
+      } catch (error) {
+        console.error(error);
+        showPageMessage(formatSupabaseError(
+          error,
+          'Não foi possível ordenar os tiers.'
+        ));
+        await loadSubcategories(rpgId, masterToken).catch(console.error);
+        renderCharacters();
+      }
+    }
+
+    async function handleCharacterReorder(
+      sourceId,
+      targetId,
+      placeAfter
+    ) {
+      const source = characters.find(
+        character => character.id === String(sourceId)
+      );
+      if (!source) return;
+
+      const groupCharacters = orderedByPosition(
+        characters.filter(character =>
+          character.category === source.category &&
+          String(character.subcategory || '') ===
+            String(source.subcategory || '')
+        )
+      );
+      const currentIds = groupCharacters.map(character => character.id);
+      const orderedIds = moveOrderedId(
+        currentIds,
+        sourceId,
+        targetId,
+        placeAfter
+      );
+      if (orderedIds.join('|') === currentIds.join('|')) return;
+
+      clearPageMessage();
+      try {
+        const saved = await reorderCharacters({
+          rpgId,
+          token: masterToken,
+          categoryId: source.category,
+          subcategoryId: source.subcategory,
+          orderedIds
+        });
+        if (!saved) throw new Error('Acesso do mestre expirado.');
+
+        const positions = new Map(
+          orderedIds.map((id, index) => [String(id), index + 1])
+        );
+        groupCharacters.forEach(character => {
+          character.order =
+            positions.get(character.id) || character.order;
+        });
+        renderCharacters();
+        showPageMessage('Ordem dos personagens atualizada.', 'success');
+      } catch (error) {
+        console.error(error);
+        showPageMessage(formatSupabaseError(
+          error,
+          'Não foi possível ordenar os personagens.'
+        ));
+        characters = await loadCharacters(
+          rpgId,
+          masterToken
+        ).catch(() => characters);
+        renderCharacters();
+      }
+    }
+
     function openModal(modal) {
       modal.classList.add('open');
       document.body.classList.add('modal-open');
@@ -286,9 +562,13 @@
       categoryGrid.innerHTML = '';
       populateCategorySelect();
 
-      const visibleCategories = role === 'master'
-        ? CATEGORIES
-        : CATEGORIES.filter(category => category.visible !== false);
+      const visibleCategories = orderedByPosition(
+        role === 'master'
+          ? CATEGORIES
+          : CATEGORIES.filter(
+              category => category.visible !== false
+            )
+      );
 
       if (!visibleCategories.length) {
         categoryGrid.innerHTML = '<div class="empty-state">Nenhuma categoria disponível.</div>';
@@ -310,7 +590,10 @@
             <p class="muted">${escapeHtml(category.description)}</p>
           </div>
         `;
-        button.addEventListener('click', () => selectCategory(category.id));
+        button.addEventListener('click', () => {
+          if (Date.now() < suppressSortClickUntil) return;
+          selectCategory(category.id);
+        });
         wrapper.appendChild(button);
 
         if (role === 'master') {
@@ -352,6 +635,15 @@
           }
 
           wrapper.appendChild(controls);
+        }
+
+        if (role === 'master') {
+          attachSortable(wrapper, {
+            type: 'category',
+            id: category.id,
+            scope: rpgId,
+            onReorder: handleCategoryReorder
+          });
         }
 
         categoryGrid.appendChild(wrapper);
@@ -412,6 +704,7 @@
         </div>
       `;
 
+      card.querySelector('img').draggable = false;
       card.querySelector('img').addEventListener('error', event => {
         event.currentTarget.src =
           'https://placehold.co/600x750?text=Imagem+indisponível';
@@ -429,6 +722,15 @@
         'click',
         event => removeCharacterRecord(character.id, event.currentTarget)
       );
+
+      if (role === 'master') {
+        attachSortable(card, {
+          type: 'character',
+          id: character.id,
+          scope: `${character.category}:${character.subcategory || 'outros'}`,
+          onReorder: handleCharacterReorder
+        });
+      }
 
       return card;
     }
@@ -455,13 +757,20 @@
       const tierIds = new Set(categoryTiers.map(item => item.id));
       const groups = categoryTiers.map(tier => ({
         tier,
-        characters: filtered.filter(
-          character => character.subcategory === tier.id
+        characters: orderedByPosition(
+          filtered.filter(
+            character => character.subcategory === tier.id
+          )
         )
       }));
-      const withoutTier = filtered.filter(character =>
-        !character.subcategory ||
-        (role === 'master' && !tierIds.has(String(character.subcategory)))
+      const withoutTier = orderedByPosition(
+        filtered.filter(character =>
+          !character.subcategory ||
+          (
+            role === 'master' &&
+            !tierIds.has(String(character.subcategory))
+          )
+        )
       );
 
       if (withoutTier.length || !categoryTiers.length) {
@@ -481,6 +790,15 @@
       visibleGroups.forEach(group => {
         const section = document.createElement('section');
         section.className = 'tier-section';
+
+        if (role === 'master' && group.tier) {
+          attachSortable(section, {
+            type: 'tier',
+            id: group.tier.id,
+            scope: selectedCategory,
+            onReorder: handleTierReorder
+          });
+        }
 
         const header = document.createElement('div');
         header.className = 'tier-header';
