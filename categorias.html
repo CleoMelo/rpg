@@ -22,7 +22,16 @@
       <p>Selecione uma categoria para visualizar os personagens.</p>
     </section>
 
+    <div id="pageMessage" class="message" aria-live="polite"></div>
+
     <section>
+      <div class="toolbar">
+        <h2>Categorias</h2>
+        <div class="master-toolbar">
+          <button id="addCategoryButton" class="btn" type="button" style="display:none">+ Criar categoria</button>
+          <button id="deleteCampaignButton" class="btn danger" type="button" style="display:none">Excluir campanha</button>
+        </div>
+      </div>
       <div id="categoryGrid" class="grid category-grid"></div>
     </section>
 
@@ -32,37 +41,63 @@
           <h2 id="selectedCategoryTitle">Selecione uma categoria</h2>
           <p id="selectedCategoryDescription" class="muted"></p>
         </div>
-        <button id="addCharacterButton" class="btn" style="display:none">+ Adicionar personagem</button>
+        <button id="addCharacterButton" class="btn" type="button" style="display:none">+ Adicionar personagem</button>
       </div>
       <div id="characterGrid" class="grid character-grid"></div>
     </section>
   </main>
 
-  <div id="characterModal" class="modal-backdrop">
+  <div id="characterModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="characterModalTitle">
     <section class="card modal">
       <div class="modal-header">
-        <h2>Novo personagem</h2>
-        <button class="close-button" id="closeModal" aria-label="Fechar">×</button>
+        <h2 id="characterModalTitle">Novo personagem</h2>
+        <button class="close-button" id="closeCharacterModal" type="button" aria-label="Fechar">×</button>
       </div>
       <form id="characterForm">
         <div class="form-group">
           <label for="characterName">Nome</label>
-          <input id="characterName" required placeholder="Nome do personagem">
+          <input id="characterName" maxlength="80" required placeholder="Nome do personagem">
         </div>
         <div class="form-group">
           <label for="characterCategory">Categoria</label>
           <select id="characterCategory" required></select>
         </div>
         <div class="form-group">
-          <label for="characterImage">URL da imagem no Imgur</label>
-          <input id="characterImage" type="url" required placeholder="https://i.imgur.com/exemplo.jpg">
-          <small>Use o link direto da imagem, normalmente iniciado por i.imgur.com.</small>
+          <label for="characterImage">Imagem do personagem</label>
+          <input id="characterImage" type="file" accept="image/*" required>
+          <small>Envie JPG, PNG, WEBP ou outra imagem de até 5 MB.</small>
         </div>
         <div class="form-group">
           <label for="characterDescription">Descrição</label>
-          <textarea id="characterDescription" rows="4" placeholder="Resumo do personagem"></textarea>
+          <textarea id="characterDescription" rows="4" maxlength="500" placeholder="Resumo do personagem"></textarea>
         </div>
+        <p id="characterMessage" class="message" aria-live="polite"></p>
         <button class="btn full" type="submit">Salvar personagem</button>
+      </form>
+    </section>
+  </div>
+
+  <div id="categoryModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="categoryModalTitle">
+    <section class="card modal">
+      <div class="modal-header">
+        <h2 id="categoryModalTitle">Nova categoria</h2>
+        <button class="close-button" id="closeCategoryModal" type="button" aria-label="Fechar">×</button>
+      </div>
+      <form id="categoryForm">
+        <div class="form-group">
+          <label for="categoryName">Nome</label>
+          <input id="categoryName" maxlength="50" required placeholder="Ex.: Deuses antigos">
+        </div>
+        <div class="form-group">
+          <label for="categoryIcon">Ícone</label>
+          <input id="categoryIcon" maxlength="8" placeholder="Ex.: 🐉">
+        </div>
+        <div class="form-group">
+          <label for="categoryDescription">Descrição</label>
+          <textarea id="categoryDescription" rows="3" maxlength="180" placeholder="O que pertence a esta categoria?"></textarea>
+        </div>
+        <p id="categoryMessage" class="message" aria-live="polite"></p>
+        <button class="btn full" type="submit">Criar categoria</button>
       </form>
     </section>
   </div>
@@ -73,117 +108,331 @@
   <script>
     const rpgId = getSelectedRpg();
     const storedRole = sessionStorage.getItem('role');
+    const masterToken = getMasterToken(rpgId);
     const masterMatchesCampaign = sessionStorage.getItem('masterRpgId') === String(rpgId);
-    const role = storedRole === 'master' && !masterMatchesCampaign ? 'player' : storedRole;
+    const role = storedRole === 'master' && masterMatchesCampaign && masterToken ? 'master' : storedRole === 'player' ? 'player' : null;
+
     if (!role) location.href = `acesso.html?rpg=${encodeURIComponent(rpgId)}`;
 
     let selectedCategory = null;
-    let characters = getCharacters(rpgId);
+    let characters = [];
+    let currentRpg = null;
 
     const categoryGrid = document.getElementById('categoryGrid');
     const characterGrid = document.getElementById('characterGrid');
-    const modal = document.getElementById('characterModal');
     const categorySelect = document.getElementById('characterCategory');
+    const characterModal = document.getElementById('characterModal');
+    const categoryModal = document.getElementById('categoryModal');
+    const pageMessage = document.getElementById('pageMessage');
 
-    async function loadCampaignName() {
-      try {
-        const rpg = await getRpgById(rpgId);
-        document.getElementById('campaignName').textContent = rpg?.name || 'Campanha';
-      } catch (error) {
-        console.error(error);
-        document.getElementById('campaignName').textContent = 'Campanha';
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>'"]/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      })[char]);
+    }
+
+    function showPageMessage(text, type = 'error') {
+      pageMessage.className = `message ${type}`;
+      pageMessage.textContent = text;
+    }
+
+    function clearPageMessage() {
+      pageMessage.className = 'message';
+      pageMessage.textContent = '';
+    }
+
+    function openModal(modal) {
+      modal.classList.add('open');
+      document.body.classList.add('modal-open');
+    }
+
+    function closeModal(modal) {
+      modal.classList.remove('open');
+      if (!document.querySelector('.modal-backdrop.open')) {
+        document.body.classList.remove('modal-open');
       }
     }
-    loadCampaignName();
-    document.getElementById('roleBadge').textContent = role === 'master' ? 'Acesso de mestre' : 'Acesso de jogador';
-    document.getElementById('changeAccess').href = `acesso.html?rpg=${encodeURIComponent(rpgId)}`;
 
-    if (role === 'master') document.getElementById('addCharacterButton').style.display = 'inline-flex';
+    function populateCategorySelect() {
+      categorySelect.innerHTML = '';
+      CATEGORIES.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category.id;
+        option.textContent = `${category.icon} ${category.name}`;
+        categorySelect.appendChild(option);
+      });
+    }
 
-    CATEGORIES.forEach(category => {
-      const option = document.createElement('option');
-      option.value = category.id;
-      option.textContent = category.name;
-      categorySelect.appendChild(option);
+    function renderCategories() {
+      categoryGrid.innerHTML = '';
+      populateCategorySelect();
 
-      const button = document.createElement('button');
-      button.className = 'category-button';
-      button.dataset.category = category.id;
-      button.innerHTML = `<span class="category-icon">${category.icon}</span><div><strong>${category.name}</strong><p class="muted">${category.description}</p></div>`;
-      button.onclick = () => selectCategory(category.id);
-      categoryGrid.appendChild(button);
-    });
+      if (!CATEGORIES.length) {
+        categoryGrid.innerHTML = '<div class="empty-state">Nenhuma categoria criada.</div>';
+        return;
+      }
+
+      CATEGORIES.forEach(category => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'category-item';
+
+        const button = document.createElement('button');
+        button.className = 'category-button';
+        button.dataset.category = category.id;
+        button.innerHTML = `
+          <span class="category-icon">${escapeHtml(category.icon)}</span>
+          <div>
+            <strong>${escapeHtml(category.name)}</strong>
+            <p class="muted">${escapeHtml(category.description)}</p>
+          </div>
+        `;
+        button.addEventListener('click', () => selectCategory(category.id));
+        wrapper.appendChild(button);
+
+        if (role === 'master' && category.custom) {
+          const removeButton = document.createElement('button');
+          removeButton.className = 'category-remove';
+          removeButton.type = 'button';
+          removeButton.title = 'Excluir categoria';
+          removeButton.setAttribute('aria-label', `Excluir ${category.name}`);
+          removeButton.textContent = '×';
+          removeButton.addEventListener('click', () => removeCategory(category.id, removeButton));
+          wrapper.appendChild(removeButton);
+        }
+
+        categoryGrid.appendChild(wrapper);
+      });
+    }
 
     function selectCategory(categoryId) {
-      selectedCategory = categoryId;
-      const category = CATEGORIES.find(item => item.id === categoryId);
-      document.querySelectorAll('.category-button').forEach(btn => btn.classList.toggle('active', btn.dataset.category === categoryId));
+      selectedCategory = String(categoryId);
+      const category = CATEGORIES.find(item => item.id === selectedCategory);
+      if (!category) return;
+
+      document.querySelectorAll('.category-button').forEach(button => {
+        button.classList.toggle('active', button.dataset.category === selectedCategory);
+      });
       document.getElementById('selectedCategoryTitle').textContent = category.name;
       document.getElementById('selectedCategoryDescription').textContent = category.description;
-      categorySelect.value = categoryId;
+      categorySelect.value = selectedCategory;
       renderCharacters();
       document.getElementById('charactersSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     function renderCharacters() {
       characterGrid.innerHTML = '';
+
       if (!selectedCategory) {
         characterGrid.innerHTML = '<div class="empty-state">Escolha uma categoria acima.</div>';
         return;
       }
+
       const filtered = characters.filter(character => character.category === selectedCategory);
       if (!filtered.length) {
         characterGrid.innerHTML = '<div class="empty-state">Nenhum personagem cadastrado nesta categoria.</div>';
         return;
       }
+
       filtered.forEach(character => {
         const card = document.createElement('article');
         card.className = 'card character-card';
         card.innerHTML = `
-          <img src="${character.image}" alt="${character.name}" onerror="this.src='https://placehold.co/600x750?text=Imagem+indisponível'">
+          <img src="${escapeHtml(character.image)}" alt="${escapeHtml(character.name)}">
           <div class="character-body">
-            <h3>${character.name}</h3>
-            <p>${character.description || 'Sem descrição.'}</p>
-            ${role === 'master' ? `<div class="character-actions"><button class="btn danger" data-remove="${character.id}">Remover</button></div>` : ''}
+            <h3>${escapeHtml(character.name)}</h3>
+            <p>${escapeHtml(character.description || 'Sem descrição.')}</p>
+            ${role === 'master' ? `<div class="character-actions"><button class="btn danger" type="button" data-remove="${escapeHtml(character.id)}">Remover</button></div>` : ''}
           </div>
         `;
+        card.querySelector('img').addEventListener('error', event => {
+          event.currentTarget.src = 'https://placehold.co/600x750?text=Imagem+indisponível';
+        }, { once: true });
+
         const removeButton = card.querySelector('[data-remove]');
-        if (removeButton) removeButton.onclick = () => removeCharacter(character.id);
+        if (removeButton) {
+          removeButton.addEventListener('click', () => removeCharacterRecord(character.id, removeButton));
+        }
         characterGrid.appendChild(card);
       });
     }
 
-    function removeCharacter(id) {
-      characters = characters.filter(character => character.id !== id);
-      saveCharacters(rpgId, characters);
-      renderCharacters();
+    async function removeCharacterRecord(characterId, button) {
+      if (!confirm('Excluir este personagem?')) return;
+      button.disabled = true;
+      clearPageMessage();
+
+      try {
+        const removed = await deleteCharacter({
+          rpgId,
+          token: masterToken,
+          characterId
+        });
+        if (!removed) throw new Error('Acesso do mestre expirado.');
+        characters = characters.filter(character => character.id !== String(characterId));
+        renderCharacters();
+      } catch (error) {
+        console.error(error);
+        showPageMessage('Não foi possível excluir o personagem. Entre novamente como mestre.');
+        button.disabled = false;
+      }
     }
 
-    document.getElementById('addCharacterButton').onclick = () => {
-      if (selectedCategory) categorySelect.value = selectedCategory;
-      modal.classList.add('open');
-    };
-    document.getElementById('closeModal').onclick = () => modal.classList.remove('open');
-    modal.onclick = event => { if (event.target === modal) modal.classList.remove('open'); };
+    async function removeCategory(categoryId, button) {
+      const category = CATEGORIES.find(item => item.id === String(categoryId));
+      if (!category || !confirm(`Excluir a categoria "${category.name}" e seus personagens?`)) return;
+      button.disabled = true;
+      clearPageMessage();
 
-    document.getElementById('characterForm').addEventListener('submit', event => {
-      event.preventDefault();
-      const character = {
-        id: crypto.randomUUID(),
-        name: document.getElementById('characterName').value.trim(),
-        category: categorySelect.value,
-        image: document.getElementById('characterImage').value.trim(),
-        description: document.getElementById('characterDescription').value.trim()
-      };
-      characters.push(character);
-      saveCharacters(rpgId, characters);
-      selectedCategory = character.category;
-      event.target.reset();
-      modal.classList.remove('open');
-      selectCategory(selectedCategory);
+      try {
+        const removed = await deleteCategory({
+          rpgId,
+          token: masterToken,
+          categoryId
+        });
+        if (!removed) throw new Error('Acesso do mestre expirado.');
+        characters = await loadCharacters(rpgId);
+        if (selectedCategory === String(categoryId)) selectedCategory = null;
+        renderCategories();
+        renderCharacters();
+      } catch (error) {
+        console.error(error);
+        showPageMessage('Não foi possível excluir a categoria. Entre novamente como mestre.');
+        button.disabled = false;
+      }
+    }
+
+    document.getElementById('addCharacterButton').addEventListener('click', () => {
+      if (!CATEGORIES.length) {
+        showPageMessage('Crie uma categoria antes de adicionar personagens.');
+        return;
+      }
+      if (selectedCategory) categorySelect.value = selectedCategory;
+      openModal(characterModal);
     });
 
-    renderCharacters();
+    document.getElementById('addCategoryButton').addEventListener('click', () => openModal(categoryModal));
+    document.getElementById('closeCharacterModal').addEventListener('click', () => closeModal(characterModal));
+    document.getElementById('closeCategoryModal').addEventListener('click', () => closeModal(categoryModal));
+    characterModal.addEventListener('click', event => { if (event.target === characterModal) closeModal(characterModal); });
+    categoryModal.addEventListener('click', event => { if (event.target === categoryModal) closeModal(categoryModal); });
+
+    document.getElementById('characterForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const submitButton = form.querySelector('button[type="submit"]');
+      const formMessage = document.getElementById('characterMessage');
+      submitButton.disabled = true;
+      submitButton.textContent = 'Enviando...';
+      formMessage.className = 'message';
+      formMessage.textContent = '';
+
+      try {
+        const character = await createCharacter({
+          rpgId,
+          token: masterToken,
+          name: document.getElementById('characterName').value,
+          categoryId: categorySelect.value,
+          description: document.getElementById('characterDescription').value,
+          file: document.getElementById('characterImage').files[0]
+        });
+        characters.push(character);
+        selectedCategory = character.category;
+        form.reset();
+        closeModal(characterModal);
+        selectCategory(selectedCategory);
+      } catch (error) {
+        console.error(error);
+        formMessage.className = 'message error';
+        formMessage.textContent = error?.message || 'Não foi possível salvar o personagem.';
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Salvar personagem';
+      }
+    });
+
+    document.getElementById('categoryForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const submitButton = form.querySelector('button[type="submit"]');
+      const formMessage = document.getElementById('categoryMessage');
+      submitButton.disabled = true;
+      formMessage.className = 'message';
+      formMessage.textContent = '';
+
+      try {
+        const category = await createCategory({
+          rpgId,
+          token: masterToken,
+          name: document.getElementById('categoryName').value,
+          description: document.getElementById('categoryDescription').value,
+          icon: document.getElementById('categoryIcon').value
+        });
+        form.reset();
+        closeModal(categoryModal);
+        renderCategories();
+        selectCategory(category.id);
+      } catch (error) {
+        console.error(error);
+        formMessage.className = 'message error';
+        formMessage.textContent = error?.message || 'Não foi possível criar a categoria.';
+      } finally {
+        submitButton.disabled = false;
+      }
+    });
+
+    document.getElementById('deleteCampaignButton').addEventListener('click', async event => {
+      if (!currentRpg?.custom) {
+        showPageMessage('As campanhas demonstrativas não podem ser excluídas.');
+        return;
+      }
+      if (!confirm(`Excluir permanentemente a campanha "${currentRpg.name}"?`)) return;
+
+      const button = event.currentTarget;
+      button.disabled = true;
+      clearPageMessage();
+
+      try {
+        const removed = await deleteRpg(rpgId, masterToken);
+        if (!removed) throw new Error('Acesso do mestre expirado.');
+        location.href = 'index.html';
+      } catch (error) {
+        console.error(error);
+        showPageMessage('Não foi possível excluir a campanha. Entre novamente como mestre.');
+        button.disabled = false;
+      }
+    });
+
+    async function initializePage() {
+      document.getElementById('changeAccess').href = `acesso.html?rpg=${encodeURIComponent(rpgId)}`;
+      document.getElementById('roleBadge').textContent = role === 'master' ? 'Acesso de mestre' : 'Acesso de jogador';
+      categoryGrid.innerHTML = '<div class="empty-state">Carregando categorias...</div>';
+      characterGrid.innerHTML = '<div class="empty-state">Carregando personagens...</div>';
+
+      try {
+        currentRpg = await getRpgById(rpgId);
+        document.getElementById('campaignName').textContent = currentRpg?.name || 'Campanha';
+        await loadCategories(rpgId);
+        characters = await loadCharacters(rpgId);
+
+        if (role === 'master') {
+          document.getElementById('addCategoryButton').style.display = 'inline-flex';
+          document.getElementById('addCharacterButton').style.display = 'inline-flex';
+          if (currentRpg?.custom) {
+            document.getElementById('deleteCampaignButton').style.display = 'inline-flex';
+          }
+        }
+
+        renderCategories();
+        renderCharacters();
+      } catch (error) {
+        console.error(error);
+        showPageMessage('Não foi possível carregar categorias e personagens. Execute o SQL de atualização no Supabase.');
+        categoryGrid.innerHTML = '';
+        characterGrid.innerHTML = '';
+      }
+    }
+
+    initializePage();
   </script>
 </body>
 </html>
