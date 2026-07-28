@@ -290,6 +290,8 @@
       element.title = 'Arraste para mudar a posição';
 
       element.addEventListener('dragstart', event => {
+        if (event.target.closest('.sortable-item') !== element) return;
+
         if (event.target.closest('.entity-controls, .character-actions')) {
           event.preventDefault();
           return;
