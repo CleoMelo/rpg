@@ -48,8 +48,8 @@
     }
 
     document.getElementById('playerButton').onclick = () => {
+      clearMasterSession(rpgId);
       sessionStorage.setItem('role', 'player');
-      sessionStorage.removeItem('masterRpgId');
       location.href = `categorias.html?rpg=${encodeURIComponent(rpgId)}`;
     };
 
