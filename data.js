@@ -22,58 +22,105 @@ const DEFAULT_RPGS = [
   }
 ];
 
-function loadCustomRpgs() {
-  try {
-    const saved = JSON.parse(localStorage.getItem("customRpgs") || "[]");
-    return Array.isArray(saved) ? saved : [];
-  } catch {
-    return [];
+let RPGS = [];
+let supabaseClient = null;
+
+function getSupabaseClient() {
+  if (supabaseClient) return supabaseClient;
+
+  const config = window.SUPABASE_CONFIG || {};
+  const configured = config.url && config.anonKey &&
+    !config.url.includes('COLE_AQUI') && !config.anonKey.includes('COLE_AQUI');
+
+  if (!configured || !window.supabase) {
+    throw new Error('Supabase não configurado. Preencha o arquivo supabase-config.js.');
   }
+
+  supabaseClient = window.supabase.createClient(config.url, config.anonKey);
+  return supabaseClient;
 }
 
-const RPGS = [...DEFAULT_RPGS, ...loadCustomRpgs()];
+function mapCampaign(row) {
+  return {
+    id: String(row.id),
+    name: row.nome,
+    description: row.descricao || 'Campanha personalizada.',
+    image: row.imagem_url,
+    custom: true
+  };
+}
+
+async function loadRpgs() {
+  try {
+    const client = getSupabaseClient();
+    const { data, error } = await client
+      .from('campanhas')
+      .select('id, nome, descricao, imagem_url, criado_em')
+      .order('criado_em', { ascending: true });
+
+    if (error) throw error;
+    RPGS = [...DEFAULT_RPGS, ...(data || []).map(mapCampaign)];
+  } catch (error) {
+    console.error(error);
+    RPGS = [...DEFAULT_RPGS];
+    throw error;
+  }
+
+  return RPGS;
+}
 
 function slugifyRpgName(name) {
   const base = name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "campanha";
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'campanha';
 
-  let id = base;
-  let suffix = 2;
-  while (RPGS.some(rpg => rpg.id === id)) id = `${base}-${suffix++}`;
-  return id;
+  const unique = typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID().slice(0, 8)
+    : Date.now().toString(36);
+  return `${base}-${unique}`;
 }
 
-function createRpg({ name, description, image }) {
-  const rpg = {
+async function createRpg({ name, description, image }) {
+  const client = getSupabaseClient();
+  const payload = {
     id: slugifyRpgName(name),
-    name: name.trim(),
-    description: description.trim() || "Campanha personalizada.",
-    image: image.trim(),
-    custom: true
+    nome: name.trim(),
+    descricao: description.trim() || 'Campanha personalizada.',
+    imagem_url: image.trim()
   };
 
-  const customRpgs = loadCustomRpgs();
-  customRpgs.push(rpg);
-  localStorage.setItem("customRpgs", JSON.stringify(customRpgs));
+  const { data, error } = await client
+    .from('campanhas')
+    .insert(payload)
+    .select('id, nome, descricao, imagem_url, criado_em')
+    .single();
+
+  if (error) throw error;
+  const rpg = mapCampaign(data);
   RPGS.push(rpg);
   return rpg;
 }
 
-function deleteRpg(id) {
-  const rpg = RPGS.find(item => item.id === id);
+async function deleteRpg(id) {
+  const rpg = RPGS.find(item => item.id === String(id));
   if (!rpg?.custom) return false;
 
-  const updated = loadCustomRpgs().filter(item => item.id !== id);
-  localStorage.setItem("customRpgs", JSON.stringify(updated));
-  localStorage.removeItem(`characters:${id}`);
+  const client = getSupabaseClient();
+  const { error } = await client.from('campanhas').delete().eq('id', id);
+  if (error) throw error;
 
-  const index = RPGS.findIndex(item => item.id === id);
+  const index = RPGS.findIndex(item => item.id === String(id));
   if (index >= 0) RPGS.splice(index, 1);
+  localStorage.removeItem(`characters:${id}`);
   return true;
+}
+
+async function getRpgById(id) {
+  if (!RPGS.length) await loadRpgs();
+  return RPGS.find(item => item.id === String(id)) || RPGS[0];
 }
 
 const CATEGORIES = [
@@ -108,7 +155,7 @@ const DEFAULT_CHARACTERS = {
 
 function getSelectedRpg() {
   const params = new URLSearchParams(location.search);
-  return params.get("rpg") || localStorage.getItem("selectedRpg") || RPGS[0].id;
+  return params.get("rpg") || localStorage.getItem("selectedRpg") || DEFAULT_RPGS[0].id;
 }
 
 function setSelectedRpg(id) {
