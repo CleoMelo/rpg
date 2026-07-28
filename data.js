@@ -348,7 +348,10 @@ async function sha256(value) {
 
 function validateImageFile(file) {
   if (!file) throw new Error('Selecione uma imagem.');
-  if (!file.type.startsWith('image/')) throw new Error('O arquivo selecionado não é uma imagem.');
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'];
+  if (!allowedTypes.includes(file.type)) {
+    throw new Error('Use uma imagem JPG, PNG, WEBP, GIF ou AVIF.');
+  }
   if (file.size > 5 * 1024 * 1024) throw new Error('A imagem deve ter no máximo 5 MB.');
 }
 
