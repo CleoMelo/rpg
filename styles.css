@@ -177,7 +177,13 @@ small, .muted { color: var(--muted); }
 .message.error { color: #fca5a5; }
 .message.success { color: #86efac; }
 
+.category-item {
+  position: relative;
+  min-width: 0;
+}
 .category-button {
+  width: 100%;
+  height: 100%;
   min-height: 145px;
   display: flex;
   flex-direction: column;
@@ -191,6 +197,21 @@ small, .muted { color: var(--muted); }
 }
 .category-button:hover, .category-button.active { border-color: var(--accent-2); background: var(--panel-2); }
 .category-icon { font-size: 2rem; }
+.category-remove {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  background: rgba(8,10,15,.75);
+  color: white;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+.category-remove:hover { background: var(--danger); }
 
 .toolbar {
   display: flex;
@@ -199,6 +220,30 @@ small, .muted { color: var(--muted); }
   gap: 14px;
   margin: 32px 0 22px;
   flex-wrap: wrap;
+}
+
+.master-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.btn:disabled, .category-remove:disabled {
+  cursor: wait;
+  opacity: .6;
+  transform: none;
+}
+input[type="file"] {
+  padding: 9px;
+}
+input[type="file"]::file-selector-button {
+  margin-right: 12px;
+  border: 0;
+  border-radius: 9px;
+  padding: 9px 12px;
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
 }
 
 .character-card { padding: 0; }
@@ -281,22 +326,6 @@ body.modal-open { overflow: hidden; }
   gap: 18px;
 }
 .rpg-card h3 { font-size: 1.45rem; margin-bottom: 8px; }
-.campaign-delete {
-  position: absolute;
-  z-index: 3;
-  top: 14px;
-  right: 14px;
-  width: 36px;
-  height: 36px;
-  border: 1px solid rgba(255,255,255,.25);
-  border-radius: 999px;
-  background: rgba(8,10,15,.72);
-  color: #fff;
-  font-size: 1.35rem;
-  line-height: 1;
-  backdrop-filter: blur(8px);
-}
-.campaign-delete:hover { background: var(--danger); }
 .campaign-preview {
   min-height: 180px;
   display: grid;
