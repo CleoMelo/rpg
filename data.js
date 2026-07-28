@@ -69,24 +69,38 @@ async function loadRpgs() {
   return RPGS;
 }
 
-async function createRpg({ name, description, image }) {
+async function createRpg({ name, description, image, password }) {
   const client = getSupabaseClient();
-  const payload = {
-    nome: name.trim(),
-    descricao: description.trim() || 'Campanha personalizada.',
-    imagem_url: image.trim()
-  };
-
   const { data, error } = await client
-    .from('campanhas')
-    .insert(payload)
-    .select('id, nome, descricao, imagem_url, criado_em')
+    .rpc('criar_campanha', {
+      p_nome: name.trim(),
+      p_descricao: description.trim() || 'Campanha personalizada.',
+      p_imagem_url: image.trim(),
+      p_senha: password
+    })
     .single();
 
   if (error) throw error;
   const rpg = mapCampaign(data);
   RPGS.push(rpg);
   return rpg;
+}
+
+async function verifyMasterPassword(id, password) {
+  const rpg = await getRpgById(id);
+
+  if (!rpg?.custom) {
+    return password === 'mestre123';
+  }
+
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('verificar_senha_mestre', {
+    p_campanha_id: String(id),
+    p_senha: password
+  });
+
+  if (error) throw error;
+  return data === true;
 }
 
 async function deleteRpg(id) {
