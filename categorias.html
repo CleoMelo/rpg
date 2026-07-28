@@ -63,9 +63,12 @@
           <select id="characterCategory" required></select>
         </div>
         <div class="form-group">
-          <label for="characterImage">Imagem do personagem</label>
-          <input id="characterImage" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" required>
-          <small>Envie JPG, PNG, WEBP ou outra imagem de até 5 MB.</small>
+          <label for="characterImage">Link direto da imagem no Imgur</label>
+          <input id="characterImage" type="url" required placeholder="https://i.imgur.com/exemplo.png">
+          <small>
+            <a class="inline-link" href="https://imgur.com/upload" target="_blank" rel="noopener noreferrer">Abrir upload do Imgur ↗</a>
+            — após enviar, clique com o botão direito na imagem e escolha <strong>Copiar endereço da imagem</strong>.
+          </small>
         </div>
         <div class="form-group">
           <label for="characterDescription">Descrição</label>
@@ -262,12 +265,10 @@
       clearPageMessage();
 
       try {
-        const targetCharacter = characters.find(character => character.id === String(characterId));
         const removed = await deleteCharacter({
           rpgId,
           token: masterToken,
-          characterId,
-          image: targetCharacter?.image
+          characterId
         });
         if (!removed) throw new Error('Acesso do mestre expirado.');
         characters = characters.filter(character => character.id !== String(characterId));
@@ -324,7 +325,7 @@
       const submitButton = form.querySelector('button[type="submit"]');
       const formMessage = document.getElementById('characterMessage');
       submitButton.disabled = true;
-      submitButton.textContent = 'Enviando...';
+      submitButton.textContent = 'Salvando...';
       formMessage.className = 'message';
       formMessage.textContent = '';
 
@@ -335,7 +336,7 @@
           name: document.getElementById('characterName').value,
           categoryId: categorySelect.value,
           description: document.getElementById('characterDescription').value,
-          file: document.getElementById('characterImage').files[0]
+          image: document.getElementById('characterImage').value
         });
         characters.push(character);
         selectedCategory = character.category;
