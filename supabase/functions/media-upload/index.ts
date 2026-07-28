@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 0.7 seconds
-Output:
 const ALLOWED_ORIGINS = new Set([
   "https://cleomelo.github.io",
   "http://localhost:5500",
@@ -168,7 +165,7 @@ async function uploadToDrive(file: File, fileName: string) {
   const metadata = JSON.stringify({
     name: fileName,
     parents: [requiredSecret("GOOGLE_DRIVE_FOLDER_ID")],
-    description: "Backup automÃ¡tico criado pelo Portal de RPGs",
+    description: "Backup automático criado pelo Portal de RPGs",
   });
 
   const body = new Blob([
@@ -197,7 +194,7 @@ async function uploadToDrive(file: File, fileName: string) {
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(
-      result.error?.message || "NÃ£o foi possÃ­vel criar o backup no Drive.",
+      result.error?.message || "Não foi possível criar o backup no Drive.",
     );
   }
   return result.id as string;
@@ -208,7 +205,7 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders(req) });
   }
   if (req.method !== "POST") {
-    return json(req, { error: "MÃ©todo nÃ£o permitido." }, 405);
+    return json(req, { error: "Método não permitido." }, 405);
   }
 
   try {
@@ -225,16 +222,16 @@ Deno.serve(async (req) => {
       return json(req, { error: "Acesso do mestre ausente." }, 401);
     }
     if (!["campaign", "character"].includes(kind)) {
-      return json(req, { error: "Tipo de imagem invÃ¡lido." }, 400);
+      return json(req, { error: "Tipo de imagem inválido." }, 400);
     }
     if (!ALLOWED_TYPES.has(file.type)) {
       return json(req, { error: "Use uma imagem JPG, PNG, WebP ou AVIF." }, 415);
     }
     if (file.size > MAX_FILE_SIZE) {
-      return json(req, { error: "A imagem deve ter no mÃ¡ximo 5 MB." }, 413);
+      return json(req, { error: "A imagem deve ter no máximo 5 MB." }, 413);
     }
     if (!(await verifyMaster(campaignId, masterToken))) {
-      return json(req, { error: "Acesso do mestre invÃ¡lido ou expirado." }, 403);
+      return json(req, { error: "Acesso do mestre inválido ou expirado." }, 403);
     }
 
     const imageKit = await uploadToImageKit(file, campaignId, kind);
@@ -263,8 +260,7 @@ Deno.serve(async (req) => {
     return json(req, {
       error: error instanceof Error
         ? error.message
-        : "NÃ£o foi possÃ­vel enviar a imagem.",
+        : "Não foi possível enviar a imagem.",
     }, 500);
   }
 });
-
