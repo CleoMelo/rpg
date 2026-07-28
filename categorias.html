@@ -314,6 +314,18 @@
       handleSortAutoScroll
     );
 
+    function canDropSortedItem(type, id, scope) {
+      return Boolean(
+        activeDrag &&
+        activeDrag.type === type &&
+        activeDrag.id !== String(id) &&
+        (
+          type === 'character' ||
+          activeDrag.scope === String(scope)
+        )
+      );
+    }
+
     function attachSortable(element, {
       type,
       id,
@@ -346,12 +358,7 @@
       });
 
       element.addEventListener('dragover', event => {
-        if (
-          !activeDrag ||
-          activeDrag.type !== type ||
-          activeDrag.scope !== String(scope) ||
-          activeDrag.id === String(id)
-        ) return;
+        if (!canDropSortedItem(type, id, scope)) return;
 
         event.preventDefault();
         event.dataTransfer.dropEffect = 'move';
@@ -365,12 +372,7 @@
       });
 
       element.addEventListener('drop', event => {
-        if (
-          !activeDrag ||
-          activeDrag.type !== type ||
-          activeDrag.scope !== String(scope) ||
-          activeDrag.id === String(id)
-        ) return;
+        if (!canDropSortedItem(type, id, scope)) return;
 
         event.preventDefault();
         const sourceId = activeDrag.id;
@@ -385,6 +387,47 @@
         activeDrag = null;
         suppressSortClickUntil = Date.now() + 300;
         clearDragStyles();
+      });
+    }
+
+    function attachCharacterTierDropZone(
+      element,
+      subcategoryId
+    ) {
+      if (role !== 'master') return;
+
+      element.addEventListener('dragover', event => {
+        if (!activeDrag || activeDrag.type !== 'character') {
+          return;
+        }
+
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        element.classList.add('sortable-over');
+      });
+
+      element.addEventListener('dragleave', event => {
+        if (!element.contains(event.relatedTarget)) {
+          element.classList.remove('sortable-over');
+        }
+      });
+
+      element.addEventListener('drop', event => {
+        if (!activeDrag || activeDrag.type !== 'character') {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        const sourceId = activeDrag.id;
+        activeDrag = null;
+        suppressSortClickUntil = Date.now() + 300;
+        clearDragStyles();
+        void handleCharacterTierMove(
+          sourceId,
+          selectedCategory,
+          subcategoryId
+        );
       });
     }
 
@@ -487,6 +530,101 @@
       }
     }
 
+    async function handleCharacterTierMove(
+      sourceId,
+      targetCategoryId,
+      targetSubcategoryId,
+      targetId = null
+    ) {
+      const sourceCharacter = characters.find(
+        character => character.id === String(sourceId)
+      );
+      if (!sourceCharacter) return;
+
+      const targetCategory = String(targetCategoryId);
+      const targetSubcategory = targetSubcategoryId
+        ? String(targetSubcategoryId)
+        : null;
+      const sameGroup =
+        sourceCharacter.category === targetCategory &&
+        String(sourceCharacter.subcategory || '') ===
+          String(targetSubcategory || '');
+
+      const destinationCharacters = orderedByPosition(
+        characters.filter(character =>
+          character.id !== sourceCharacter.id &&
+          character.category === targetCategory &&
+          String(character.subcategory || '') ===
+            String(targetSubcategory || '')
+        )
+      );
+      const orderedIds = destinationCharacters.map(
+        character => character.id
+      );
+      const targetIndex = targetId
+        ? orderedIds.indexOf(String(targetId))
+        : -1;
+      orderedIds.splice(
+        targetIndex >= 0 ? targetIndex : orderedIds.length,
+        0,
+        sourceCharacter.id
+      );
+
+      clearPageMessage();
+      try {
+        if (!sameGroup) {
+          const updated = await updateCharacter({
+            rpgId,
+            token: masterToken,
+            characterId: sourceCharacter.id,
+            name: sourceCharacter.name,
+            categoryId: targetCategory,
+            subcategoryId: targetSubcategory,
+            description: sourceCharacter.description || '',
+            image: sourceCharacter.image,
+            visible: sourceCharacter.visible !== false
+          });
+          if (!updated) {
+            throw new Error('Acesso do mestre expirado.');
+          }
+
+          const sourceIndex = characters.findIndex(
+            character => character.id === sourceCharacter.id
+          );
+          if (sourceIndex >= 0) characters[sourceIndex] = updated;
+        }
+
+        const saved = await reorderCharacters({
+          rpgId,
+          token: masterToken,
+          categoryId: targetCategory,
+          subcategoryId: targetSubcategory,
+          orderedIds
+        });
+        if (!saved) throw new Error('Acesso do mestre expirado.');
+
+        characters = await loadCharacters(rpgId, masterToken);
+        renderCharacters();
+        showPageMessage(
+          sameGroup
+            ? 'Ordem dos personagens atualizada.'
+            : 'Personagem movido para outro tier.',
+          'success'
+        );
+      } catch (error) {
+        console.error(error);
+        showPageMessage(formatSupabaseError(
+          error,
+          'Não foi possível mover o personagem.'
+        ));
+        characters = await loadCharacters(
+          rpgId,
+          masterToken
+        ).catch(() => characters);
+        renderCharacters();
+      }
+    }
+
     async function handleCharacterReorder(
       sourceId,
       targetId
@@ -494,7 +632,24 @@
       const source = characters.find(
         character => character.id === String(sourceId)
       );
-      if (!source) return;
+      const target = characters.find(
+        character => character.id === String(targetId)
+      );
+      if (!source || !target) return;
+
+      if (
+        source.category !== target.category ||
+        String(source.subcategory || '') !==
+          String(target.subcategory || '')
+      ) {
+        await handleCharacterTierMove(
+          sourceId,
+          target.category,
+          target.subcategory,
+          targetId
+        );
+        return;
+      }
 
       const groupCharacters = orderedByPosition(
         characters.filter(character =>
@@ -802,7 +957,11 @@
         )
       );
 
-      if (withoutTier.length || !categoryTiers.length) {
+      if (
+        withoutTier.length ||
+        !categoryTiers.length ||
+        role === 'master'
+      ) {
         groups.push({ tier: null, characters: withoutTier });
       }
 
@@ -827,6 +986,12 @@
             scope: selectedCategory,
             onReorder: handleTierReorder
           });
+        }
+        if (role === 'master') {
+          attachCharacterTierDropZone(
+            section,
+            group.tier?.id || null
+          );
         }
 
         const header = document.createElement('div');
