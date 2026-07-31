@@ -317,6 +317,88 @@ body.sorting-active {
   gap: 10px;
   flex-wrap: wrap;
 }
+
+.filter-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  align-items: end;
+  gap: 14px;
+  margin: 0 0 24px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.018));
+  box-shadow: 0 14px 35px rgba(0,0,0,.16);
+}
+
+.campaign-filter-panel,
+.category-filter-panel {
+  grid-template-columns: minmax(260px, 1fr) auto;
+}
+
+.character-filter-panel {
+  grid-template-columns: minmax(250px, 1.7fr) repeat(4, minmax(150px, 1fr)) auto;
+}
+
+.filter-field {
+  min-width: 0;
+}
+
+.filter-field-grow {
+  min-width: min(100%, 260px);
+}
+
+.filter-field label {
+  margin-bottom: 7px;
+  color: #dbe2f0;
+  font-size: .82rem;
+  letter-spacing: .025em;
+}
+
+.filter-field input,
+.filter-field select {
+  min-height: 46px;
+  background: rgba(7,10,16,.72);
+}
+
+.search-input {
+  position: relative;
+}
+
+.search-input > span {
+  position: absolute;
+  z-index: 1;
+  left: 14px;
+  top: 50%;
+  color: var(--muted);
+  font-size: 1.35rem;
+  line-height: 1;
+  pointer-events: none;
+  transform: translateY(-53%);
+}
+
+.search-input input {
+  padding-left: 42px;
+}
+
+.filter-clear {
+  min-height: 46px;
+  white-space: nowrap;
+}
+
+.filter-clear:disabled {
+  cursor: default;
+  opacity: .42;
+}
+
+.filter-status {
+  grid-column: 1 / -1;
+  margin: -2px 0 0;
+  color: var(--muted);
+  font-size: .88rem;
+}
+
 .btn:disabled, .entity-icon-button:disabled {
   cursor: wait;
   opacity: .6;
@@ -577,7 +659,33 @@ input[type="file"]::file-selector-button {
   grid-column: 1 / -1;
 }
 
+@media (max-width: 1120px) {
+  .character-filter-panel {
+    grid-template-columns: repeat(3, minmax(170px, 1fr));
+  }
+
+  .character-filter-panel .filter-field-grow {
+    grid-column: span 2;
+  }
+}
+
 @media (max-width: 620px) {
+  .filter-panel,
+  .campaign-filter-panel,
+  .category-filter-panel,
+  .character-filter-panel {
+    grid-template-columns: 1fr;
+    padding: 14px;
+  }
+
+  .character-filter-panel .filter-field-grow {
+    grid-column: auto;
+  }
+
+  .filter-clear {
+    width: 100%;
+  }
+
   .tier-section {
     padding: 14px;
   }

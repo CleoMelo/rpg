@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Portal de RPGs</title>
-  <link rel="stylesheet" href="styles.css?v=20260728-11">
+  <link rel="stylesheet" href="styles.css?v=20260731-1">
 </head>
 <body>
   <header class="site-header">
@@ -35,6 +35,24 @@
           <p>Selecione uma campanha para entrar.</p>
         </div>
         <button id="sectionCreateRpg" class="btn" type="button">+ Nova campanha</button>
+      </div>
+      <div class="filter-panel campaign-filter-panel">
+        <div class="filter-field filter-field-grow">
+          <label for="campaignSearch">Pesquisar campanhas</label>
+          <div class="search-input">
+            <span aria-hidden="true">⌕</span>
+            <input
+              id="campaignSearch"
+              type="search"
+              autocomplete="off"
+              placeholder="Nome ou descrição da campanha"
+            >
+          </div>
+        </div>
+        <button id="clearCampaignSearch" class="btn secondary filter-clear" type="button">
+          Limpar
+        </button>
+        <p id="campaignFilterStatus" class="filter-status" aria-live="polite"></p>
       </div>
       <div id="rpgGrid" class="grid rpg-grid"></div>
     </section>
@@ -102,6 +120,9 @@
     const imageInput = document.getElementById('rpgImage');
     const preview = document.getElementById('imagePreview');
     const message = document.getElementById('rpgMessage');
+    const campaignSearch = document.getElementById('campaignSearch');
+    const clearCampaignSearch = document.getElementById('clearCampaignSearch');
+    const campaignFilterStatus = document.getElementById('campaignFilterStatus');
 
     function escapeHtml(value) {
       return String(value).replace(/[&<>'"]/g, char => ({
@@ -109,16 +130,38 @@
       })[char]);
     }
 
+    function normalizeSearch(value) {
+      return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLocaleLowerCase('pt-BR')
+        .trim();
+    }
+
     function renderRpgs() {
       grid.innerHTML = '';
-      grid.classList.toggle('single-item', RPGS.length === 1);
+      const query = normalizeSearch(campaignSearch.value);
+      const filteredRpgs = RPGS.filter(rpg => {
+        if (!query) return true;
+        return normalizeSearch(
+          `${rpg.name} ${rpg.description || ''}`
+        ).includes(query);
+      });
 
-      if (!RPGS.length) {
-        grid.innerHTML = '<div class="empty-state">Nenhuma campanha encontrada.</div>';
+      grid.classList.toggle('single-item', filteredRpgs.length === 1);
+      clearCampaignSearch.disabled = !query;
+      campaignFilterStatus.textContent = query
+        ? `${filteredRpgs.length} de ${RPGS.length} campanha(s) encontrada(s)`
+        : `${RPGS.length} campanha(s) disponível(is)`;
+
+      if (!filteredRpgs.length) {
+        grid.innerHTML = query
+          ? '<div class="empty-state">Nenhuma campanha corresponde à pesquisa.</div>'
+          : '<div class="empty-state">Nenhuma campanha encontrada.</div>';
         return;
       }
 
-      RPGS.forEach(rpg => {
+      filteredRpgs.forEach(rpg => {
         const card = document.createElement('article');
         card.className = 'card rpg-card';
         card.style.backgroundImage = `url("${rpg.image.replace(/"/g, '%22')}")`;
@@ -136,6 +179,13 @@
         grid.appendChild(card);
       });
     }
+
+    campaignSearch.addEventListener('input', renderRpgs);
+    clearCampaignSearch.addEventListener('click', () => {
+      campaignSearch.value = '';
+      renderRpgs();
+      campaignSearch.focus();
+    });
 
     function openModal() {
       modal.classList.add('open');

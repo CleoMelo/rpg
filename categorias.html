@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Categorias</title>
-  <link rel="stylesheet" href="styles.css?v=20260728-15">
+  <link rel="stylesheet" href="styles.css?v=20260731-1">
 </head>
 <body>
   <header class="site-header">
@@ -33,6 +33,24 @@
           <button id="deleteCampaignButton" class="btn danger" type="button" style="display:none">Excluir campanha</button>
         </div>
       </div>
+      <div class="filter-panel category-filter-panel">
+        <div class="filter-field filter-field-grow">
+          <label for="categorySearch">Pesquisar categorias</label>
+          <div class="search-input">
+            <span aria-hidden="true">⌕</span>
+            <input
+              id="categorySearch"
+              type="search"
+              autocomplete="off"
+              placeholder="Nome ou descrição da categoria"
+            >
+          </div>
+        </div>
+        <button id="clearCategorySearch" class="btn secondary filter-clear" type="button">
+          Limpar
+        </button>
+        <p id="categoryFilterStatus" class="filter-status" aria-live="polite"></p>
+      </div>
       <div id="categoryGrid" class="grid category-grid"></div>
     </section>
 
@@ -46,6 +64,54 @@
           <button id="addSubcategoryButton" class="btn secondary" type="button" style="display:none">+ Criar tier</button>
           <button id="addCharacterButton" class="btn" type="button" style="display:none">+ Adicionar personagem</button>
         </div>
+      </div>
+      <div id="characterFilters" class="filter-panel character-filter-panel">
+        <div class="filter-field filter-field-grow">
+          <label for="characterSearch">Pesquisar personagens</label>
+          <div class="search-input">
+            <span aria-hidden="true">⌕</span>
+            <input
+              id="characterSearch"
+              type="search"
+              autocomplete="off"
+              placeholder="Nome, descrição ou tier"
+            >
+          </div>
+        </div>
+        <div class="filter-field">
+          <label for="tierFilter">Tier</label>
+          <select id="tierFilter">
+            <option value="all">Todos os tiers</option>
+          </select>
+        </div>
+        <div id="visibilityFilterField" class="filter-field" style="display:none">
+          <label for="visibilityFilter">Visibilidade</label>
+          <select id="visibilityFilter">
+            <option value="all">Todos</option>
+            <option value="visible">Visíveis aos jogadores</option>
+            <option value="hidden">Somente para o mestre</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label for="descriptionFilter">Descrição</label>
+          <select id="descriptionFilter">
+            <option value="all">Todas</option>
+            <option value="with">Com descrição</option>
+            <option value="without">Sem descrição</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label for="characterSort">Ordenar</label>
+          <select id="characterSort">
+            <option value="position">Ordem atual</option>
+            <option value="name-asc">Nome: A–Z</option>
+            <option value="name-desc">Nome: Z–A</option>
+          </select>
+        </div>
+        <button id="clearCharacterFilters" class="btn secondary filter-clear" type="button">
+          Limpar filtros
+        </button>
+        <p id="characterFilterStatus" class="filter-status" aria-live="polite"></p>
       </div>
       <div id="characterGrid" class="grid character-grid"></div>
     </section>
@@ -213,11 +279,54 @@
     const categoryModal = document.getElementById('categoryModal');
     const subcategoryModal = document.getElementById('subcategoryModal');
     const pageMessage = document.getElementById('pageMessage');
+    const categorySearch = document.getElementById('categorySearch');
+    const clearCategorySearch = document.getElementById('clearCategorySearch');
+    const categoryFilterStatus = document.getElementById('categoryFilterStatus');
+    const characterSearch = document.getElementById('characterSearch');
+    const tierFilter = document.getElementById('tierFilter');
+    const visibilityFilter = document.getElementById('visibilityFilter');
+    const descriptionFilter = document.getElementById('descriptionFilter');
+    const characterSort = document.getElementById('characterSort');
+    const clearCharacterFilters = document.getElementById('clearCharacterFilters');
+    const characterFilterStatus = document.getElementById('characterFilterStatus');
 
     function escapeHtml(value) {
       return String(value ?? '').replace(/[&<>'"]/g, char => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
       })[char]);
+    }
+
+    function normalizeSearch(value) {
+      return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLocaleLowerCase('pt-BR')
+        .trim();
+    }
+
+    function characterFiltersAreActive() {
+      return Boolean(
+        normalizeSearch(characterSearch.value) ||
+        tierFilter.value !== 'all' ||
+        visibilityFilter.value !== 'all' ||
+        descriptionFilter.value !== 'all' ||
+        characterSort.value !== 'position'
+      );
+    }
+
+    function sortCharactersForView(items) {
+      if (characterSort.value === 'position') {
+        return orderedByPosition(items);
+      }
+
+      const direction = characterSort.value === 'name-desc' ? -1 : 1;
+      return [...items].sort((left, right) =>
+        direction * String(left.name || '').localeCompare(
+          String(right.name || ''),
+          'pt-BR',
+          { sensitivity: 'base' }
+        )
+      );
     }
 
     function formatSupabaseError(error, fallback) {
@@ -742,20 +851,61 @@
       ) ? String(selectedId) : '';
     }
 
+    function populateTierFilter(categoryId) {
+      const previousValue = tierFilter.value || 'all';
+      const categoryTiers = SUBCATEGORIES
+        .filter(item =>
+          item.category === String(categoryId) &&
+          (role === 'master' || item.visible !== false)
+        )
+        .sort((left, right) => left.order - right.order);
+
+      tierFilter.innerHTML = '<option value="all">Todos os tiers</option>';
+      categoryTiers.forEach(tier => {
+        const option = document.createElement('option');
+        option.value = tier.id;
+        option.textContent = tier.name;
+        tierFilter.appendChild(option);
+      });
+
+      const withoutTierOption = document.createElement('option');
+      withoutTierOption.value = 'without-tier';
+      withoutTierOption.textContent = 'Outros (sem tier)';
+      tierFilter.appendChild(withoutTierOption);
+
+      tierFilter.value = [...tierFilter.options].some(
+        option => option.value === previousValue
+      ) ? previousValue : 'all';
+    }
+
     function renderCategories() {
       categoryGrid.innerHTML = '';
       populateCategorySelect();
 
-      const visibleCategories = orderedByPosition(
+      const categoryQuery = normalizeSearch(categorySearch.value);
+      const availableCategories = orderedByPosition(
         role === 'master'
           ? CATEGORIES
           : CATEGORIES.filter(
               category => category.visible !== false
             )
       );
+      const visibleCategories = availableCategories.filter(category => {
+        if (!categoryQuery) return true;
+        return normalizeSearch(
+          `${category.name} ${category.description || ''}`
+        ).includes(categoryQuery);
+      });
+
+      clearCategorySearch.disabled = !categoryQuery;
+      categoryFilterStatus.textContent = categoryQuery
+        ? `${visibleCategories.length} de ${availableCategories.length} categoria(s) encontrada(s)`
+        : `${availableCategories.length} categoria(s) disponível(is)`;
 
       if (!visibleCategories.length) {
-        categoryGrid.innerHTML = '<div class="empty-state">Nenhuma categoria disponível.</div>';
+        categoryGrid.innerHTML = categoryQuery
+          ? '<div class="empty-state">Nenhuma categoria corresponde à pesquisa.</div>'
+          : '<div class="empty-state">Nenhuma categoria disponível.</div>';
         return;
       }
 
@@ -821,7 +971,7 @@
           wrapper.appendChild(controls);
         }
 
-        if (role === 'master') {
+        if (role === 'master' && !categoryQuery) {
           attachSortable(wrapper, {
             type: 'category',
             id: category.id,
@@ -846,6 +996,7 @@
       document.getElementById('selectedCategoryDescription').textContent = category.description;
       categorySelect.value = selectedCategory;
       populateSubcategorySelect(selectedCategory);
+      populateTierFilter(selectedCategory);
       if (role === 'master') {
         document.getElementById('addSubcategoryButton').style.display = 'inline-flex';
       }
@@ -907,7 +1058,7 @@
         event => removeCharacterRecord(character.id, event.currentTarget)
       );
 
-      if (role === 'master') {
+      if (role === 'master' && !characterFiltersAreActive()) {
         attachSortable(card, {
           type: 'character',
           id: character.id,
@@ -923,31 +1074,84 @@
       characterGrid.innerHTML = '';
 
       if (!selectedCategory) {
+        clearCharacterFilters.disabled = !characterFiltersAreActive();
+        characterFilterStatus.textContent = 'Selecione uma categoria para pesquisar personagens.';
         characterGrid.innerHTML =
           '<div class="empty-state">Escolha uma categoria acima.</div>';
         return;
       }
 
-      const filtered = characters.filter(character =>
+      populateTierFilter(selectedCategory);
+      const availableCharacters = characters.filter(character =>
         character.category === selectedCategory &&
         (role === 'master' || character.visible !== false)
       );
-      const categoryTiers = SUBCATEGORIES
+      const allCategoryTiers = SUBCATEGORIES
+        .filter(item => item.category === selectedCategory);
+      const availableTiers = allCategoryTiers
         .filter(item =>
-          item.category === selectedCategory &&
           (role === 'master' || item.visible !== false)
         )
         .sort((left, right) => left.order - right.order);
-      const tierIds = new Set(categoryTiers.map(item => item.id));
+      const tierNames = new Map(
+        allCategoryTiers.map(tier => [tier.id, tier.name])
+      );
+      const tierIds = new Set(allCategoryTiers.map(item => item.id));
+      const searchQuery = normalizeSearch(characterSearch.value);
+      const selectedTierFilter = tierFilter.value || 'all';
+      const filtered = availableCharacters.filter(character => {
+        const description = String(character.description || '').trim();
+        const matchesVisibility =
+          role !== 'master' ||
+          visibilityFilter.value === 'all' ||
+          (
+            visibilityFilter.value === 'visible'
+              ? character.visible !== false
+              : character.visible === false
+          );
+        const matchesDescription =
+          descriptionFilter.value === 'all' ||
+          (
+            descriptionFilter.value === 'with'
+              ? Boolean(description)
+              : !description
+          );
+        const matchesTier =
+          selectedTierFilter === 'all' ||
+          (
+            selectedTierFilter === 'without-tier'
+              ? (
+                  !character.subcategory ||
+                  !tierIds.has(String(character.subcategory))
+                )
+              : String(character.subcategory || '') === selectedTierFilter
+          );
+        const searchableText = normalizeSearch([
+          character.name,
+          description,
+          tierNames.get(String(character.subcategory)) || 'Outros'
+        ].join(' '));
+
+        return (
+          matchesVisibility &&
+          matchesDescription &&
+          matchesTier &&
+          (!searchQuery || searchableText.includes(searchQuery))
+        );
+      });
+      const categoryTiers = availableTiers.filter(tier =>
+        selectedTierFilter === 'all' ||
+        selectedTierFilter === tier.id
+      );
       const groups = categoryTiers.map(tier => ({
         tier,
-        characters: orderedByPosition(
+        characters: sortCharactersForView(
           filtered.filter(
             character => character.subcategory === tier.id
           )
         )
       }));
-      const withoutTier = orderedByPosition(
+      const withoutTier = sortCharactersForView(
         filtered.filter(character =>
           !character.subcategory ||
           (
@@ -957,21 +1161,33 @@
         )
       );
 
-      if (
+      const shouldShowWithoutTier =
+        selectedTierFilter === 'all' ||
+        selectedTierFilter === 'without-tier';
+      if (shouldShowWithoutTier && (
         withoutTier.length ||
-        !categoryTiers.length ||
-        role === 'master'
-      ) {
+        (!availableTiers.length && selectedTierFilter === 'all') ||
+        (role === 'master' && !characterFiltersAreActive())
+      )) {
         groups.push({ tier: null, characters: withoutTier });
       }
 
-      const visibleGroups = role === 'master'
-        ? groups
-        : groups.filter(group => group.characters.length);
+      const filtersActive = characterFiltersAreActive();
+      clearCharacterFilters.disabled = !filtersActive;
+      characterFilterStatus.textContent = filtersActive
+        ? `${filtered.length} de ${availableCharacters.length} personagem(ns) encontrado(s)`
+        : `${availableCharacters.length} personagem(ns) nesta categoria`;
+
+      const visibleGroups =
+        role === 'master' && !filtersActive
+          ? groups
+          : groups.filter(group => group.characters.length);
 
       if (!visibleGroups.length) {
         characterGrid.innerHTML =
-          '<div class="empty-state">Nenhum personagem cadastrado nesta categoria.</div>';
+          filtersActive
+            ? '<div class="empty-state">Nenhum personagem corresponde aos filtros aplicados.</div>'
+            : '<div class="empty-state">Nenhum personagem cadastrado nesta categoria.</div>';
         return;
       }
 
@@ -979,7 +1195,7 @@
         const section = document.createElement('section');
         section.className = 'tier-section';
 
-        if (role === 'master' && group.tier) {
+        if (role === 'master' && group.tier && !filtersActive) {
           attachSortable(section, {
             type: 'tier',
             id: group.tier.id,
@@ -987,7 +1203,7 @@
             onReorder: handleTierReorder
           });
         }
-        if (role === 'master') {
+        if (role === 'master' && !filtersActive) {
           attachCharacterTierDropZone(
             section,
             group.tier?.id || null
@@ -1437,6 +1653,48 @@
       openModal(subcategoryModal);
     });
 
+    categorySearch.addEventListener('input', renderCategories);
+    clearCategorySearch.addEventListener('click', () => {
+      categorySearch.value = '';
+      renderCategories();
+      categorySearch.focus();
+    });
+
+    characterSearch.addEventListener('input', renderCharacters);
+    [
+      tierFilter,
+      visibilityFilter,
+      descriptionFilter,
+      characterSort
+    ].forEach(control => {
+      control.addEventListener('change', renderCharacters);
+    });
+
+    clearCharacterFilters.addEventListener('click', () => {
+      characterSearch.value = '';
+      tierFilter.value = 'all';
+      visibilityFilter.value = 'all';
+      descriptionFilter.value = 'all';
+      characterSort.value = 'position';
+      renderCharacters();
+      characterSearch.focus();
+    });
+
+    document.addEventListener('keydown', event => {
+      const activeElement = document.activeElement;
+      const isTyping = activeElement?.matches(
+        'input, textarea, select, [contenteditable="true"]'
+      );
+      if (
+        event.key === '/' &&
+        !isTyping &&
+        !document.querySelector('.modal-backdrop.open')
+      ) {
+        event.preventDefault();
+        (selectedCategory ? characterSearch : categorySearch).focus();
+      }
+    });
+
     categorySelect.addEventListener('change', () => {
       populateSubcategorySelect(categorySelect.value);
     });
@@ -1815,6 +2073,7 @@
         characters = await loadCharacters(rpgId, role === 'master' ? masterToken : null);
 
         if (role === 'master') {
+          document.getElementById('visibilityFilterField').style.display = '';
           document.getElementById('addCategoryButton').style.display = 'inline-flex';
           document.getElementById('addCharacterButton').style.display = 'inline-flex';
           if (currentRpg?.custom) {
