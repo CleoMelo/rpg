@@ -120,6 +120,55 @@
     });
   }
 
+  async function getFichaUrl(id){
+    try{
+      if(typeof getSupabaseClient!=='function')return localStorage.getItem(key(id))||'';
+      const client=getSupabaseClient();
+      const {data,error}=await client
+        .from('personagens')
+        .select('ficha_url')
+        .eq('id',String(id))
+        .maybeSingle();
+      if(error)throw error;
+      return String(data?.ficha_url||'').trim();
+    }catch(error){
+      console.error('Não foi possível carregar a ficha do personagem:',error);
+      return localStorage.getItem(key(id))||'';
+    }
+  }
+
+  async function saveFichaUrl(id,url){
+    if(!id)return false;
+    const normalized=String(url||'').trim();
+    if(normalized){
+      try{new URL(normalized)}catch{return false;}
+    }
+
+    if(typeof getSupabaseClient!=='function'){
+      if(normalized)localStorage.setItem(key(id),normalized);
+      else localStorage.removeItem(key(id));
+      return true;
+    }
+
+    const rpgId=new URLSearchParams(location.search).get('rpg')||localStorage.getItem('selectedRpg')||'';
+    const token=typeof getMasterToken==='function'?getMasterToken(rpgId):null;
+    if(!rpgId||!token)return false;
+
+    const client=getSupabaseClient();
+    const {data,error}=await client.rpc('salvar_ficha_personagem',{
+      p_campanha_id:String(rpgId),
+      p_personagem_id:String(id),
+      p_token:token,
+      p_ficha_url:normalized||null
+    });
+    if(error)throw error;
+    if(!data)throw new Error('Acesso do mestre expirado.');
+
+    if(normalized)localStorage.setItem(key(id),normalized);
+    else localStorage.removeItem(key(id));
+    return true;
+  }
+
   function modal(){
     if(document.getElementById('characterHighlightModal'))return;
     const m=document.createElement('div');
@@ -134,7 +183,7 @@
     m.onclick=e=>{if(e.target===m)close()};
   }
 
-  function openCard(card){
+  async function openCard(card){
     styles();
     removeCardDescriptions();
     modal();
@@ -149,8 +198,15 @@
     document.getElementById('characterHighlightDescription').textContent=desc||'Nenhuma descrição cadastrada.';
     document.getElementById('characterHighlightBadge').textContent=card.querySelector('.visibility-badge')?'Somente para o mestre':'Personagem';
     const link=document.getElementById('characterHighlightFicha');
-    const url=localStorage.getItem(key(id))||'';
-    if(isMaster()&&url){link.href=url;link.style.display='inline-flex'}else{link.style.display='none';link.removeAttribute('href')}
+    link.style.display='none';
+    link.removeAttribute('href');
+    if(isMaster()){
+      const url=await getFichaUrl(id);
+      if(url){
+        link.href=url;
+        link.style.display='inline-flex';
+      }
+    }
     const m=document.getElementById('characterHighlightModal');
     m.classList.add('open');
     document.body.classList.add('modal-open');
@@ -162,9 +218,16 @@
     if(!form||document.getElementById('characterFichaUrl'))return;
     const g=document.createElement('div');
     g.className='form-group';
-    g.innerHTML='<label for="characterFichaUrl">Link da ficha do personagem</label><input id="characterFichaUrl" type="url" maxlength="500" placeholder="https://..."><small>Opcional. O link aparece no destaque do personagem para o mestre.</small>';
+    g.innerHTML='<label for="characterFichaUrl">Link da ficha do personagem</label><input id="characterFichaUrl" type="url" maxlength="500" placeholder="https://..."><small>Opcional. O link é salvo no Supabase e aparece no destaque do personagem para o mestre.</small>';
     const d=document.getElementById('characterDescription');
     (d?.closest('.form-group')||form.lastElementChild).after(g);
+  }
+
+  async function loadFichaIntoForm(id){
+    injectField();
+    const input=document.getElementById('characterFichaUrl');
+    if(!input)return;
+    input.value=await getFichaUrl(id);
   }
 
   function setup(){
@@ -178,30 +241,34 @@
       if(edit&&isMaster()){
         setTimeout(()=>{
           injectField();
-          const i=document.getElementById('characterFichaUrl');
           const f=document.getElementById('characterForm');
           if(f)f.dataset.fichaCharacterId=edit.dataset.edit;
-          if(i)i.value=localStorage.getItem(key(edit.dataset.edit))||'';
+          void loadFichaIntoForm(edit.dataset.edit);
         },0);
         return;
       }
       const card=e.target.closest('.character-card');
       if(!card||e.target.closest('button,a,input,select,textarea,.entity-controls,.character-actions'))return;
-      openCard(card);
+      void openCard(card);
     });
 
     document.addEventListener('submit',e=>{
       if(e.target.id!=='characterForm'||!isMaster())return;
-      const i=document.getElementById('characterFichaUrl');
-      const id=e.target.dataset.fichaCharacterId||'';
-      setTimeout(()=>{
-        const name=document.getElementById('characterName')?.value.trim();
-        const card=[...document.querySelectorAll('.character-card')].find(c=>c.querySelector('h3')?.textContent.trim()===name);
-        const cardId=card?.dataset.characterId||card?.querySelector('[data-edit]')?.dataset.edit||id;
-        if(cardId&&i?.value.trim()){
-          try{new URL(i.value.trim());localStorage.setItem(key(cardId),i.value.trim())}catch{}
+      const input=document.getElementById('characterFichaUrl');
+      const explicitId=e.target.dataset.fichaCharacterId||'';
+      const value=input?.value.trim()||'';
+      setTimeout(async()=>{
+        try{
+          const name=document.getElementById('characterName')?.value.trim();
+          const card=[...document.querySelectorAll('.character-card')]
+            .find(c=>c.querySelector('h3')?.textContent.trim()===name);
+          const cardId=card?.dataset.characterId||card?.querySelector('[data-edit]')?.dataset.edit||explicitId;
+          if(!cardId)return;
+          await saveFichaUrl(cardId,value);
+        }catch(error){
+          console.error('Não foi possível salvar o link da ficha:',error);
         }
-      },150);
+      },400);
     });
 
     new MutationObserver(()=>{
