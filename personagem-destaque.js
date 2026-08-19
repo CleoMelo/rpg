@@ -8,6 +8,7 @@
     s.id='characterHighlightStyles';
     s.textContent=`
       .character-card{cursor:pointer}
+      .character-body > p{display:none}
       .character-highlight-backdrop{z-index:2000}
       .character-highlight-modal{
         position:relative;
