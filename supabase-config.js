@@ -5,15 +5,26 @@ window.SUPABASE_CONFIG = {
   anonKey: "sb_publishable_hf2_LBBJeU3mhZVsyL2OuQ_ctYFguSZ"
 };
 
-// Carrega a camada de destaque dos personagens sem exigir alteração manual em cada página.
+// Carrega as camadas opcionais do portal sem exigir alteração manual em cada página.
 (function () {
-  const load = () => {
-    if (document.querySelector('script[data-character-highlight]')) return;
+  const loadScript = (src, attribute) => {
+    if (document.querySelector(`script[${attribute}]`)) return;
     const script = document.createElement('script');
-    script.src = 'personagem-destaque.js?v=20260819-1';
-    script.dataset.characterHighlight = 'true';
+    script.src = src;
+    script.setAttribute(attribute, 'true');
     document.head.appendChild(script);
   };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', load, { once: true });
-  else load();
+
+  const load = () => {
+    loadScript('personagem-destaque.js?v=20260819-1', 'data-character-highlight');
+    if (/\/categorias\.html$/i.test(location.pathname)) {
+      loadScript('busca-global-personagem.js?v=20260820-1', 'data-global-character-search');
+    }
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', load, { once: true });
+  } else {
+    load();
+  }
 })();
