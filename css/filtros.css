@@ -2,7 +2,7 @@
  * ARQUIVO RPG — FILTROS
  *
  * Regras isoladas dos painéis de filtros para facilitar manutenção.
- * Este arquivo deve ser carregado DEPOIS de styles.css.
+ * Este arquivo é carregado depois de styles.css na página de categorias.
  */
 
 .filter-panel {
@@ -17,22 +17,22 @@
   box-shadow: 0 14px 35px rgba(0,0,0,.16);
 }
 
-/* Filtro de categorias: pesquisa | classificação | limpar */
+/* Categorias: pesquisa | classificação | limpar */
 .category-filter-panel {
-  grid-template-columns: minmax(260px, 1fr) minmax(170px, auto) auto;
+  grid-template-columns: minmax(260px, 1fr) minmax(190px, auto) auto;
 }
 
-/* O status fica sozinho na segunda linha. */
+/* O status ocupa sozinho a segunda linha. */
 .category-filter-panel .filter-status {
   grid-column: 1 / -1;
 }
 
-/* Filtro de campanhas */
+/* Campanhas: pesquisa | limpar */
 .campaign-filter-panel {
   grid-template-columns: minmax(260px, 1fr) auto;
 }
 
-/* Filtro de personagens */
+/* Personagens: pesquisa | filtros | limpar */
 .character-filter-panel {
   grid-template-columns: minmax(250px, 1.7fr) repeat(4, minmax(150px, 1fr)) auto;
 }
@@ -78,15 +78,27 @@
   padding-left: 42px;
 }
 
-/* Botões Limpar: tamanho preservado, apenas alinhamento. */
+/*
+ * LIMPAR
+ *
+ * Mantém a dimensão visual atual (46px de altura) e alinha o botão
+ * exatamente com os campos da primeira linha do painel.
+ */
 .filter-clear {
+  height: 46px;
   min-height: 46px;
+  margin: 0;
   white-space: nowrap;
   align-self: end;
   justify-self: end;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.category-filter-panel .filter-clear {
+  align-self: end;
+  justify-self: end;
 }
 
 .filter-clear:disabled {
@@ -125,7 +137,9 @@
     grid-column: auto;
   }
 
-  .filter-clear {
+  .filter-clear,
+  .category-filter-panel .filter-clear {
     width: 100%;
+    justify-self: stretch;
   }
 }
