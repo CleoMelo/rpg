@@ -5,6 +5,41 @@
 .category-type-badge { display:inline-flex; align-items:center; gap:5px; width:max-content; margin:0 0 5px; padding:3px 8px; border:1px solid rgba(255,255,255,.1); border-radius:999px; background:rgba(255,255,255,.055); font-size:.7rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; opacity:.82; }
 .category-classification-field small { display:block; margin-top:5px; opacity:.62; }
 
+/* Classificações também funcionam como filtros rápidos. */
+.category-classification-filters {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:7px;
+  min-height:46px;
+}
+
+.category-classification-filter {
+  min-height:38px;
+  padding:7px 11px;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:10px;
+  background:rgba(255,255,255,.035);
+  color:inherit;
+  font:inherit;
+  font-size:.82rem;
+  font-weight:700;
+  cursor:pointer;
+  transition:background .15s ease,border-color .15s ease,transform .15s ease;
+}
+
+.category-classification-filter:hover {
+  background:rgba(255,255,255,.075);
+  border-color:rgba(255,255,255,.18);
+  transform:translateY(-1px);
+}
+
+.category-classification-filter.is-active {
+  background:rgba(255,255,255,.11);
+  border-color:var(--accent, rgba(255,255,255,.3));
+  box-shadow:0 5px 14px rgba(0,0,0,.12);
+}
+
 .classification-manager { margin: -8px 0 24px; padding: 14px 18px; border: 1px solid var(--border); border-radius: 16px; background: rgba(255,255,255,.025); }
 .classification-manager-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
 .classification-manager-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:8px; }
