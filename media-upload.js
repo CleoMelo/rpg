@@ -50,7 +50,7 @@ async function deleteReplacedMedia({ rpgId, token, kind, imageUrl }) {
 
 (function loadCategoryModules() {
   if (!/\/categorias\.html$/i.test(location.pathname)) return;
-  const styles = ['css/filtros.css?v=20260824-3','css/classificacoes.css?v=20260824-2','css/personagens.css?v=20260824-2','css/modais.css?v=20260824-2'];
+  const styles = ['css/filtros.css?v=20260824-3','css/classificacoes.css?v=20260824-3','css/personagens.css?v=20260824-2','css/modais.css?v=20260824-2'];
   styles.forEach(href => { const baseHref = href.split('?')[0]; if (document.querySelector(`link[href^="${baseHref}"]`)) return; const link = document.createElement('link'); link.rel = 'stylesheet'; link.href = href; document.head.appendChild(link); });
-  if (!document.querySelector('script[data-category-classification]')) { const script = document.createElement('script'); script.src = 'classificacao-categorias-v4.js?v=20260824-1'; script.dataset.categoryClassification = 'true'; document.body.appendChild(script); }
+  if (!document.querySelector('script[data-category-classification]')) { const script = document.createElement('script'); script.src = 'classificacao-categorias-v5.js?v=20260824-1'; script.dataset.categoryClassification = 'true'; document.body.appendChild(script); }
 })();
