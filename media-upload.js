@@ -61,16 +61,10 @@ async function deleteCampaignMedia({ rpgId, token }) {
       apikey: window.SUPABASE_CONFIG.anonKey,
       'content-type': 'application/json'
     },
-    body: JSON.stringify({
-      action: 'delete-campaign',
-      campaignId: String(rpgId),
-      masterToken: String(token || '')
-    })
+    body: JSON.stringify({ action: 'delete-campaign', campaignId: String(rpgId), masterToken: String(token || '') })
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.error || 'Não foi possível remover as imagens da campanha.');
-  }
+  if (!response.ok) throw new Error(payload.error || 'Não foi possível remover as imagens da campanha.');
   return payload;
 }
 
@@ -78,22 +72,14 @@ async function deleteUploadedMedia({ rpgId, token, imagekitFileId = '', driveFil
   if (!imagekitFileId && !driveFileId) return null;
   const response = await fetch(MEDIA_UPLOAD_ENDPOINT, {
     method: 'POST',
-    headers: {
-      apikey: window.SUPABASE_CONFIG.anonKey,
-      'content-type': 'application/json'
-    },
+    headers: { apikey: window.SUPABASE_CONFIG.anonKey, 'content-type': 'application/json' },
     body: JSON.stringify({
-      action: 'delete-upload',
-      campaignId: String(rpgId),
-      masterToken: String(token || ''),
-      imagekitFileId: String(imagekitFileId || ''),
-      driveFileId: String(driveFileId || '')
+      action: 'delete-upload', campaignId: String(rpgId), masterToken: String(token || ''),
+      imagekitFileId: String(imagekitFileId || ''), driveFileId: String(driveFileId || '')
     })
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.error || 'Não foi possível remover a imagem enviada sem registro.');
-  }
+  if (!response.ok) throw new Error(payload.error || 'Não foi possível remover a imagem enviada sem registro.');
   return payload;
 }
 
@@ -102,21 +88,11 @@ async function deleteCharacterMedia({ rpgId, token, imageUrls = [] }) {
   if (!uniqueUrls.length) return { success: true, imagekitDeleted: 0, driveDeleted: 0 };
   const response = await fetch(MEDIA_UPLOAD_ENDPOINT, {
     method: 'POST',
-    headers: {
-      apikey: window.SUPABASE_CONFIG.anonKey,
-      'content-type': 'application/json'
-    },
-    body: JSON.stringify({
-      action: 'delete-character-media',
-      campaignId: String(rpgId),
-      masterToken: String(token || ''),
-      imageUrls: uniqueUrls
-    })
+    headers: { apikey: window.SUPABASE_CONFIG.anonKey, 'content-type': 'application/json' },
+    body: JSON.stringify({ action: 'delete-character-media', campaignId: String(rpgId), masterToken: String(token || ''), imageUrls: uniqueUrls })
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.error || 'Não foi possível remover as imagens dos personagens.');
-  }
+  if (!response.ok) throw new Error(payload.error || 'Não foi possível remover as imagens dos personagens.');
   return payload;
 }
 
@@ -125,39 +101,25 @@ async function deleteReplacedMedia({ rpgId, token, kind, imageUrl }) {
   if (!previousUrl) return { success: true, imagekitDeleted: 0, driveDeleted: 0 };
   const response = await fetch(MEDIA_UPLOAD_ENDPOINT, {
     method: 'POST',
-    headers: {
-      apikey: window.SUPABASE_CONFIG.anonKey,
-      'content-type': 'application/json'
-    },
+    headers: { apikey: window.SUPABASE_CONFIG.anonKey, 'content-type': 'application/json' },
     body: JSON.stringify({
-      action: 'delete-replaced-media',
-      campaignId: String(rpgId),
-      masterToken: String(token || ''),
-      kind: kind === 'campaign' ? 'campaign' : 'character',
-      imageUrls: [previousUrl]
+      action: 'delete-replaced-media', campaignId: String(rpgId), masterToken: String(token || ''),
+      kind: kind === 'campaign' ? 'campaign' : 'character', imageUrls: [previousUrl]
     })
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.error || 'A nova imagem foi salva, mas não foi possível remover a anterior.');
-  }
+  if (!response.ok) throw new Error(payload.error || 'A nova imagem foi salva, mas não foi possível remover a anterior.');
   return payload;
 }
 
-/*
- * Página de categorias: carrega módulos CSS pequenos e editáveis depois do CSS base,
- * além do módulo responsável pelas classificações das categorias.
- */
 (function loadCategoryModules() {
   if (!/\/categorias\.html$/i.test(location.pathname)) return;
-
   const styles = [
     'css/filtros.css?v=20260824-2',
     'css/classificacoes.css?v=20260824-1',
     'css/personagens.css?v=20260824-1',
     'css/modais.css?v=20260824-1'
   ];
-
   styles.forEach(href => {
     const baseHref = href.split('?')[0];
     if (document.querySelector(`link[href^="${baseHref}"]`)) return;
@@ -166,10 +128,9 @@ async function deleteReplacedMedia({ rpgId, token, kind, imageUrl }) {
     link.href = href;
     document.head.appendChild(link);
   });
-
   if (!document.querySelector('script[data-category-classification]')) {
     const script = document.createElement('script');
-    script.src = 'classificacao-categorias.js?v=20260824-1';
+    script.src = 'classificacao-categorias-v2.js?v=20260824-1';
     script.dataset.categoryClassification = 'true';
     document.body.appendChild(script);
   }
