@@ -145,21 +145,32 @@ async function deleteReplacedMedia({ rpgId, token, kind, imageUrl }) {
 }
 
 /*
- * Página de categorias: carrega módulos CSS pequenos e editáveis depois do CSS base.
+ * Página de categorias: carrega módulos CSS pequenos e editáveis depois do CSS base,
+ * além do módulo responsável pelas classificações das categorias.
  */
-(function loadPageStyles() {
+(function loadCategoryModules() {
   if (!/\/categorias\.html$/i.test(location.pathname)) return;
-  const modules = [
-    'css/filtros.css?v=20260824-1',
+
+  const styles = [
+    'css/filtros.css?v=20260824-2',
     'css/classificacoes.css?v=20260824-1',
     'css/personagens.css?v=20260824-1',
     'css/modais.css?v=20260824-1'
   ];
-  modules.forEach(href => {
-    if (document.querySelector(`link[href^="${href.split('?')[0]}"]`)) return;
+
+  styles.forEach(href => {
+    const baseHref = href.split('?')[0];
+    if (document.querySelector(`link[href^="${baseHref}"]`)) return;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = href;
     document.head.appendChild(link);
   });
+
+  if (!document.querySelector('script[data-category-classification]')) {
+    const script = document.createElement('script');
+    script.src = 'classificacao-categorias.js?v=20260824-1';
+    script.dataset.categoryClassification = 'true';
+    document.body.appendChild(script);
+  }
 })();
