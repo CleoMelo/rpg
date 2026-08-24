@@ -29,6 +29,7 @@ SET search_path = public, private
 AS $$
 DECLARE
   v_categoria public.categorias%ROWTYPE;
+  v_validated public.categorias%ROWTYPE;
 BEGIN
   IF p_tipo NOT IN ('personagem', 'local', 'animal', 'item', 'faccao', 'evento', 'outro') THEN
     RAISE EXCEPTION 'Tipo de categoria inválido.';
@@ -44,8 +45,11 @@ BEGIN
     RETURN FALSE;
   END IF;
 
-  -- Reutiliza a validação existente do mestre sem alterar os demais dados.
-  PERFORM public.editar_categoria(
+  -- Reutiliza a validação existente do mestre. A edição é feita com os
+  -- valores atuais para que nenhum outro campo seja alterado.
+  SELECT *
+    INTO v_validated
+  FROM public.editar_categoria(
     p_campanha_id,
     p_categoria_id,
     p_token,
@@ -54,6 +58,10 @@ BEGIN
     v_categoria.icone,
     v_categoria.visivel
   );
+
+  IF v_validated.id IS NULL THEN
+    RETURN FALSE;
+  END IF;
 
   UPDATE public.categorias
   SET tipo = p_tipo
