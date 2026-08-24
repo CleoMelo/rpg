@@ -382,9 +382,16 @@ body.sorting-active {
   padding-left: 42px;
 }
 
+/* BOTÃO LIMPAR
+   Mantém o tamanho atual e corrige apenas o alinhamento */
 .filter-clear {
   min-height: 46px;
   white-space: nowrap;
+  align-self: end;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .filter-clear:disabled {
