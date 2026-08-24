@@ -19,7 +19,7 @@ window.SUPABASE_CONFIG = {
     loadScript('personagem-destaque.js?v=20260819-1', 'data-character-highlight');
     if (/\/categorias\.html$/i.test(location.pathname)) {
       loadScript('busca-global-personagem.js?v=20260820-1', 'data-global-character-search');
-      loadScript('classificacao-categorias.js?v=20260824-1', 'data-category-classification');
+      loadScript('classificacao-categorias-v3.js?v=20260824-3', 'data-category-classification');
       loadScript('organizacao-categorias.js?v=20260824-1', 'data-category-organization');
     }
   };
