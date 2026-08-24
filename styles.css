@@ -332,9 +332,13 @@ body.sorting-active {
   box-shadow: 0 14px 35px rgba(0,0,0,.16);
 }
 
-.campaign-filter-panel,
-.category-filter-panel {
+.campaign-filter-panel {
   grid-template-columns: minmax(260px, 1fr) auto;
+}
+
+.category-filter-panel {
+  grid-template-columns: minmax(260px, 1fr) minmax(170px, auto) auto;
+  align-items: end;
 }
 
 .character-filter-panel {
@@ -382,8 +386,6 @@ body.sorting-active {
   padding-left: 42px;
 }
 
-/* BOTÃO LIMPAR
-   Mantém o tamanho atual e corrige apenas o alinhamento */
 .filter-clear {
   min-height: 46px;
   white-space: nowrap;
@@ -392,6 +394,10 @@ body.sorting-active {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.category-filter-panel .filter-status {
+  grid-column: 1 / -1;
 }
 
 .filter-clear:disabled {
