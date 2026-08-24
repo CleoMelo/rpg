@@ -14,7 +14,6 @@
   const typeMap = new Map(TYPES.map(type => [type.value, type]));
   let categoryTypes = new Map();
   let filterValue = 'personagem';
-  let gridObserver = null;
   let pendingSubmission = null;
 
   const rpgId = () => typeof getSelectedRpg === 'function' ? getSelectedRpg() : new URLSearchParams(location.search).get('rpg') || localStorage.getItem('selectedRpg') || '';
@@ -160,10 +159,11 @@
 
   function setup() {
     styles(); ensureFilter(); ensureFormField(); interceptSubmit(); loadLocalTypes();
-    const grid = document.getElementById('categoryGrid');
-    if (grid && !gridObserver) { gridObserver = new MutationObserver(() => { decorate(); updateSelectedLabels(); }); gridObserver.observe(grid, { childList: true, subtree: true }); }
     const modal = document.getElementById('categoryModal');
-    if (modal && !modal.dataset.classificationObserved) { modal.dataset.classificationObserved = 'true'; new MutationObserver(syncEditForm).observe(modal, { attributes: true, attributeFilter: ['class'] }); }
+    if (modal && !modal.dataset.classificationObserved) {
+      modal.dataset.classificationObserved = 'true';
+      new MutationObserver(syncEditForm).observe(modal, { attributes: true, attributeFilter: ['class'] });
+    }
     loadTypes().finally(() => { ensureFilter(); ensureFormField(); interceptSubmit(); decorate(); updateSelectedLabels(); });
   }
 
