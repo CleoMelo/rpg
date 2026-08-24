@@ -20,6 +20,7 @@ window.SUPABASE_CONFIG = {
     if (/\/categorias\.html$/i.test(location.pathname)) {
       loadScript('busca-global-personagem.js?v=20260820-1', 'data-global-character-search');
       loadScript('classificacao-categorias.js?v=20260824-1', 'data-category-classification');
+      loadScript('organizacao-categorias.js?v=20260824-1', 'data-category-organization');
     }
   };
 
