@@ -17,14 +17,29 @@
   box-shadow: 0 14px 35px rgba(0,0,0,.16);
 }
 
-/* Categorias: pesquisa | classificação | limpar */
+/* Categorias: pesquisa | classificação | limpar / status */
 .category-filter-panel {
   grid-template-columns: minmax(260px, 1fr) minmax(190px, auto) auto;
+  grid-template-areas:
+    "search classification clear"
+    "status status status";
 }
 
-/* O status ocupa sozinho a segunda linha. */
-.category-filter-panel .filter-status {
-  grid-column: 1 / -1;
+.category-filter-panel > .filter-field-grow {
+  grid-area: search;
+}
+
+.category-filter-panel > .category-type-filter,
+.category-filter-panel > #categoryClassificationField {
+  grid-area: classification;
+}
+
+.category-filter-panel > .filter-clear {
+  grid-area: clear;
+}
+
+.category-filter-panel > .filter-status {
+  grid-area: status;
 }
 
 /* Campanhas: pesquisa | limpar */
@@ -126,6 +141,14 @@
   .character-filter-panel {
     grid-template-columns: 1fr;
     padding: 14px;
+  }
+
+  .category-filter-panel {
+    grid-template-areas:
+      "search"
+      "classification"
+      "clear"
+      "status";
   }
 
   .character-filter-panel .filter-field-grow {
