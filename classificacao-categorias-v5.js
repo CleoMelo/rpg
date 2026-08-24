@@ -33,9 +33,18 @@
   function render(){
     const panel=document.querySelector('.category-filter-panel');if(!panel)return;
     let field=document.getElementById('categoryClassificationField');
-    if(!field){field=document.createElement('div');field.id='categoryClassificationField';field.className='filter-field category-type-filter';const clear=document.getElementById('clearCategorySearch');if(clear)panel.insertBefore(field,clear);else panel.appendChild(field);}
-    field.innerHTML=`<label>Classificação</label><div class="category-classification-filters" role="group" aria-label="Filtrar por classificação"><button type="button" class="category-classification-filter ${selected==='all'?'is-active':''}" data-classification-filter="all">Todos</button>${classifications.map(x=>`<button type="button" class="category-classification-filter ${selected===x.id?'is-active':''}" data-classification-filter="${esc(x.id)}"><span aria-hidden="true">${esc(x.icone)}</span> ${esc(x.nome)}</button>`).join('')}</div>`;
-    field.querySelectorAll('[data-classification-filter]').forEach(button=>button.onclick=()=>{selected=button.dataset.classificationFilter;render();applyFilter();});
+    if(!field){
+      field=document.createElement('div');
+      field.id='categoryClassificationField';
+      field.className='filter-field category-type-filter';
+      const clear=document.getElementById('clearCategorySearch');
+      if(clear)panel.insertBefore(field,clear);else panel.appendChild(field);
+    }
+    field.innerHTML=`<label for="categoryTypeFilter">Classificação</label><select id="categoryTypeFilter"><option value="all">Todos</option>${classifications.map(x=>`<option value="${esc(x.id)}">${esc(x.icone)} ${esc(x.nome)}</option>`).join('')}</select>`;
+    const select=field.querySelector('#categoryTypeFilter');
+    select.value=classifications.some(x=>x.id===selected)?selected:'all';
+    select.onchange=()=>{selected=select.value;applyFilter();};
+
     let manager=document.getElementById('categoryClassificationManager');
     if(!master()){manager?.remove();return;}
     if(!manager){manager=document.createElement('section');manager.id='categoryClassificationManager';manager.className='classification-manager';panel.after(manager);}
