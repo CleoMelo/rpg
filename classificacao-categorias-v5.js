@@ -25,6 +25,11 @@
     render();renderFormField();applyFilter();
   }
 
+  function classificationForCategory(id){
+    const classificationId=String(assignments.get(String(id))||DEFAULT_ID);
+    return classifications.find(x=>x.id===classificationId)||classifications.find(x=>x.padrao)||DEFAULT;
+  }
+
   function render(){
     const panel=document.querySelector('.category-filter-panel');if(!panel)return;
     let field=document.getElementById('categoryClassificationField');
@@ -52,10 +57,45 @@
   function categoryClassification(id){return String(assignments.get(String(id))||classifications.find(x=>x.padrao)?.id||DEFAULT_ID);}
   function applyFilter(){document.querySelectorAll('#categoryGrid .category-item').forEach(item=>{const button=item.querySelector('.category-button');if(!button)return;item.style.display=selected==='all'||categoryClassification(button.dataset.category)===selected?'':'none';});}
 
-  function renderFormField(){const form=document.getElementById('categoryForm');if(!form||document.getElementById('categoryClassification'))return;const description=document.getElementById('categoryDescription')?.closest('.form-group');if(!description)return;const group=document.createElement('div');group.className='form-group category-classification-field';group.innerHTML=`<label for="categoryClassification">Classificação</label><select id="categoryClassification" required>${classifications.map(x=>`<option value="${esc(x.id)}">${esc(x.icone)} ${esc(x.nome)}</option>`).join('')}</select>`;description.after(group);form.addEventListener('submit',capture,true);}
-  function capture(){const before=new Set((typeof CATEGORIES!=='undefined'?CATEGORIES:[]).map(x=>String(x.id)));window.__pendingCategoryClassification={id:typeof editingCategoryId!=='undefined'?editingCategoryId:null,value:document.getElementById('categoryClassification')?.value||DEFAULT_ID,before,retries:0};setTimeout(savePending,200);}
-  async function savePending(){const p=window.__pendingCategoryClassification;if(!p)return;let id=p.id;if(!id&&typeof CATEGORIES!=='undefined')id=CATEGORIES.find(x=>!p.before.has(String(x.id)))?.id||null;if(!id){if(p.retries++<30)return setTimeout(savePending,200);window.__pendingCategoryClassification=null;return;}window.__pendingCategoryClassification=null;const defaultId=classifications.find(x=>x.padrao)?.id;const classificationId=p.value===DEFAULT_ID?defaultId:p.value;if(!classificationId||!token())return;try{const{error}=await client().rpc('classificar_categoria_por_classificacao',{p_campanha_id:String(campaignId()),p_categoria_id:String(id),p_token:token(),p_classificacao_id:String(classificationId)});if(error)throw error;assignments.set(String(id),String(classificationId));applyFilter();}catch(error){console.error('Classificação da categoria:',error);}}
-  function watchGrid(){const grid=document.getElementById('categoryGrid');if(!grid||grid.dataset.classificationObserver)return;grid.dataset.classificationObserver='true';new MutationObserver(applyFilter).observe(grid,{childList:true,subtree:true});}
+  function renderFormField(){
+    const form=document.getElementById('categoryForm');
+    if(!form)return;
+    let group=document.getElementById('categoryClassificationFieldForm');
+    if(!group){
+      const description=document.getElementById('categoryDescription')?.closest('.form-group');
+      if(!description)return;
+      group=document.createElement('div');
+      group.id='categoryClassificationFieldForm';
+      group.className='form-group category-classification-field';
+      description.after(group);
+      form.addEventListener('submit',capture,true);
+    }
+    group.innerHTML=`<label for="categoryClassification">Classificação</label><select id="categoryClassification" required>${classifications.map(x=>`<option value="${esc(x.id)}">${esc(x.icone)} ${esc(x.nome)}</option>`).join('')}</select>`;
+    const select=group.querySelector('#categoryClassification');
+    const currentId=typeof editingCategoryId!=='undefined'?editingCategoryId:null;
+    select.value=currentId?categoryClassification(currentId):(classifications.find(x=>x.padrao)?.id||DEFAULT_ID);
+  }
+
+  function capture(){
+    const select=document.getElementById('categoryClassification');
+    const before=new Set((typeof CATEGORIES!=='undefined'?CATEGORIES:[]).map(x=>String(x.id)));
+    window.__pendingCategoryClassification={id:typeof editingCategoryId!=='undefined'?editingCategoryId:null,value:select?.value||DEFAULT_ID,before,retries:0};
+    setTimeout(savePending,200);
+  }
+
+  async function savePending(){
+    const p=window.__pendingCategoryClassification;if(!p)return;
+    let id=p.id;
+    if(!id&&typeof CATEGORIES!=='undefined')id=CATEGORIES.find(x=>!p.before.has(String(x.id)))?.id||null;
+    if(!id){if(p.retries++<30)return setTimeout(savePending,200);window.__pendingCategoryClassification=null;return;}
+    window.__pendingCategoryClassification=null;
+    const defaultId=classifications.find(x=>x.padrao)?.id;
+    const classificationId=p.value===DEFAULT_ID?defaultId:p.value;
+    if(!classificationId||!token())return;
+    try{const{error}=await client().rpc('classificar_categoria_por_classificacao',{p_campanha_id:String(campaignId()),p_categoria_id:String(id),p_token:token(),p_classificacao_id:String(classificationId)});if(error)throw error;assignments.set(String(id),String(classificationId));render();applyFilter();}catch(error){console.error('Classificação da categoria:',error);}
+  }
+
+  function watchGrid(){const grid=document.getElementById('categoryGrid');if(!grid||grid.dataset.classificationObserver)return;grid.dataset.classificationObserver='true';new MutationObserver(()=>{renderFormField();applyFilter();}).observe(grid,{childList:true,subtree:true});}
   function setup(){if(booted)return;booted=true;load();watchGrid();setTimeout(renderFormField,500);setTimeout(renderFormField,1500);}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
 })();
