@@ -66,7 +66,6 @@ function setFilePreview(input, preview, existingUrl = '') {
   return file;
 }
 
-
 async function deleteCampaignMedia({ rpgId, token }) {
   const response = await fetch(MEDIA_UPLOAD_ENDPOINT, {
     method: 'POST',
@@ -91,7 +90,6 @@ async function deleteCampaignMedia({ rpgId, token }) {
 
   return payload;
 }
-
 
 async function deleteUploadedMedia({
   rpgId,
@@ -127,7 +125,6 @@ async function deleteUploadedMedia({
   return payload;
 }
 
-
 async function deleteCharacterMedia({ rpgId, token, imageUrls = [] }) {
   const uniqueUrls = [...new Set(
     imageUrls.map(value => String(value || '').trim()).filter(Boolean)
@@ -161,7 +158,6 @@ async function deleteCharacterMedia({ rpgId, token, imageUrls = [] }) {
 
   return payload;
 }
-
 
 async function deleteReplacedMedia({
   rpgId,
@@ -199,3 +195,26 @@ async function deleteReplacedMedia({
 
   return payload;
 }
+
+/*
+ * Carrega CSS específico da página sem inflar o styles.css principal.
+ * Mantemos styles.css como base e estes módulos somente complementam
+ * as áreas que precisam de manutenção frequente.
+ */
+(function loadPageStyles() {
+  if (!/\/categorias\.html$/i.test(location.pathname)) return;
+
+  const modules = [
+    'css/filtros.css?v=20260824-1',
+    'css/classificacoes.css?v=20260824-1',
+    'css/personagens.css?v=20260824-1'
+  ];
+
+  modules.forEach(href => {
+    if (document.querySelector(`link[href^="${href.split('?')[0]}"]`)) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    document.head.appendChild(link);
+  });
+})();
