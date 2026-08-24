@@ -1,32 +1,27 @@
 /* ARQUIVO RPG — CLASSIFICAÇÕES */
 
-.category-type-filter {
-  min-width: 190px;
-}
+.category-type-filter { min-width: 190px; }
+.category-type-filter select { width: 100%; }
+.category-type-badge { display:inline-flex; align-items:center; gap:5px; width:max-content; margin:0 0 5px; padding:3px 8px; border:1px solid rgba(255,255,255,.1); border-radius:999px; background:rgba(255,255,255,.055); font-size:.7rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; opacity:.82; }
+.category-classification-field small { display:block; margin-top:5px; opacity:.62; }
 
-.category-type-filter select {
-  width: 100%;
-}
+.classification-manager { margin: -8px 0 24px; padding: 14px 18px; border: 1px solid var(--border); border-radius: 16px; background: rgba(255,255,255,.025); }
+.classification-manager-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.classification-manager-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:8px; }
+.classification-manager-item { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:40px; padding:8px 10px; border:1px solid rgba(255,255,255,.08); border-radius:10px; background:rgba(255,255,255,.025); }
+.classification-manager-item small { opacity:.6; font-size:.72rem; }
+.classification-manager-actions { display:flex; gap:5px; }
+.classification-manager-actions button { border:0; background:none; color:inherit; cursor:pointer; font-size:.75rem; opacity:.72; }
+.classification-manager-actions button:hover { opacity:1; text-decoration:underline; }
 
-.category-type-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  width: max-content;
-  margin: 0 0 5px;
-  padding: 3px 8px;
-  border: 1px solid rgba(255,255,255,.1);
-  border-radius: 999px;
-  background: rgba(255,255,255,.055);
-  font-size: .7rem;
-  font-weight: 800;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  opacity: .82;
-}
+.classification-editor-modal { width:min(420px,calc(100% - 32px)); padding:0; border:1px solid var(--border); border-radius:18px; background:var(--surface, #171717); color:inherit; box-shadow:0 24px 80px rgba(0,0,0,.45); }
+.classification-editor-modal::backdrop { background:rgba(0,0,0,.65); }
+.classification-editor { display:grid; gap:14px; padding:22px; }
+.classification-editor h3 { margin:0 0 4px; }
+.classification-editor label { display:grid; gap:6px; font-weight:700; }
+.classification-editor input { width:100%; box-sizing:border-box; }
+.classification-editor-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:4px; }
 
-.category-classification-field small {
-  display: block;
-  margin-top: 5px;
-  opacity: .62;
+@media (max-width: 700px) {
+  .classification-manager-head { align-items:flex-start; flex-direction:column; }
 }
