@@ -78,12 +78,7 @@
   padding-left: 42px;
 }
 
-/*
- * LIMPAR
- *
- * Mantém a dimensão visual atual (46px de altura) e alinha o botão
- * exatamente com os campos da primeira linha do painel.
- */
+/* LIMPAR: mesma altura dos campos e ao lado do dropdown */
 .filter-clear {
   height: 46px;
   min-height: 46px;
