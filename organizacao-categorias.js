@@ -7,25 +7,31 @@
   style.textContent = `
     .category-filter-panel.category-organization-layout {
       display: grid !important;
-      grid-template-columns: minmax(0, 1fr) auto minmax(220px, 270px);
+      grid-template-columns: minmax(0, 1fr) minmax(190px, auto) auto;
+      grid-template-areas:
+        "search classification clear"
+        "status status status";
       align-items: end;
       gap: 14px;
     }
     .category-filter-panel.category-organization-layout .filter-field-grow {
       min-width: 0;
-      grid-column: 1;
+      grid-area: search;
     }
-    .category-filter-panel.category-organization-layout #clearCategorySearch {
-      grid-column: 2;
-      white-space: nowrap;
-      min-height: 48px;
-    }
-    .category-filter-panel.category-organization-layout #categoryTypeFilterField {
-      grid-column: 3;
+    .category-filter-panel.category-organization-layout #categoryTypeFilterField,
+    .category-filter-panel.category-organization-layout #categoryClassificationField {
+      grid-area: classification;
       min-width: 0;
     }
+    .category-filter-panel.category-organization-layout #clearCategorySearch {
+      grid-area: clear;
+      min-height: 46px;
+      white-space: nowrap;
+      align-self: end;
+      justify-self: end;
+    }
     .category-filter-panel.category-organization-layout #categoryFilterStatus {
-      grid-column: 1 / -1;
+      grid-area: status;
       margin: 0;
     }
     .category-organization-hint {
@@ -35,25 +41,21 @@
     }
     @media (max-width: 820px) {
       .category-filter-panel.category-organization-layout {
-        grid-template-columns: minmax(0, 1fr) minmax(170px, 220px);
-      }
-      .category-filter-panel.category-organization-layout .filter-field-grow {
-        grid-column: 1 / -1;
-      }
-      .category-filter-panel.category-organization-layout #clearCategorySearch {
-        grid-column: 1;
-      }
-      .category-filter-panel.category-organization-layout #categoryTypeFilterField {
-        grid-column: 2;
+        grid-template-columns: minmax(0, 1fr) minmax(190px, auto) auto;
       }
     }
-    @media (max-width: 560px) {
+    @media (max-width: 620px) {
       .category-filter-panel.category-organization-layout {
         grid-template-columns: 1fr;
+        grid-template-areas:
+          "search"
+          "classification"
+          "clear"
+          "status";
       }
-      .category-filter-panel.category-organization-layout #clearCategorySearch,
-      .category-filter-panel.category-organization-layout #categoryTypeFilterField {
-        grid-column: 1;
+      .category-filter-panel.category-organization-layout #clearCategorySearch {
+        width: 100%;
+        justify-self: stretch;
       }
     }
   `;
@@ -65,7 +67,6 @@
     panel.classList.add('category-organization-layout');
 
     const toolbar = panel.previousElementSibling;
-    const masterToolbar = toolbar?.querySelector('.master-toolbar');
     const isMaster = sessionStorage.getItem('role') === 'master';
     if (isMaster && toolbar && !toolbar.querySelector('.category-organization-hint')) {
       const hint = document.createElement('p');
@@ -75,7 +76,7 @@
     }
 
     const applyOrder = () => {
-      const field = document.getElementById('categoryTypeFilterField');
+      const field = document.getElementById('categoryClassificationField');
       const clear = document.getElementById('clearCategorySearch');
       if (!field || !clear) return false;
       panel.appendChild(field);
