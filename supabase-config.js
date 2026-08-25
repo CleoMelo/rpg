@@ -30,6 +30,7 @@ window.SUPABASE_CONFIG = {
         await loadScript('busca-global-personagem.js?v=20260820-1', 'data-global-character-search');
         await loadScript('classificacao-categorias.js?v=20260824-1', 'data-category-classification');
         await loadScript('organizacao-categorias.js?v=20260824-2', 'data-category-organization');
+        await loadScript('alterar-senha.js?v=20260825-1', 'data-change-master-password');
       }
     } catch (error) {
       console.error('Não foi possível carregar as dependências do portal:', error);
