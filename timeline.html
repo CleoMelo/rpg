@@ -9,6 +9,7 @@
     .timeline-page{max-width:1400px;margin:0 auto;padding:48px 24px 72px}
     .timeline-header{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:28px}
     .timeline-header h1{margin:6px 0 8px}
+    .timeline-actions{display:flex;gap:10px;flex-wrap:wrap}
     .timeline-card{overflow:hidden}
     .timeline-scroll{overflow-x:auto;padding-bottom:8px}
     .timeline{min-width:900px;display:grid;grid-template-columns:250px 1fr;border-top:1px solid rgba(255,255,255,.12)}
@@ -16,8 +17,19 @@
     .timeline-years{height:58px;display:grid;grid-template-columns:repeat(3,1fr);align-items:center;text-align:center;font-weight:700;font-size:1.05rem;letter-spacing:.04em}
     .timeline-label{display:flex;align-items:center;min-height:72px;padding:14px 18px;border-top:1px solid rgba(255,255,255,.08);border-right:1px solid rgba(255,255,255,.12);font-weight:600}
     .timeline-track{position:relative;min-height:72px;border-top:1px solid rgba(255,255,255,.08);background-image:linear-gradient(to right,rgba(255,255,255,.08) 1px,transparent 1px);background-size:33.3333% 100%}
-    .event-bar{position:absolute;top:22px;height:28px;border-radius:7px;display:flex;align-items:center;padding:0 10px;min-width:12px;box-sizing:border-box;background:linear-gradient(90deg,#8f6bff,#b99cff);box-shadow:0 5px 16px rgba(0,0,0,.22);color:#fff;font-size:.82rem;white-space:nowrap;overflow:hidden}
+    .event-bar{position:absolute;top:22px;height:28px;border:0;border-radius:7px;display:flex;align-items:center;padding:0 10px;min-width:14px;box-sizing:border-box;background:linear-gradient(90deg,#8f6bff,#b99cff);box-shadow:0 5px 16px rgba(0,0,0,.22);color:#fff;font-size:.82rem;white-space:nowrap;overflow:hidden;cursor:pointer}
+    .event-bar:hover{filter:brightness(1.08);outline:2px solid rgba(255,255,255,.25)}
     .timeline-legend{margin-top:18px;color:var(--muted,#aaa);font-size:.9rem}
+    .timeline-empty{grid-column:1/-1;padding:40px;text-align:center;color:var(--muted,#aaa);border-top:1px solid rgba(255,255,255,.08)}
+    .editor-card{margin-top:18px;padding:22px}
+    .editor-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
+    .editor-header h2{margin:0;font-size:1.15rem}
+    .timeline-form{display:grid;grid-template-columns:minmax(220px,2fr) repeat(2,minmax(130px,1fr)) auto;gap:12px;align-items:end}
+    .timeline-form label{display:block;font-size:.85rem;font-weight:600;margin-bottom:6px}
+    .timeline-form input{width:100%;box-sizing:border-box}
+    .timeline-form-actions{display:flex;gap:8px}
+    .saved-note{font-size:.82rem;color:var(--muted,#aaa);margin:12px 0 0}
+    @media(max-width:900px){.timeline-form{grid-template-columns:1fr 1fr}.timeline-form .name-field{grid-column:1/-1}.timeline-form-actions{grid-column:1/-1}}
     @media(max-width:700px){.timeline-page{padding:30px 14px}.timeline-header{align-items:flex-start;flex-direction:column}.timeline{grid-template-columns:190px 1fr}.timeline-label-head{height:52px}.timeline-years{height:52px}}
   </style>
 </head>
@@ -28,25 +40,59 @@
   </header>
   <main class="timeline-page">
     <div class="timeline-header">
-      <div><span class="eyebrow">Ferramenta de teste</span><h1>Timeline</h1><p class="lead">Visualização horizontal de períodos e eventos.</p></div>
+      <div><span class="eyebrow">Ferramenta de teste</span><h1>Timeline</h1><p class="lead">Crie, edite e remova períodos e eventos. Os dados desta página ficam salvos apenas neste navegador.</p></div>
+      <div class="timeline-actions"><button id="resetTimeline" class="btn secondary" type="button">Restaurar exemplo</button></div>
     </div>
+
     <section class="card timeline-card">
       <div class="timeline-scroll">
-        <div class="timeline" aria-label="Timeline de teste">
-          <div class="timeline-label-head"></div>
-          <div class="timeline-years"><span>3206</span><span>3207</span><span>3208</span></div>
-          <div class="timeline-label">Guerra das Cinzas</div>
-          <div class="timeline-track"><div class="event-bar" style="left:0%;width:58%">Guerra das Cinzas</div></div>
-          <div class="timeline-label">Reinado de Kael</div>
-          <div class="timeline-track"><div class="event-bar" style="left:27%;width:58%">Reinado de Kael</div></div>
-          <div class="timeline-label">Construção da cidade</div>
-          <div class="timeline-track"><div class="event-bar" style="left:28%;width:22%">Construção da cidade</div></div>
-          <div class="timeline-label">Queda de Asteria</div>
-          <div class="timeline-track"><div class="event-bar" style="left:82%;width:12%">Queda de Asteria</div></div>
-        </div>
+        <div id="timeline" class="timeline" aria-label="Timeline de teste"></div>
       </div>
-      <p class="timeline-legend">Protótipo independente: os eventos são apenas dados de demonstração e ainda não estão ligados a campanhas ou ao Supabase.</p>
+      <p class="timeline-legend">Protótipo independente: nenhuma informação é enviada ao Supabase ou vinculada a campanhas. Clique em uma barra para editar.</p>
+    </section>
+
+    <section class="card editor-card">
+      <div class="editor-header"><h2 id="editorTitle">Adicionar evento</h2><button id="cancelEdit" class="btn secondary" type="button" hidden>Cancelar edição</button></div>
+      <form id="timelineForm" class="timeline-form">
+        <div class="name-field"><label for="eventName">Evento</label><input id="eventName" maxlength="80" required placeholder="Ex.: Guerra das Cinzas"></div>
+        <div><label for="eventStart">Ano inicial</label><input id="eventStart" type="number" step="1" required value="3206"></div>
+        <div><label for="eventEnd">Ano final</label><input id="eventEnd" type="number" step="1" required value="3207"></div>
+        <div class="timeline-form-actions"><button id="saveEvent" class="btn" type="submit">Adicionar</button></div>
+      </form>
+      <p class="saved-note">As alterações são salvas automaticamente em <code>localStorage</code>.</p>
     </section>
   </main>
+  <script>
+    const STORAGE_KEY='arquivo-rpg.timeline.test.v1';
+    const DEFAULT_EVENTS=[
+      {id:'guerra-cinzas',name:'Guerra das Cinzas',start:3206,end:3207.74},
+      {id:'reinado-kael',name:'Reinado de Kael',start:3206.81,end:3208.55},
+      {id:'construcao-cidade',name:'Construção da cidade',start:3206.84,end:3207.50},
+      {id:'queda-asteria',name:'Queda de Asteria',start:3208.46,end:3208.82}
+    ];
+    const MIN_YEAR=3206,MAX_YEAR=3209;
+    const timeline=document.getElementById('timeline'),form=document.getElementById('timelineForm'),nameInput=document.getElementById('eventName'),startInput=document.getElementById('eventStart'),endInput=document.getElementById('eventEnd'),editorTitle=document.getElementById('editorTitle'),saveButton=document.getElementById('saveEvent'),cancelButton=document.getElementById('cancelEdit'),resetButton=document.getElementById('resetTimeline');
+    let events=loadEvents(),editingId=null;
+
+    function escapeHtml(value){return String(value).replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'})[char]);}
+    function loadEvents(){try{const saved=JSON.parse(localStorage.getItem(STORAGE_KEY));if(Array.isArray(saved))return saved.filter(isValidEvent); }catch(error){console.warn('Não foi possível ler a timeline local.',error);}return DEFAULT_EVENTS.map(event=>({...event}));}
+    function isValidEvent(event){return event&&typeof event.name==='string'&&event.name.trim()&&Number.isFinite(Number(event.start))&&Number.isFinite(Number(event.end))&&Number(event.end)>Number(event.start);}
+    function saveEvents(){localStorage.setItem(STORAGE_KEY,JSON.stringify(events));}
+    function render(){
+      const rows=events.map(event=>{
+        const left=Math.max(0,Math.min(100,((Number(event.start)-MIN_YEAR)/(MAX_YEAR-MIN_YEAR))*100));
+        const width=Math.max(.8,Math.min(100-left,((Number(event.end)-Number(event.start))/(MAX_YEAR-MIN_YEAR))*100));
+        return `<div class="timeline-label" title="${escapeHtml(event.name)}">${escapeHtml(event.name)}</div><div class="timeline-track"><button class="event-bar" type="button" data-id="${escapeHtml(event.id)}" style="left:${left}%;width:${width}%" title="Clique para editar">${escapeHtml(event.name)}</button></div>`;
+      }).join('');
+      timeline.innerHTML=`<div class="timeline-label-head"></div><div class="timeline-years"><span>3206</span><span>3207</span><span>3208</span></div>${rows||'<div class="timeline-empty">Nenhum evento cadastrado. Use o formulário abaixo para adicionar um.</div>'}`;
+      timeline.querySelectorAll('.event-bar').forEach(button=>button.addEventListener('click',()=>startEdit(button.dataset.id)));
+    }
+    function resetForm(){editingId=null;form.reset();startInput.value='3206';endInput.value='3207';editorTitle.textContent='Adicionar evento';saveButton.textContent='Adicionar';cancelButton.hidden=true;nameInput.focus();}
+    function startEdit(id){const event=events.find(item=>item.id===id);if(!event)return;editingId=id;nameInput.value=event.name;startInput.value=event.start;endInput.value=event.end;editorTitle.textContent='Editar evento';saveButton.textContent='Salvar alterações';cancelButton.hidden=false;nameInput.focus();}
+    form.addEventListener('submit',event=>{event.preventDefault();const name=nameInput.value.trim(),start=Number(startInput.value),end=Number(endInput.value);if(!name||!Number.isFinite(start)||!Number.isFinite(end)||end<=start){alert('Informe um nome e um período válido. O ano final deve ser maior que o inicial.');return;}if(editingId){const target=events.find(item=>item.id===editingId);if(target)Object.assign(target,{name,start,end});}else{events.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name,start,end});}saveEvents();render();resetForm();});
+    cancelButton.addEventListener('click',resetForm);
+    resetButton.addEventListener('click',()=>{if(!confirm('Restaurar os quatro eventos de exemplo? Isso substituirá os dados salvos localmente.'))return;events=DEFAULT_EVENTS.map(event=>({...event}));saveEvents();render();resetForm();});
+    render();
+  </script>
 </body>
 </html>
