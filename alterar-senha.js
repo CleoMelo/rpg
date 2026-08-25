@@ -114,10 +114,16 @@
         if (error) throw error;
         if (!data) throw new Error('Não foi possível alterar a senha.');
 
-        message.className = 'message success';
-        message.textContent = 'Senha alterada com sucesso. Sua sessão atual continua ativa.';
-        form.reset();
-        setTimeout(close, 1200);
+        // A senha foi alterada. O token atual não deve continuar sendo usado.
+        if (typeof clearMasterSession === 'function') {
+          clearMasterSession(rpgId);
+        } else {
+          sessionStorage.removeItem(`masterSession:${String(rpgId)}`);
+        }
+
+        // Volta para a página de senha do mestre para que ele entre novamente
+        // usando a nova senha.
+        location.href = `mestre.html?rpg=${encodeURIComponent(rpgId)}`;
       } catch (error) {
         console.error(error);
         message.className = 'message error';
