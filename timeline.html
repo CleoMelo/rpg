@@ -6,92 +6,39 @@
   <title>Timeline — Teste</title>
   <link rel="stylesheet" href="styles.css?v=20260731-1">
   <style>
-    .timeline-page{max-width:1400px;margin:0 auto;padding:48px 24px 72px}
-    .timeline-header{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:28px}
-    .timeline-header h1{margin:6px 0 8px}
-    .timeline-actions{display:flex;gap:10px;flex-wrap:wrap}
-    .timeline-card{overflow:hidden}
-    .timeline-scroll{overflow-x:auto;padding-bottom:8px}
-    .timeline{min-width:900px;display:grid;grid-template-columns:250px 1fr;border-top:1px solid rgba(255,255,255,.12)}
-    .timeline-label-head{height:58px;border-right:1px solid rgba(255,255,255,.12)}
-    .timeline-years{height:58px;display:grid;grid-template-columns:repeat(3,1fr);align-items:center;text-align:center;font-weight:700;font-size:1.05rem;letter-spacing:.04em}
-    .timeline-label{display:flex;align-items:center;min-height:72px;padding:14px 18px;border-top:1px solid rgba(255,255,255,.08);border-right:1px solid rgba(255,255,255,.12);font-weight:600}
-    .timeline-track{position:relative;min-height:72px;border-top:1px solid rgba(255,255,255,.08);background-image:linear-gradient(to right,rgba(255,255,255,.08) 1px,transparent 1px);background-size:33.3333% 100%}
-    .event-bar{position:absolute;top:22px;height:28px;border:0;border-radius:7px;display:flex;align-items:center;padding:0 10px;min-width:14px;box-sizing:border-box;background:linear-gradient(90deg,#8f6bff,#b99cff);box-shadow:0 5px 16px rgba(0,0,0,.22);color:#fff;font-size:.82rem;white-space:nowrap;overflow:hidden;cursor:pointer}
-    .event-bar:hover{filter:brightness(1.08);outline:2px solid rgba(255,255,255,.25)}
-    .timeline-legend{margin-top:18px;color:var(--muted,#aaa);font-size:.9rem}
-    .timeline-empty{grid-column:1/-1;padding:40px;text-align:center;color:var(--muted,#aaa);border-top:1px solid rgba(255,255,255,.08)}
-    .editor-card{margin-top:18px;padding:22px}
-    .editor-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
-    .editor-header h2{margin:0;font-size:1.15rem}
-    .timeline-form{display:grid;grid-template-columns:minmax(220px,2fr) repeat(2,minmax(130px,1fr)) auto;gap:12px;align-items:end}
-    .timeline-form label{display:block;font-size:.85rem;font-weight:600;margin-bottom:6px}
-    .timeline-form input{width:100%;box-sizing:border-box}
-    .timeline-form-actions{display:flex;gap:8px}
-    .saved-note{font-size:.82rem;color:var(--muted,#aaa);margin:12px 0 0}
-    @media(max-width:900px){.timeline-form{grid-template-columns:1fr 1fr}.timeline-form .name-field{grid-column:1/-1}.timeline-form-actions{grid-column:1/-1}}
-    @media(max-width:700px){.timeline-page{padding:30px 14px}.timeline-header{align-items:flex-start;flex-direction:column}.timeline{grid-template-columns:190px 1fr}.timeline-label-head{height:52px}.timeline-years{height:52px}}
+    .timeline-page{max-width:1400px;margin:0 auto;padding:48px 24px 72px}.timeline-header{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:28px}.timeline-header h1{margin:6px 0 8px}.timeline-actions{display:flex;gap:10px;flex-wrap:wrap}.timeline-stack{display:flex;flex-direction:column;gap:24px}.timeline-card{overflow:hidden;padding-bottom:18px}.timeline-card-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 20px 10px}.timeline-card-header h2{margin:0;font-size:1.1rem}.timeline-card-actions{display:flex;gap:8px}.timeline-scroll{overflow-x:auto;padding:0 20px 8px}.timeline{min-width:900px;display:grid;grid-template-columns:250px 1fr;border-top:1px solid rgba(255,255,255,.12)}.timeline-label-head{height:58px;border-right:1px solid rgba(255,255,255,.12)}.timeline-years{height:58px;display:grid;grid-template-columns:repeat(3,1fr);align-items:center;text-align:center;font-weight:700;font-size:1.05rem;letter-spacing:.04em}.timeline-label{display:flex;align-items:center;min-height:72px;padding:14px 18px;border-top:1px solid rgba(255,255,255,.08);border-right:1px solid rgba(255,255,255,.12);font-weight:600}.timeline-track{position:relative;min-height:72px;border-top:1px solid rgba(255,255,255,.08);background-image:linear-gradient(to right,rgba(255,255,255,.08) 1px,transparent 1px);background-size:33.3333% 100%}.event-bar{position:absolute;top:22px;height:28px;border:0;border-radius:7px;display:flex;align-items:center;padding:0 10px;min-width:14px;box-sizing:border-box;background:linear-gradient(90deg,#8f6bff,#b99cff);box-shadow:0 5px 16px rgba(0,0,0,.22);color:#fff;font-size:.82rem;white-space:nowrap;overflow:hidden;cursor:pointer}.event-bar:hover{filter:brightness(1.08);outline:2px solid rgba(255,255,255,.25)}.timeline-legend{margin:0;padding:0 20px;color:var(--muted,#aaa);font-size:.9rem}.timeline-empty{grid-column:1/-1;padding:40px;text-align:center;color:var(--muted,#aaa);border-top:1px solid rgba(255,255,255,.08)}.editor-card{margin-top:24px;padding:22px}.editor-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}.editor-header h2{margin:0;font-size:1.15rem}.timeline-form{display:grid;grid-template-columns:minmax(220px,2fr) repeat(2,minmax(130px,1fr)) auto;gap:12px;align-items:end}.timeline-form label{display:block;font-size:.85rem;font-weight:600;margin-bottom:6px}.timeline-form input{width:100%;box-sizing:border-box}.timeline-form-actions{display:flex;gap:8px}.saved-note{font-size:.82rem;color:var(--muted,#aaa);margin:12px 0 0}@media(max-width:900px){.timeline-form{grid-template-columns:1fr 1fr}.timeline-form .name-field{grid-column:1/-1}.timeline-form-actions{grid-column:1/-1}}@media(max-width:700px){.timeline-page{padding:30px 14px}.timeline-header{align-items:flex-start;flex-direction:column}.timeline{grid-template-columns:190px 1fr}.timeline-label-head{height:52px}.timeline-years{height:52px}}
   </style>
 </head>
 <body>
-  <header class="site-header">
-    <a class="brand" href="index.html">ARQUIVO <span>RPG</span></a>
-    <nav class="nav-links"><a href="index.html">Voltar</a></nav>
-  </header>
+  <header class="site-header"><a class="brand" href="index.html">ARQUIVO <span>RPG</span></a><nav class="nav-links"><a href="index.html">Voltar</a></nav></header>
   <main class="timeline-page">
-    <div class="timeline-header">
-      <div><span class="eyebrow">Ferramenta de teste</span><h1>Timeline</h1><p class="lead">Crie, edite e remova períodos e eventos. Os dados desta página ficam salvos apenas neste navegador.</p></div>
-      <div class="timeline-actions"><button id="resetTimeline" class="btn secondary" type="button">Restaurar exemplo</button></div>
-    </div>
-
-    <section class="card timeline-card">
-      <div class="timeline-scroll">
-        <div id="timeline" class="timeline" aria-label="Timeline de teste"></div>
-      </div>
-      <p class="timeline-legend">Protótipo independente: nenhuma informação é enviada ao Supabase ou vinculada a campanhas. Clique em uma barra para editar.</p>
-    </section>
-
-    <section class="card editor-card">
-      <div class="editor-header"><h2 id="editorTitle">Adicionar evento</h2><button id="cancelEdit" class="btn secondary" type="button" hidden>Cancelar edição</button></div>
-      <form id="timelineForm" class="timeline-form">
-        <div class="name-field"><label for="eventName">Evento</label><input id="eventName" maxlength="80" required placeholder="Ex.: Guerra das Cinzas"></div>
-        <div><label for="eventStart">Ano inicial</label><input id="eventStart" type="number" step="1" required value="3206"></div>
-        <div><label for="eventEnd">Ano final</label><input id="eventEnd" type="number" step="1" required value="3207"></div>
-        <div class="timeline-form-actions"><button id="saveEvent" class="btn" type="submit">Adicionar</button></div>
-      </form>
-      <p class="saved-note">As alterações são salvas automaticamente em <code>localStorage</code>.</p>
-    </section>
+    <div class="timeline-header"><div><span class="eyebrow">Ferramenta de teste</span><h1>Timeline</h1><p class="lead">Crie várias timelines, com quantos eventos quiser. Cada timeline fica independente e os dados são salvos apenas neste navegador.</p></div><div class="timeline-actions"><button id="addTimeline" class="btn" type="button">+ Nova timeline</button><button id="resetTimeline" class="btn secondary" type="button">Restaurar exemplo</button></div></div>
+    <div id="timelineStack" class="timeline-stack"></div>
+    <section class="card editor-card"><div class="editor-header"><h2 id="editorTitle">Adicionar evento</h2><button id="cancelEdit" class="btn secondary" type="button" hidden>Cancelar edição</button></div><form id="timelineForm" class="timeline-form"><div class="name-field"><label for="eventName">Evento</label><input id="eventName" maxlength="80" required placeholder="Ex.: Guerra das Cinzas"></div><div><label for="eventStart">Ano inicial</label><input id="eventStart" type="number" step="1" required value="3206"></div><div><label for="eventEnd">Ano final</label><input id="eventEnd" type="number" step="1" required value="3207"></div><div class="timeline-form-actions"><button id="saveEvent" class="btn" type="submit">Adicionar</button></div></form><p class="saved-note">As alterações são salvas automaticamente em <code>localStorage</code>.</p></section>
   </main>
   <script>
-    const STORAGE_KEY='arquivo-rpg.timeline.test.v1';
-    const DEFAULT_EVENTS=[
-      {id:'guerra-cinzas',name:'Guerra das Cinzas',start:3206,end:3207.74},
-      {id:'reinado-kael',name:'Reinado de Kael',start:3206.81,end:3208.55},
-      {id:'construcao-cidade',name:'Construção da cidade',start:3206.84,end:3207.50},
-      {id:'queda-asteria',name:'Queda de Asteria',start:3208.46,end:3208.82}
-    ];
+    const STORAGE_KEY='arquivo-rpg.timelines.test.v2';
+    const DEFAULT_TIMELINES=[{id:'timeline-1',name:'Linha do tempo principal',events:[{id:'guerra-cinzas',name:'Guerra das Cinzas',start:3206,end:3207.74},{id:'reinado-kael',name:'Reinado de Kael',start:3206.81,end:3208.55},{id:'construcao-cidade',name:'Construção da cidade',start:3206.84,end:3207.50},{id:'queda-asteria',name:'Queda de Asteria',start:3208.46,end:3208.82}]},{id:'timeline-2',name:'Segunda timeline',events:[]}];
     const MIN_YEAR=3206,MAX_YEAR=3209;
-    const timeline=document.getElementById('timeline'),form=document.getElementById('timelineForm'),nameInput=document.getElementById('eventName'),startInput=document.getElementById('eventStart'),endInput=document.getElementById('eventEnd'),editorTitle=document.getElementById('editorTitle'),saveButton=document.getElementById('saveEvent'),cancelButton=document.getElementById('cancelEdit'),resetButton=document.getElementById('resetTimeline');
-    let events=loadEvents(),editingId=null;
-
+    const stack=document.getElementById('timelineStack'),form=document.getElementById('timelineForm'),nameInput=document.getElementById('eventName'),startInput=document.getElementById('eventStart'),endInput=document.getElementById('eventEnd'),editorTitle=document.getElementById('editorTitle'),saveButton=document.getElementById('saveEvent'),cancelButton=document.getElementById('cancelEdit'),resetButton=document.getElementById('resetTimeline'),addTimelineButton=document.getElementById('addTimeline');
+    let timelines=loadTimelines(),editing={timelineId:null,eventId:null};
     function escapeHtml(value){return String(value).replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'})[char]);}
-    function loadEvents(){try{const saved=JSON.parse(localStorage.getItem(STORAGE_KEY));if(Array.isArray(saved))return saved.filter(isValidEvent); }catch(error){console.warn('Não foi possível ler a timeline local.',error);}return DEFAULT_EVENTS.map(event=>({...event}));}
-    function isValidEvent(event){return event&&typeof event.name==='string'&&event.name.trim()&&Number.isFinite(Number(event.start))&&Number.isFinite(Number(event.end))&&Number(event.end)>Number(event.start);}
-    function saveEvents(){localStorage.setItem(STORAGE_KEY,JSON.stringify(events));}
-    function render(){
-      const rows=events.map(event=>{
-        const left=Math.max(0,Math.min(100,((Number(event.start)-MIN_YEAR)/(MAX_YEAR-MIN_YEAR))*100));
-        const width=Math.max(.8,Math.min(100-left,((Number(event.end)-Number(event.start))/(MAX_YEAR-MIN_YEAR))*100));
-        return `<div class="timeline-label" title="${escapeHtml(event.name)}">${escapeHtml(event.name)}</div><div class="timeline-track"><button class="event-bar" type="button" data-id="${escapeHtml(event.id)}" style="left:${left}%;width:${width}%" title="Clique para editar">${escapeHtml(event.name)}</button></div>`;
-      }).join('');
-      timeline.innerHTML=`<div class="timeline-label-head"></div><div class="timeline-years"><span>3206</span><span>3207</span><span>3208</span></div>${rows||'<div class="timeline-empty">Nenhum evento cadastrado. Use o formulário abaixo para adicionar um.</div>'}`;
-      timeline.querySelectorAll('.event-bar').forEach(button=>button.addEventListener('click',()=>startEdit(button.dataset.id)));
+    function validEvent(e){return e&&typeof e.name==='string'&&e.name.trim()&&Number.isFinite(Number(e.start))&&Number.isFinite(Number(e.end))&&Number(e.end)>Number(e.start);}
+    function loadTimelines(){try{const saved=JSON.parse(localStorage.getItem(STORAGE_KEY));if(Array.isArray(saved)&&saved.length)return saved.map(t=>({id:t.id||crypto.randomUUID(),name:t.name||'Timeline',events:Array.isArray(t.events)?t.events.filter(validEvent):[]}));}catch(e){console.warn('Não foi possível ler as timelines locais.',e)}return DEFAULT_TIMELINES.map(t=>({...t,events:t.events.map(e=>({...e}))}));}
+    function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(timelines));}
+    function render(){stack.innerHTML=timelines.map(t=>{const rows=t.events.map(e=>{const left=Math.max(0,Math.min(100,((Number(e.start)-MIN_YEAR)/(MAX_YEAR-MIN_YEAR))*100));const width=Math.max(.8,Math.min(100-left,((Number(e.end)-Number(e.start))/(MAX_YEAR-MIN_YEAR))*100));return `<div class="timeline-label" title="${escapeHtml(e.name)}">${escapeHtml(e.name)}</div><div class="timeline-track"><button class="event-bar" type="button" data-timeline="${escapeHtml(t.id)}" data-event="${escapeHtml(e.id)}" style="left:${left}%;width:${width}%">${escapeHtml(e.name)}</button></div>`}).join('');return `<section class="card timeline-card"><div class="timeline-card-header"><h2>${escapeHtml(t.name)}</h2><div class="timeline-card-actions"><button class="btn secondary rename-timeline" type="button" data-id="${escapeHtml(t.id)}">Renomear</button><button class="btn secondary delete-timeline" type="button" data-id="${escapeHtml(t.id)}" ${timelines.length===1?'disabled':''}>Excluir</button></div></div><div class="timeline-scroll"><div class="timeline"><div class="timeline-label-head"></div><div class="timeline-years"><span>3206</span><span>3207</span><span>3208</span></div>${rows||'<div class="timeline-empty">Nenhum evento nesta timeline.</div>'}</div></div><p class="timeline-legend">${t.events.length} evento(s). Clique em uma barra para editar.</p></section>`}).join('');
+      stack.querySelectorAll('.event-bar').forEach(b=>b.addEventListener('click',()=>startEdit(b.dataset.timeline,b.dataset.event)));
+      stack.querySelectorAll('.rename-timeline').forEach(b=>b.addEventListener('click',()=>renameTimeline(b.dataset.id)));
+      stack.querySelectorAll('.delete-timeline').forEach(b=>b.addEventListener('click',()=>deleteTimeline(b.dataset.id)));
     }
-    function resetForm(){editingId=null;form.reset();startInput.value='3206';endInput.value='3207';editorTitle.textContent='Adicionar evento';saveButton.textContent='Adicionar';cancelButton.hidden=true;nameInput.focus();}
-    function startEdit(id){const event=events.find(item=>item.id===id);if(!event)return;editingId=id;nameInput.value=event.name;startInput.value=event.start;endInput.value=event.end;editorTitle.textContent='Editar evento';saveButton.textContent='Salvar alterações';cancelButton.hidden=false;nameInput.focus();}
-    form.addEventListener('submit',event=>{event.preventDefault();const name=nameInput.value.trim(),start=Number(startInput.value),end=Number(endInput.value);if(!name||!Number.isFinite(start)||!Number.isFinite(end)||end<=start){alert('Informe um nome e um período válido. O ano final deve ser maior que o inicial.');return;}if(editingId){const target=events.find(item=>item.id===editingId);if(target)Object.assign(target,{name,start,end});}else{events.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name,start,end});}saveEvents();render();resetForm();});
+    function resetForm(){editing={timelineId:null,eventId:null};form.reset();startInput.value='3206';endInput.value='3207';editorTitle.textContent='Adicionar evento';saveButton.textContent='Adicionar';cancelButton.hidden=true;}
+    function startEdit(tid,eid){const t=timelines.find(x=>x.id===tid),e=t?.events.find(x=>x.id===eid);if(!e)return;editing={timelineId:tid,eventId:eid};nameInput.value=e.name;startInput.value=e.start;endInput.value=e.end;editorTitle.textContent=`Editar evento — ${t.name}`;saveButton.textContent='Salvar alterações';cancelButton.hidden=false;form.scrollIntoView({behavior:'smooth',block:'center'});nameInput.focus();}
+    form.addEventListener('submit',e=>{e.preventDefault();const name=nameInput.value.trim(),start=Number(startInput.value),end=Number(endInput.value);if(!name||!Number.isFinite(start)||!Number.isFinite(end)||end<=start){alert('Informe um nome e um período válido.');return}let t=timelines.find(x=>x.id===editing.timelineId);if(editing.eventId&&t){const ev=t.events.find(x=>x.id===editing.eventId);if(ev)Object.assign(ev,{name,start,end})}else{if(!t)t=timelines[0];t.events.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name,start,end})}save();render();resetForm()});
     cancelButton.addEventListener('click',resetForm);
-    resetButton.addEventListener('click',()=>{if(!confirm('Restaurar os quatro eventos de exemplo? Isso substituirá os dados salvos localmente.'))return;events=DEFAULT_EVENTS.map(event=>({...event}));saveEvents();render();resetForm();});
+    addTimelineButton.addEventListener('click',()=>{const name=prompt('Nome da nova timeline:','Nova timeline');if(!name?.trim())return;const t={id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),name:name.trim(),events:[]};timelines.push(t);save();render();});
+    function renameTimeline(id){const t=timelines.find(x=>x.id===id);if(!t)return;const name=prompt('Nome da timeline:',t.name);if(name?.trim()){t.name=name.trim();save();render();}}
+    function deleteTimeline(id){if(timelines.length===1)return;if(!confirm('Excluir esta timeline e todos os seus eventos?'))return;timelines=timelines.filter(t=>t.id!==id);if(editing.timelineId===id)resetForm();save();render();}
+    resetButton.addEventListener('click',()=>{if(!confirm('Restaurar as timelines de exemplo? Isso substituirá os dados salvos localmente.'))return;timelines=DEFAULT_TIMELINES.map(t=>({...t,events:t.events.map(e=>({...e}))}));save();render();resetForm()});
     render();
   </script>
 </body>
