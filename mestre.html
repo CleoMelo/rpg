@@ -26,6 +26,9 @@
         <button class="btn full" type="submit">Entrar como mestre</button>
         <div id="message" class="message"></div>
       </form>
+      <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:14px;">
+        <a class="btn secondary" href="#" id="changePasswordLink">🔑 Trocar senha</a>
+      </div>
       <small>Campanhas demonstrativas continuam usando a senha <strong>mestre123</strong>.</small>
     </section>
   </main>
@@ -36,6 +39,7 @@
   <script>
     const rpgId = getSelectedRpg();
     document.getElementById('backLink').href = `acesso.html?rpg=${encodeURIComponent(rpgId)}`;
+    document.getElementById('changePasswordLink').href = `trocar-senha.html?rpg=${encodeURIComponent(rpgId)}`;
     document.getElementById('masterForm').addEventListener('submit', async event => {
       event.preventDefault();
       const password = document.getElementById('password').value;
