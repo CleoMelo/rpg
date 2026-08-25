@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Timeline — Teste</title>
+  <link rel="stylesheet" href="styles.css?v=20260731-1">
+  <style>
+    .timeline-page{max-width:1400px;margin:0 auto;padding:48px 24px 72px}
+    .timeline-header{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:28px}
+    .timeline-header h1{margin:6px 0 8px}
+    .timeline-card{overflow:hidden}
+    .timeline-scroll{overflow-x:auto;padding-bottom:8px}
+    .timeline{min-width:900px;display:grid;grid-template-columns:250px 1fr;border-top:1px solid rgba(255,255,255,.12)}
+    .timeline-label-head{height:58px;border-right:1px solid rgba(255,255,255,.12)}
+    .timeline-years{height:58px;display:grid;grid-template-columns:repeat(3,1fr);align-items:center;text-align:center;font-weight:700;font-size:1.05rem;letter-spacing:.04em}
+    .timeline-label{display:flex;align-items:center;min-height:72px;padding:14px 18px;border-top:1px solid rgba(255,255,255,.08);border-right:1px solid rgba(255,255,255,.12);font-weight:600}
+    .timeline-track{position:relative;min-height:72px;border-top:1px solid rgba(255,255,255,.08);background-image:linear-gradient(to right,rgba(255,255,255,.08) 1px,transparent 1px);background-size:33.3333% 100%}
+    .event-bar{position:absolute;top:22px;height:28px;border-radius:7px;display:flex;align-items:center;padding:0 10px;min-width:12px;box-sizing:border-box;background:linear-gradient(90deg,#8f6bff,#b99cff);box-shadow:0 5px 16px rgba(0,0,0,.22);color:#fff;font-size:.82rem;white-space:nowrap;overflow:hidden}
+    .timeline-legend{margin-top:18px;color:var(--muted,#aaa);font-size:.9rem}
+    @media(max-width:700px){.timeline-page{padding:30px 14px}.timeline-header{align-items:flex-start;flex-direction:column}.timeline{grid-template-columns:190px 1fr}.timeline-label-head{height:52px}.timeline-years{height:52px}}
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html">ARQUIVO <span>RPG</span></a>
+    <nav class="nav-links"><a href="index.html">Voltar</a></nav>
+  </header>
+  <main class="timeline-page">
+    <div class="timeline-header">
+      <div><span class="eyebrow">Ferramenta de teste</span><h1>Timeline</h1><p class="lead">Visualização horizontal de períodos e eventos.</p></div>
+    </div>
+    <section class="card timeline-card">
+      <div class="timeline-scroll">
+        <div class="timeline" aria-label="Timeline de teste">
+          <div class="timeline-label-head"></div>
+          <div class="timeline-years"><span>3206</span><span>3207</span><span>3208</span></div>
+          <div class="timeline-label">Guerra das Cinzas</div>
+          <div class="timeline-track"><div class="event-bar" style="left:0%;width:58%">Guerra das Cinzas</div></div>
+          <div class="timeline-label">Reinado de Kael</div>
+          <div class="timeline-track"><div class="event-bar" style="left:27%;width:58%">Reinado de Kael</div></div>
+          <div class="timeline-label">Construção da cidade</div>
+          <div class="timeline-track"><div class="event-bar" style="left:28%;width:22%">Construção da cidade</div></div>
+          <div class="timeline-label">Queda de Asteria</div>
+          <div class="timeline-track"><div class="event-bar" style="left:82%;width:12%">Queda de Asteria</div></div>
+        </div>
+      </div>
+      <p class="timeline-legend">Protótipo independente: os eventos são apenas dados de demonstração e ainda não estão ligados a campanhas ou ao Supabase.</p>
+    </section>
+  </main>
+</body>
+</html>
