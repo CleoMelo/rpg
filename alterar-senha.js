@@ -54,6 +54,9 @@
 
     const close = () => {
       backdrop.classList.remove('open');
+      if (!document.querySelector('.modal-backdrop.open')) {
+        document.body.classList.remove('modal-open');
+      }
       form.reset();
       message.textContent = '';
       message.className = 'message';
