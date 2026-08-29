@@ -2,8 +2,8 @@
 -- Execute no Supabase Dashboard > SQL Editor.
 -- Pode ser executado novamente: usa IF NOT EXISTS / CREATE OR REPLACE.
 --
--- IMPORTANTE: public.campanhas.id é TEXT neste projeto.
--- A timeline reutiliza a sessão de mestre já existente em public.sessoes_mestre.
+-- public.campanhas.id é TEXT neste projeto.
+-- A timeline reutiliza public.token_mestre_valido(text, text).
 
 begin;
 
@@ -31,29 +31,6 @@ alter table public.timeline_history enable row level security;
 
 revoke all on table public.timeline_data from anon, authenticated;
 revoke all on table public.timeline_history from anon, authenticated;
-
-create or replace function public.timeline_mestre_valido(
-  p_campanha_id text,
-  p_token text
-)
-returns boolean
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select
-    p_token is not null
-    and p_token <> ''
-    and exists (
-      select 1
-      from public.sessoes_mestre s
-      where s.campanha_id::text = p_campanha_id
-        and s.token::text = p_token
-    );
-$$;
-
-revoke all on function public.timeline_mestre_valido(text, text) from public, anon, authenticated;
 
 create or replace function public.carregar_timeline(
   p_campanha_id text
@@ -88,7 +65,7 @@ declare
   v_versao_atual bigint;
   v_nova_versao bigint;
 begin
-  if not public.timeline_mestre_valido(p_campanha_id, p_token) then
+  if not public.token_mestre_valido(p_campanha_id, p_token) then
     raise exception 'Sessão de mestre inválida para esta campanha.' using errcode = '42501';
   end if;
 
@@ -161,7 +138,7 @@ security definer
 set search_path = ''
 as $$
 begin
-  if not public.timeline_mestre_valido(p_campanha_id, p_token) then
+  if not public.token_mestre_valido(p_campanha_id, p_token) then
     raise exception 'Sessão de mestre inválida para esta campanha.' using errcode = '42501';
   end if;
 
@@ -209,7 +186,7 @@ declare
   v_data_atual jsonb;
   v_versao_atual bigint;
 begin
-  if not public.timeline_mestre_valido(p_campanha_id, p_token) then
+  if not public.token_mestre_valido(p_campanha_id, p_token) then
     raise exception 'Sessão de mestre inválida para esta campanha.' using errcode = '42501';
   end if;
 
