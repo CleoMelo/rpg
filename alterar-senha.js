@@ -1,6 +1,7 @@
 (function () {
   function initChangePassword() {
     if (!/\/categorias\.html$/i.test(location.pathname)) return;
+    if (sessionStorage.getItem('role') !== 'master') return;
     if (document.getElementById('changeMasterPasswordButton')) return;
 
     const toolbar = document.querySelector('.master-toolbar');
@@ -53,6 +54,9 @@
 
     const close = () => {
       backdrop.classList.remove('open');
+      if (!document.querySelector('.modal-backdrop.open')) {
+        document.body.classList.remove('modal-open');
+      }
       form.reset();
       message.textContent = '';
       message.className = 'message';
@@ -60,6 +64,7 @@
 
     const open = () => {
       backdrop.classList.add('open');
+      document.body.classList.add('modal-open');
       document.getElementById('currentMasterPassword').focus();
     };
 
@@ -74,8 +79,12 @@
       message.className = 'message';
       message.textContent = '';
 
-      const rpgId = typeof getSelectedRpg === 'function' ? getSelectedRpg() : new URLSearchParams(location.search).get('rpg');
-      const token = typeof getMasterToken === 'function' ? getMasterToken(rpgId) : sessionStorage.getItem(`masterSession:${String(rpgId)}`);
+      const rpgId = typeof getSelectedRpg === 'function'
+        ? getSelectedRpg()
+        : new URLSearchParams(location.search).get('rpg');
+      const token = typeof getMasterToken === 'function'
+        ? getMasterToken(rpgId)
+        : sessionStorage.getItem(`masterSession:${String(rpgId)}`);
       const currentPassword = document.getElementById('currentMasterPassword').value;
       const newPassword = document.getElementById('newMasterPassword').value;
       const confirmPassword = document.getElementById('confirmMasterPassword').value;
@@ -114,15 +123,12 @@
         if (error) throw error;
         if (!data) throw new Error('Não foi possível alterar a senha.');
 
-        // A senha foi alterada. O token atual não deve continuar sendo usado.
         if (typeof clearMasterSession === 'function') {
           clearMasterSession(rpgId);
         } else {
           sessionStorage.removeItem(`masterSession:${String(rpgId)}`);
         }
 
-        // Volta para a página de senha do mestre para que ele entre novamente
-        // usando a nova senha.
         location.href = `mestre.html?rpg=${encodeURIComponent(rpgId)}`;
       } catch (error) {
         console.error(error);

@@ -4,8 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Acesso do mestre</title>
-  <link rel="stylesheet" href="styles.css?v=20260728-11">
-  <link rel="stylesheet" href="css/modais.css?v=20260824-1">
+  <link rel="stylesheet" href="styles.css?v=20260829-1">
 </head>
 <body>
   <header class="site-header">
@@ -26,20 +25,15 @@
         <button class="btn full" type="submit">Entrar como mestre</button>
         <div id="message" class="message"></div>
       </form>
-      <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:14px;">
-        <a class="btn secondary" href="#" id="changePasswordLink">🔑 Trocar senha</a>
-      </div>
-      <small>Campanhas demonstrativas continuam usando a senha <strong>mestre123</strong>.</small>
     </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-config.js?v=20260728-4"></script>
-  <script src="data.js?v=20260728-18"></script>
+  <script src="supabase-config.js?v=20260829-1"></script>
+  <script src="data.js?v=20260829-1"></script>
   <script>
     const rpgId = getSelectedRpg();
     document.getElementById('backLink').href = `acesso.html?rpg=${encodeURIComponent(rpgId)}`;
-    document.getElementById('changePasswordLink').href = `trocar-senha.html?rpg=${encodeURIComponent(rpgId)}`;
     document.getElementById('masterForm').addEventListener('submit', async event => {
       event.preventDefault();
       const password = document.getElementById('password').value;
@@ -64,9 +58,7 @@
       } catch (error) {
         console.error(error);
         message.className = 'message error';
-        message.textContent = error?.code === 'PGRST202'
-          ? 'Execute a migração de senha no Supabase.'
-          : 'Não foi possível verificar a senha.';
+        message.textContent = 'Não foi possível verificar a senha.';
       } finally {
         submitButton.disabled = false;
       }

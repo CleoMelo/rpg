@@ -51,13 +51,6 @@ function sanitizeName(value: string) {
 }
 
 async function verifyMaster(campaignId: string, masterToken: string) {
-  if (
-    ["reinos-partidos", "neon-abyss", "ecos-do-vazio"].includes(campaignId) &&
-    masterToken === `demo:${campaignId}`
-  ) {
-    return true;
-  }
-
   const supabaseUrl = requiredSecret("SUPABASE_URL");
   const serviceKey = requiredSecret("SUPABASE_SERVICE_ROLE_KEY");
   const headers = {

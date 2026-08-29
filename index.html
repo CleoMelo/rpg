@@ -4,9 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Portal de RPGs</title>
-  <link rel="stylesheet" href="styles.css?v=20260731-1">
-  <link rel="stylesheet" href="css/filtros.css?v=20260824-1">
-  <link rel="stylesheet" href="css/modais.css?v=20260824-1">
+  <link rel="stylesheet" href="styles.css?v=20260829-1">
 </head>
 <body>
   <header class="site-header">
@@ -62,9 +60,9 @@
   </div>
   <footer class="footer">Portal de RPGs — projeto personalizável</footer>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-config.js?v=20260728-4"></script>
-  <script src="data.js?v=20260728-18"></script>
-  <script src="media-upload.js?v=20260728-6"></script>
+  <script src="supabase-config.js?v=20260829-1"></script>
+  <script src="data.js?v=20260829-1"></script>
+  <script src="media-upload.js?v=20260829-1"></script>
   <script>
     const grid=document.getElementById('rpgGrid'),modal=document.getElementById('rpgModal'),form=document.getElementById('rpgForm'),imageInput=document.getElementById('rpgImage'),preview=document.getElementById('imagePreview'),message=document.getElementById('rpgMessage'),campaignSearch=document.getElementById('campaignSearch'),clearCampaignSearch=document.getElementById('clearCampaignSearch'),campaignFilterStatus=document.getElementById('campaignFilterStatus');
     function escapeHtml(value){return String(value).replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'})[char]);}
