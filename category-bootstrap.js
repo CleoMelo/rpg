@@ -7,7 +7,7 @@
   document.head.appendChild(stylesheet);
 
   const scripts = [
-    'personagem-destaque.js?v=20260829-2',
+    'personagem-destaque.js?v=20260829-3',
     'busca-global-personagem.js?v=20260820-1',
     'classificacao-categorias.js?v=20260824-1',
     'alterar-senha.js?v=20260829-1'

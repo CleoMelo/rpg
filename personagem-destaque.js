@@ -121,19 +121,28 @@
   }
 
   async function getFichaUrl(id){
+    const cached=localStorage.getItem(key(id))||'';
     try{
-      if(typeof getSupabaseClient!=='function')return localStorage.getItem(key(id))||'';
+      if(typeof getSupabaseClient!=='function')return cached;
+      const rpgId=new URLSearchParams(location.search).get('rpg')||localStorage.getItem('selectedRpg')||'';
+      const token=typeof getMasterToken==='function'?getMasterToken(rpgId):null;
+      if(!rpgId||!token)return cached;
+
       const client=getSupabaseClient();
-      const {data,error}=await client
-        .from('personagens')
-        .select('ficha_url')
-        .eq('id',String(id))
-        .maybeSingle();
+      const {data,error}=await client.rpc('obter_ficha_personagem_mestre',{
+        p_campanha_id:String(rpgId),
+        p_personagem_id:String(id),
+        p_token:token
+      });
       if(error)throw error;
-      return String(data?.ficha_url||'').trim();
+
+      const url=String(data||'').trim();
+      if(url)localStorage.setItem(key(id),url);
+      else localStorage.removeItem(key(id));
+      return url;
     }catch(error){
       console.error('Não foi possível carregar a ficha do personagem:',error);
-      return localStorage.getItem(key(id))||'';
+      return cached;
     }
   }
 
