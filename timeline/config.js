@@ -3,5 +3,23 @@ window.TIMELINE_REPO = {
   repo: "rpg",
   branch: "import-timeline-cavaleiros",
   path: "timeline/timeline.json",
-  workerUrl: "__WORKER_URL__"
+  storage: "supabase",
+  workerUrl: "supabase://timeline"
 };
+
+(() => {
+  const editorPage = /\/timeline\.html$/i.test(location.pathname);
+  const rootPrefix = editorPage ? "./" : "../";
+  const timelinePrefix = editorPage ? "./timeline/" : "./";
+
+  const scripts = [
+    "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
+    `${rootPrefix}supabase-config.js?v=20260829-1`,
+    `${rootPrefix}data.js?v=20260829-1`,
+    `${timelinePrefix}supabase-adapter.js?v=1`
+  ];
+
+  for (const src of scripts) {
+    document.write(`<script src="${src}"><\/script>`);
+  }
+})();
