@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Categorias</title>
-  <link rel="stylesheet" href="styles.css?v=20260731-1">
+  <link rel="stylesheet" href="styles.css?v=20260829-2">
 </head>
 <body>
   <header class="site-header">
@@ -251,9 +251,9 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-config.js?v=20260728-4"></script>
-  <script src="data.js?v=20260728-18"></script>
-  <script src="media-upload.js?v=20260728-6"></script>
+  <script src="supabase-config.js?v=20260829-2"></script>
+  <script src="data.js?v=20260829-2"></script>
+  <script src="media-upload.js?v=20260829-2"></script>
   <script>
     const rpgId = getSelectedRpg();
     const storedRole = sessionStorage.getItem('role');
@@ -1626,6 +1626,7 @@
       editingCharacterId = null;
       const form = document.getElementById('characterForm');
       form.reset();
+      delete form.dataset.fichaCharacterId;
       document.getElementById('characterModalTitle').textContent = 'Novo personagem';
       form.querySelector('button[type="submit"]').textContent = 'Salvar personagem';
       setFilePreview(
@@ -1751,6 +1752,9 @@
     document.getElementById('characterForm').addEventListener('submit', async event => {
       event.preventDefault();
       const form = event.currentTarget;
+      const fichaInput = document.getElementById('characterFichaUrl');
+      const fichaUrl = fichaInput?.value.trim() || '';
+      delete form.dataset.fichaCharacterId;
       const submitButton = form.querySelector('button[type="submit"]');
       const formMessage = document.getElementById('characterMessage');
       submitButton.disabled = true;
@@ -1761,6 +1765,7 @@
       let upload = null;
       let characterSaved = false;
       let replacedMediaWarning = '';
+      let fichaWarning = '';
       try {
         const imageInput = document.getElementById('characterImage');
         const imageFile = imageInput.files?.[0];
@@ -1809,6 +1814,29 @@
         }
 
         characterSaved = true;
+        if (fichaInput) {
+          try {
+            const { data, error } = await getSupabaseClient().rpc(
+              'salvar_ficha_personagem',
+              {
+                p_campanha_id: String(rpgId),
+                p_personagem_id: String(character.id),
+                p_token: masterToken,
+                p_ficha_url: fichaUrl || null
+              }
+            );
+            if (error) throw error;
+            if (!data) throw new Error('Acesso do mestre expirado.');
+
+            const fichaKey = `characterFicha:${character.id}`;
+            if (fichaUrl) localStorage.setItem(fichaKey, fichaUrl);
+            else localStorage.removeItem(fichaKey);
+          } catch (fichaError) {
+            console.error('Falha ao salvar a ficha do personagem:', fichaError);
+            fichaWarning =
+              'O personagem foi salvo, mas o link da ficha não pôde ser atualizado.';
+          }
+        }
         if (
           upload &&
           existingCharacter?.image &&
@@ -1835,7 +1863,8 @@
         selectCategory(selectedCategory);
         const characterWarnings = [
           upload?.warning,
-          replacedMediaWarning
+          replacedMediaWarning,
+          fichaWarning
         ].filter(Boolean);
         if (characterWarnings.length) {
           showPageMessage(characterWarnings.join(' '));

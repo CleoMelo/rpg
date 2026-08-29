@@ -137,38 +137,6 @@
     }
   }
 
-  async function saveFichaUrl(id,url){
-    if(!id)return false;
-    const normalized=String(url||'').trim();
-    if(normalized){
-      try{new URL(normalized)}catch{return false;}
-    }
-
-    if(typeof getSupabaseClient!=='function'){
-      if(normalized)localStorage.setItem(key(id),normalized);
-      else localStorage.removeItem(key(id));
-      return true;
-    }
-
-    const rpgId=new URLSearchParams(location.search).get('rpg')||localStorage.getItem('selectedRpg')||'';
-    const token=typeof getMasterToken==='function'?getMasterToken(rpgId):null;
-    if(!rpgId||!token)return false;
-
-    const client=getSupabaseClient();
-    const {data,error}=await client.rpc('salvar_ficha_personagem',{
-      p_campanha_id:String(rpgId),
-      p_personagem_id:String(id),
-      p_token:token,
-      p_ficha_url:normalized||null
-    });
-    if(error)throw error;
-    if(!data)throw new Error('Acesso do mestre expirado.');
-
-    if(normalized)localStorage.setItem(key(id),normalized);
-    else localStorage.removeItem(key(id));
-    return true;
-  }
-
   function modal(){
     if(document.getElementById('characterHighlightModal'))return;
     const m=document.createElement('div');
@@ -241,8 +209,6 @@
       if(edit&&isMaster()){
         setTimeout(()=>{
           injectField();
-          const f=document.getElementById('characterForm');
-          if(f)f.dataset.fichaCharacterId=edit.dataset.edit;
           void loadFichaIntoForm(edit.dataset.edit);
         },0);
         return;
@@ -250,25 +216,6 @@
       const card=e.target.closest('.character-card');
       if(!card||e.target.closest('button,a,input,select,textarea,.entity-controls,.character-actions'))return;
       void openCard(card);
-    });
-
-    document.addEventListener('submit',e=>{
-      if(e.target.id!=='characterForm'||!isMaster())return;
-      const input=document.getElementById('characterFichaUrl');
-      const explicitId=e.target.dataset.fichaCharacterId||'';
-      const value=input?.value.trim()||'';
-      setTimeout(async()=>{
-        try{
-          const name=document.getElementById('characterName')?.value.trim();
-          const card=[...document.querySelectorAll('.character-card')]
-            .find(c=>c.querySelector('h3')?.textContent.trim()===name);
-          const cardId=card?.dataset.characterId||card?.querySelector('[data-edit]')?.dataset.edit||explicitId;
-          if(!cardId)return;
-          await saveFichaUrl(cardId,value);
-        }catch(error){
-          console.error('Não foi possível salvar o link da ficha:',error);
-        }
-      },400);
     });
 
     new MutationObserver(()=>{
