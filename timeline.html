@@ -1,10 +1,313 @@
 <!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Timeline Gantt</title><link rel="stylesheet" href="styles.css"><style>
-.timeline-page{max-width:1500px;margin:auto;padding:30px}.gantt-box{overflow:auto;background:#111827;border-radius:12px;padding:20px}.header,.row{display:grid;grid-template-columns:280px 1fr}.header{height:70px}.axis{position:relative;border-bottom:1px solid #555}.year{position:absolute;top:5px;transform:translateX(-50%)}.row{height:65px}.name{display:flex;align-items:center;background:#111827;border-top:1px solid #333;padding-left:12px;z-index:3}.track{position:relative;border-top:1px solid #333}.bar{position:absolute;top:17px;height:30px;border-radius:8px;color:white;padding:5px 10px;cursor:grab;overflow:hidden}.group{margin:25px 0;font-weight:bold}.controls{display:flex;gap:10px;margin:20px 0}.hidden{display:none}.event-form input{margin:5px;width:180px}</style></head>
-<body><header class="site-header"><a class="brand" href="index.html">ARQUIVO <span>RPG</span></a></header><main class="timeline-page"><h1>Timeline Gantt</h1><input id="search" placeholder="Pesquisar evento"><button id="add">Novo evento</button><div id="form" class="hidden event-form"><input id="n" placeholder="Nome"><input id="s" placeholder="Inicio"><input id="e" placeholder="Fim"><input id="g" placeholder="Grupo"><input id="c" placeholder="Cor"><button id="save">Salvar</button></div><section class="gantt-box"><div id="gantt"></div></section></main>
-<script>
-const KEY='timeline-gantt-local';let events=JSON.parse(localStorage.getItem(KEY)||'[]');if(!events.length)events=[{name:'Guerra das Cinzas',start:3206,end:3207,group:'Guerras',color:'#ef4444'},{name:'Reinado de Kael',start:3206,end:3208,group:'Politica',color:'#eab308'}];
-let edit=null;const saveDB=()=>localStorage.setItem(KEY,JSON.stringify(events));
-function render(){let filter=search.value.toLowerCase();let list=events.filter(e=>e.name.toLowerCase().includes(filter));let min=Math.min(...list.map(e=>e.start)),max=Math.max(...list.map(e=>e.end))+1;let h='<div class="header"><div></div><div class="axis">';for(let y=min;y<=max;y++)h+=`<span class="year" style="left:${(y-min)/(max-min)*100}%">${y}</span>`;h+='</div></div>';list.forEach((e,i)=>{let l=(e.start-min)/(max-min)*100,w=Math.max(3,(e.end-e.start+1)/(max-min)*100);h+=`<div class="row"><div class="name">${e.group||'Eventos'} - ${e.name}</div><div class="track"><div class="bar" draggable="true" style="left:${l}%;width:${w}%;background:${e.color||'#8f6bff'}" data-id="${i}">${e.name}</div></div></div>`});gantt.innerHTML=h;document.querySelectorAll('.bar').forEach(b=>b.ondblclick=()=>{edit=Number(b.dataset.id);let e=events[edit];n.value=e.name;s.value=e.start;e.value=e.end;g.value=e.group;c.value=e.color;form.classList.remove('hidden')})}
-add.onclick=()=>form.classList.remove('hidden');search.oninput=render;save.onclick=()=>{let e={name:n.value,start:Number(s.value),end:Number(e.value||s.value),group:g.value,color:c.value||'#8f6bff'};if(edit!==null){events[edit]=e;edit=null}else events.push(e);saveDB();form.classList.add('hidden');render()};saveDB();render();
-</script></body></html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#090a0d">
+  <title>Cavaleiros Divinos — Timeline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./timeline/styles.css?v=20">
+</head>
+<body class="admin-page lk16-page">
+  <header class="lk16-appbar">
+    <div class="lk16-brand"><span class="lk16-brand-mark">✦</span><strong>Cavaleiros Timeline</strong></div>
+    <div class="lk16-app-actions">
+      <span id="saveBadge" class="lk16-save-status">Carregando…</span>
+      <span id="dirtyText" class="lk16-dirty-text">Nenhuma alteração pendente</span>
+      <button id="discardBtn" class="lk16-top-btn" type="button" disabled>Descartar</button>
+      <button id="saveAllBtn" class="lk16-top-btn lk16-save-btn" type="button" disabled>Salvar alterações</button>
+      <button id="backupHistoryBtn" class="lk16-top-btn" type="button">Backups</button>
+      <a class="lk16-top-btn" href="./timeline/">Ver site público</a>
+    </div>
+  </header>
+
+  <main class="lk16-shell">
+    <section class="lk16-timeline-card">
+      <header class="lk16-title-row lk17-title-row">
+        <h1><span class="lk16-hourglass">⌛</span>Cavaleiros Divinos e a Ordem dos Reinos</h1>
+        <div class="lk17-title-actions">
+          <button id="fitBtn" class="lk17-mini-btn" type="button" title="Enquadrar toda a história">Enquadrar</button>
+          <button id="recentBtn" class="lk17-mini-btn" type="button" title="Ir aos acontecimentos mais recentes">Recentes</button>
+          <button id="timeSystemBtn" class="lk16-time-system-btn lk17-mini-btn" type="button">▣ Tempo</button>
+        </div>
+      </header>
+
+      <div class="lk16-context-row">
+        <div class="lk16-context-left">
+          <span class="lk16-world-pill">▣ Cavaleiros</span>
+          <div class="lk16-view-switch" role="tablist" aria-label="Visualização">
+            <button id="ganttTab" class="active" type="button" role="tab" aria-selected="true">Gantt</button>
+            <button id="listTab" type="button" role="tab" aria-selected="false">Lista</button>
+          </div>
+          <button id="searchToggleBtn" class="lk16-icon-btn" type="button" title="Pesquisar">⌕</button>
+          <button id="lanesBtn" class="lk16-context-btn" type="button">Categorias</button>
+          <button id="helpBtn" class="lk16-icon-btn" type="button" title="Ajuda">?</button>
+          <button id="exportBtn" class="lk16-icon-btn" type="button" title="Baixar JSON">⇩</button>
+          <button id="newEvent" class="hidden" type="button">Novo evento</button>
+        </div>
+
+        <div class="lk16-context-right">
+          <label class="lk16-resolution-select">
+            <span>Escala</span>
+            <select id="scalePreset">
+              <option value="1576800000">Milênios</option>
+              <option value="157680000">Séculos</option>
+              <option value="15768000">Décadas</option>
+              <option value="2628000">Anos</option>
+              <option value="525600">Meses</option>
+              <option value="43200">Dias</option>
+              <option value="4320">Horas</option>
+            </select>
+          </label>
+          <button id="jumpDateBtn" class="lk16-date-btn" type="button">▣ <span id="jumpDateLabel">—</span></button>
+        </div>
+      </div>
+
+      <div id="searchPanel" class="lk16-search-panel lk17-search-panel hidden">
+        <input id="search" type="search" placeholder="Buscar em todos os acontecimentos…">
+        <select id="laneFilter"><option value="">Todas as categorias</option></select>
+        <button id="clearSearchBtn" class="lk16-context-btn" type="button">Limpar</button>
+        <div id="searchResults" class="lk17-search-results"></div>
+      </div>
+
+      <div id="ganttCommandRow" class="lk16-statusbar">
+        <span id="ganttRange">—</span>
+        <span class="lk16-status-dot">•</span>
+        <span id="ganttVisibleCount">0 acontecimentos</span>
+        <span class="lk16-status-dot">•</span>
+        <span id="detailLevelLabel">Todos os acontecimentos</span>
+        <span class="lk16-status-spacer"></span>
+        <span id="cursorDateLabel">Passe o mouse sobre a linha do tempo</span>
+        <span class="lk16-status-dot">•</span>
+        <span id="liveScaleLabel">—</span>
+        <span class="lk16-status-dot">•</span>
+        <span id="snapInfo">—</span>
+
+      </div>
+
+      <div id="historyNavigator" class="lk17-history-nav">
+        <div class="lk17-history-label">
+          <strong>História inteira</strong>
+          <span id="historyRangeLabel">—</span>
+        </div>
+        <div id="historyOverviewTrack" class="lk17-history-track" title="Todos os acontecimentos. Clique para ir a uma época.">
+          <div id="historyOverviewMarkers" class="lk17-history-markers"></div>
+          <div id="historyOverviewWindow" class="lk17-history-window" title="Período visível — arraste para navegar"></div>
+        </div>
+        <span id="historyEventCount" class="lk17-history-count">0 eventos</span>
+      </div>
+
+      <section id="ganttView" class="gantt-stage lk16-gantt-stage">
+        <div id="ganttScroller" class="gantt-scroller gantt-scroller-full lk-gantt-scroller lk16-gantt-scroller" tabindex="0" aria-label="Linha do tempo editável">
+          <div class="gantt-axis-row lk-axis-row lk16-axis-row">
+            <div class="gantt-corner lk-corner lk16-corner">
+              <span>Categoria</span>
+              <button id="toggleAllLanesBtn" class="lane-header-action" type="button" title="Recolher ou expandir categorias">⇅</button>
+            </div>
+            <div id="ganttAxis" class="gantt-axis lk-axis lk16-axis">
+              <div id="ganttAxisMajor" class="axis-tier axis-major"></div>
+              <div id="ganttAxisMinor" class="axis-tier axis-minor"></div>
+            </div>
+          </div>
+          <div id="ganttRows" class="gantt-rows"></div>
+        </div>
+
+        <div class="lk16-bottom-toolbar" aria-label="Ferramentas da linha do tempo">
+          <button id="modePointer" class="lk16-tool" type="button" title="Selecionar e editar">↖</button>
+          <button id="modeHand" class="lk16-tool active" type="button" title="Mover">✋</button>
+          <button id="modeAdd" class="lk16-tool" type="button" title="Adicionar acontecimento">＋</button>
+          <span class="lk16-tool-divider"></span>
+          <button id="undoBtn" class="lk16-tool" type="button" title="Desfazer (Ctrl+Z)" disabled>↶</button>
+          <button id="redoBtn" class="lk16-tool" type="button" title="Refazer (Ctrl+Y)" disabled>↷</button>
+          <span class="lk16-tool-divider"></span>
+          <button id="listQuickBtn" class="lk16-tool" type="button" title="Abrir lista">☷</button>
+        </div>
+
+        <div class="lk16-zoom-toolbar" aria-label="Zoom">
+          <span id="zoomResolutionLabel" class="hidden">História</span>
+          <button id="zoomOut" type="button" title="Afastar">−</button>
+          <button id="zoomIn" type="button" title="Aproximar">＋</button>
+        </div>
+
+        <div id="modeHint" class="mode-hint lk16-help-bubble">
+          <span id="modeHintText">Use a mão para arrastar a linha do tempo. A rodinha aproxima ou afasta no ponto do mouse.</span>
+          <button id="closeModeHint" class="mode-hint-close" type="button" aria-label="Fechar ajuda">×</button>
+        </div>
+      </section>
+
+      <section id="listView" class="panel admin-list-view hidden">
+        <div class="section-head">
+          <div><p class="eyebrow">LISTA</p><h2>Acontecimentos</h2></div>
+          <span id="editorCount" class="muted"></span>
+        </div>
+        <div id="editorList" class="editor-list"></div>
+      </section>
+    </section>
+  </main>
+
+  <dialog id="jumpDateDialog">
+    <form id="jumpDateForm" class="dialog-card lk16-small-dialog">
+      <div class="dialog-head">
+        <div><p class="eyebrow">NAVEGAR</p><h2>Ir para uma data</h2></div>
+        <button class="icon-button" data-close type="button">×</button>
+      </div>
+      <div class="date-fields">
+        <label><span>Era</span><select id="jumpEra"><option value="after">Depois Grande Mudança</option><option value="before">Antes Grande Mudança</option></select></label>
+        <label><span>Ano</span><input id="jumpYear" type="number" min="1" required></label>
+        <label><span>Mês</span><select id="jumpMonth"></select></label>
+        <label><span>Dia</span><input id="jumpDay" type="number" min="1" max="31" required></label>
+        <label><span>Hora</span><input id="jumpHour" type="number" min="0" max="23" value="0"></label>
+        <label><span>Minuto</span><input id="jumpMinute" type="number" min="0" max="59" value="0"></label>
+      </div>
+      <div class="dialog-actions"><span class="spacer"></span><button class="button ghost" data-close type="button">Cancelar</button><button class="button primary" type="submit">Ir para data</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="timeSystemDialog">
+    <div class="dialog-card lk16-small-dialog">
+      <div class="dialog-head"><div><p class="eyebrow">TEMPO</p><h2>Sistema de tempo</h2></div><button class="icon-button" data-close type="button">×</button></div>
+      <div id="timeSystemBody" class="event-detail"></div>
+      <div class="dialog-actions"><span class="spacer"></span><button class="button primary" data-close type="button">Fechar</button></div>
+    </div>
+  </dialog>
+  <dialog id="eventDialog">
+    <form id="eventForm" class="dialog-card event-dialog-wide">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">ACONTECIMENTO</p>
+          <h2 id="eventDialogTitle">Editar</h2>
+        </div>
+        <button class="icon-button" data-close type="button" aria-label="Fechar">×</button>
+      </div>
+
+      <input id="eventId" type="hidden">
+
+      <label class="full">
+        <span>Nome</span>
+        <input id="eventName" maxlength="260" required>
+      </label>
+
+      <div class="event-meta-grid">
+        <label>
+          <span>Tipo temporal</span>
+          <select id="eventTiming">
+            <option value="point">Acontecimento pontual</option>
+            <option value="range">Acontecimento com duração</option>
+          </select>
+        </label>
+        <label><span>Categoria</span><select id="eventLane"></select></label>
+        <label>
+          <span>Importância</span>
+          <select id="eventDetail">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </label>
+        <label><span>Cor original do evento</span><input id="eventColor" type="color"></label>
+      </div>
+
+      <section class="date-editor-block">
+        <div class="date-editor-title">
+          <strong>Início</strong>
+          <span class="muted">Data exata em que o acontecimento começa.</span>
+        </div>
+        <div class="date-fields">
+          <label>
+            <span>Era</span>
+            <select id="eventEra">
+              <option value="after">Depois Grande Mudança</option>
+              <option value="before">Antes Grande Mudança</option>
+            </select>
+          </label>
+          <label><span>Ano</span><input id="eventYear" type="number" min="1" required></label>
+          <label><span>Mês</span><select id="eventMonth"></select></label>
+          <label><span>Dia</span><input id="eventDay" type="number" min="1" max="31" required></label>
+          <label><span>Hora</span><input id="eventHour" type="number" min="0" max="23" required></label>
+          <label><span>Minuto</span><input id="eventMinute" type="number" min="0" max="59" required></label>
+        </div>
+      </section>
+
+      <section id="eventEndBlock" class="date-editor-block hidden">
+        <div class="date-editor-title">
+          <strong>Fim</strong>
+          <span class="muted">A barra ocupará exatamente o intervalo entre início e fim.</span>
+        </div>
+        <div class="date-fields">
+          <label>
+            <span>Era</span>
+            <select id="eventEndEra">
+              <option value="after">Depois Grande Mudança</option>
+              <option value="before">Antes Grande Mudança</option>
+            </select>
+          </label>
+          <label><span>Ano</span><input id="eventEndYear" type="number" min="1"></label>
+          <label><span>Mês</span><select id="eventEndMonth"></select></label>
+          <label><span>Dia</span><input id="eventEndDay" type="number" min="1" max="31"></label>
+          <label><span>Hora</span><input id="eventEndHour" type="number" min="0" max="23"></label>
+          <label><span>Minuto</span><input id="eventEndMinute" type="number" min="0" max="59"></label>
+        </div>
+      </section>
+
+      <p id="datePreview" class="date-preview"></p>
+      <p class="muted">Eventos sem fim continuam pontuais no JSON. No Gantt eles recebem apenas uma barra curta de interface, sem inventar uma duração.</p>
+
+      <div class="dialog-actions">
+        <button id="deleteEvent" class="button danger hidden" type="button">Excluir</button>
+        <span class="spacer"></span>
+        <button class="button ghost" data-close type="button">Cancelar</button>
+        <button class="button primary" type="submit">Aplicar alteração</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="lanesDialog">
+    <div class="dialog-card">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">ORGANIZAÇÃO</p>
+          <h2>Categorias e cores</h2>
+          <p class="muted">Cada linha recebe uma cor própria no Gantt.</p>
+        </div>
+        <button class="icon-button" data-close type="button" aria-label="Fechar">×</button>
+      </div>
+      <div id="lanesEditor" class="lanes-editor"></div>
+      <div class="dialog-actions">
+        <button id="addLane" class="button ghost" type="button">+ Categoria</button>
+        <span class="spacer"></span>
+        <button class="button ghost" data-close type="button">Cancelar</button>
+        <button id="saveLanes" class="button primary" type="button">Aplicar categorias</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="backupsDialog">
+    <div class="dialog-card backups-dialog-card">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">ARQUIVO DE SEGURANÇA</p>
+          <h2>Histórico de backups</h2>
+          <p class="muted">Cada salvamento vira uma versão do timeline.json no histórico do GitHub.</p>
+        </div>
+        <button class="icon-button" data-close type="button" aria-label="Fechar">×</button>
+      </div>
+      <div id="backupsStatus" class="backup-status muted">Carregando backups…</div>
+      <div id="backupsList" class="backups-list"></div>
+      <div class="dialog-actions">
+        <button id="refreshBackupsBtn" class="button ghost" type="button">Atualizar lista</button>
+        <span class="spacer"></span>
+        <button class="button primary" data-close type="button">Fechar</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <script src="./timeline/config.js?v=20"></script>
+  <script src="./timeline/common.js?v=20"></script>
+  <script src="./timeline/admin.js?v=20"></script>
+</body>
+</html>
