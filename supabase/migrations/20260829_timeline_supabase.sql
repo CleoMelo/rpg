@@ -2,13 +2,13 @@
 -- Execute no Supabase Dashboard > SQL Editor.
 -- Pode ser executado novamente: usa IF NOT EXISTS / CREATE OR REPLACE.
 --
--- A timeline continua vinculada à campanha e reutiliza a sessão de mestre
--- já existente em public.sessoes_mestre.
+-- IMPORTANTE: public.campanhas.id é TEXT neste projeto.
+-- A timeline reutiliza a sessão de mestre já existente em public.sessoes_mestre.
 
 begin;
 
 create table if not exists public.timeline_data (
-  campanha_id uuid primary key references public.campanhas(id) on delete cascade,
+  campanha_id text primary key references public.campanhas(id) on delete cascade,
   data jsonb not null,
   versao bigint not null default 1,
   atualizado_em timestamptz not null default now()
@@ -16,7 +16,7 @@ create table if not exists public.timeline_data (
 
 create table if not exists public.timeline_history (
   id bigint generated always as identity primary key,
-  campanha_id uuid not null references public.campanhas(id) on delete cascade,
+  campanha_id text not null references public.campanhas(id) on delete cascade,
   data jsonb not null,
   versao bigint not null,
   mensagem text not null default 'Backup da timeline',
@@ -33,7 +33,7 @@ revoke all on table public.timeline_data from anon, authenticated;
 revoke all on table public.timeline_history from anon, authenticated;
 
 create or replace function public.timeline_mestre_valido(
-  p_campanha_id uuid,
+  p_campanha_id text,
   p_token text
 )
 returns boolean
@@ -48,15 +48,15 @@ as $$
     and exists (
       select 1
       from public.sessoes_mestre s
-      where s.campanha_id = p_campanha_id
+      where s.campanha_id::text = p_campanha_id
         and s.token::text = p_token
     );
 $$;
 
-revoke all on function public.timeline_mestre_valido(uuid, text) from public, anon, authenticated;
+revoke all on function public.timeline_mestre_valido(text, text) from public, anon, authenticated;
 
 create or replace function public.carregar_timeline(
-  p_campanha_id uuid
+  p_campanha_id text
 )
 returns jsonb
 language sql
@@ -69,11 +69,11 @@ as $$
   where t.campanha_id = p_campanha_id;
 $$;
 
-revoke all on function public.carregar_timeline(uuid) from public;
-grant execute on function public.carregar_timeline(uuid) to anon, authenticated;
+revoke all on function public.carregar_timeline(text) from public;
+grant execute on function public.carregar_timeline(text) to anon, authenticated;
 
 create or replace function public.salvar_timeline(
-  p_campanha_id uuid,
+  p_campanha_id text,
   p_token text,
   p_data jsonb,
   p_mensagem text default 'Edição pela timeline'
@@ -142,11 +142,11 @@ begin
 end;
 $$;
 
-revoke all on function public.salvar_timeline(uuid, text, jsonb, text) from public;
-grant execute on function public.salvar_timeline(uuid, text, jsonb, text) to anon, authenticated;
+revoke all on function public.salvar_timeline(text, text, jsonb, text) from public;
+grant execute on function public.salvar_timeline(text, text, jsonb, text) to anon, authenticated;
 
 create or replace function public.listar_backups_timeline(
-  p_campanha_id uuid,
+  p_campanha_id text,
   p_token text
 )
 returns table (
@@ -190,11 +190,11 @@ begin
 end;
 $$;
 
-revoke all on function public.listar_backups_timeline(uuid, text) from public;
-grant execute on function public.listar_backups_timeline(uuid, text) to anon, authenticated;
+revoke all on function public.listar_backups_timeline(text, text) from public;
+grant execute on function public.listar_backups_timeline(text, text) to anon, authenticated;
 
 create or replace function public.restaurar_backup_timeline(
-  p_campanha_id uuid,
+  p_campanha_id text,
   p_token text,
   p_backup_id bigint
 )
@@ -262,8 +262,8 @@ begin
 end;
 $$;
 
-revoke all on function public.restaurar_backup_timeline(uuid, text, bigint) from public;
-grant execute on function public.restaurar_backup_timeline(uuid, text, bigint) to anon, authenticated;
+revoke all on function public.restaurar_backup_timeline(text, text, bigint) from public;
+grant execute on function public.restaurar_backup_timeline(text, text, bigint) to anon, authenticated;
 
 notify pgrst, 'reload schema';
 
