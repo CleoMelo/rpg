@@ -7,6 +7,13 @@ window.TIMELINE_REPO = {
   workerUrl: "supabase://timeline"
 };
 
+// Compatibilidade do editor legado: admin.js usa historyDrag como estado global
+// no navegador de histórico. Declaramos explicitamente o estado antes de carregar
+// admin.js para evitar ReferenceError em pointerdown/pointermove/pointerup.
+if (!("historyDrag" in window)) {
+  window.historyDrag = null;
+}
+
 (() => {
   const editorPage = /\/timeline\.html$/i.test(location.pathname);
   const rootPrefix = editorPage ? "./" : "../";
