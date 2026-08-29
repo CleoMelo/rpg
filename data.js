@@ -1,19 +1,16 @@
-const DEFAULT_RPGS = [];
-
 let RPGS = [];
 let supabaseClient = null;
+let CATEGORIES = [];
+let SUBCATEGORIES = [];
 
 function getSupabaseClient() {
   if (supabaseClient) return supabaseClient;
-
   const config = window.SUPABASE_CONFIG || {};
   const configured = config.url && config.anonKey &&
     !config.url.includes('COLE_AQUI') && !config.anonKey.includes('COLE_AQUI');
-
   if (!configured || !window.supabase) {
     throw new Error('Supabase não configurado. Preencha o arquivo supabase-config.js.');
   }
-
   supabaseClient = window.supabase.createClient(config.url, config.anonKey);
   return supabaseClient;
 }
@@ -29,59 +26,45 @@ function mapCampaign(row) {
 }
 
 async function loadRpgs() {
-  try {
-    const client = getSupabaseClient();
-    const { data, error } = await client
-      .from('campanhas')
-      .select('id, nome, descricao, imagem_url, criado_em')
-      .order('criado_em', { ascending: true });
-
-    if (error) throw error;
-    RPGS = [...DEFAULT_RPGS, ...(data || []).map(mapCampaign)];
-  } catch (error) {
-    console.error(error);
-    RPGS = [...DEFAULT_RPGS];
+  const client = getSupabaseClient();
+  const { data, error } = await client
+    .from('campanhas')
+    .select('id, nome, descricao, imagem_url, criado_em')
+    .order('criado_em', { ascending: true });
+  if (error) {
+    RPGS = [];
     throw error;
   }
-
+  RPGS = (data || []).map(mapCampaign);
   return RPGS;
 }
 
 function normalizeImgurImageUrl(value) {
   let url;
-
   try {
     url = new URL(String(value || '').trim());
   } catch {
-    throw new Error('Informe um endereço de imagem válido do Imgur.');
+    throw new Error('Informe um endereço de imagem válido.');
   }
-
   const hostname = url.hostname.toLowerCase();
   const imageExtension = /\.(?:jpe?g|png|gif|webp|avif)$/i.test(url.pathname);
   const legacyImgur = hostname === 'i.imgur.com' && imageExtension;
   const imageKit = hostname === 'ik.imagekit.io' &&
-    url.pathname.startsWith('/apirpgs/') &&
-    imageExtension;
-
+    url.pathname.startsWith('/apirpgs/') && imageExtension;
   if (url.protocol !== 'https:' || (!legacyImgur && !imageKit)) {
     throw new Error('A imagem precisa ter sido enviada pelo Portal de RPGs.');
   }
-
   return url.href;
 }
 
 async function createRpg({ name, description, image, password }) {
   const client = getSupabaseClient();
-  const imageUrl = normalizeImgurImageUrl(image);
-  const { data, error } = await client
-    .rpc('criar_campanha', {
-      p_nome: name.trim(),
-      p_descricao: description.trim() || 'Campanha personalizada.',
-      p_imagem_url: imageUrl,
-      p_senha: password
-    })
-    .single();
-
+  const { data, error } = await client.rpc('criar_campanha', {
+    p_nome: name.trim(),
+    p_descricao: description.trim() || 'Campanha personalizada.',
+    p_imagem_url: normalizeImgurImageUrl(image),
+    p_senha: password
+  }).single();
   if (error) throw error;
   const rpg = mapCampaign(data);
   RPGS.push(rpg);
@@ -89,31 +72,20 @@ async function createRpg({ name, description, image, password }) {
 }
 
 async function updateRpg({ id, token, name, description, image }) {
-  const rpg = RPGS.find(item => item.id === String(id));
-  if (!rpg?.custom || !token) return null;
-
-  const imageUrl = normalizeImgurImageUrl(image);
+  if (!token) return null;
   const client = getSupabaseClient();
-  const { data, error } = await client
-    .rpc('editar_campanha', {
-      p_campanha_id: String(id),
-      p_token: token,
-      p_nome: name.trim(),
-      p_descricao: description.trim() || 'Campanha personalizada.',
-      p_imagem_url: imageUrl
-    })
-    .single();
-
+  const { data, error } = await client.rpc('editar_campanha', {
+    p_campanha_id: String(id),
+    p_token: token,
+    p_nome: name.trim(),
+    p_descricao: description.trim() || 'Campanha personalizada.',
+    p_imagem_url: normalizeImgurImageUrl(image)
+  }).single();
   if (error) throw error;
-
   const updated = mapCampaign(data);
   const index = RPGS.findIndex(item => item.id === String(id));
   if (index >= 0) RPGS[index] = updated;
   return updated;
-}
-
-function isDefaultRpg(id) {
-  return DEFAULT_RPGS.some(rpg => rpg.id === String(id));
 }
 
 function masterSessionKey(id) {
@@ -139,19 +111,11 @@ function clearMasterSession(id) {
 }
 
 async function authenticateMaster(id, password) {
-  if (isDefaultRpg(id)) {
-    if (password !== 'mestre123') return null;
-    const demoToken = `demo:${String(id)}`;
-    setMasterSession(id, demoToken);
-    return demoToken;
-  }
-
   const client = getSupabaseClient();
   const { data, error } = await client.rpc('autenticar_mestre', {
     p_campanha_id: String(id),
     p_senha: password
   });
-
   if (error) throw error;
   if (!data) return null;
   setMasterSession(id, data);
@@ -159,25 +123,17 @@ async function authenticateMaster(id, password) {
 }
 
 async function deleteRpg(id, token) {
-  const rpg = RPGS.find(item => item.id === String(id));
-  if (!rpg?.custom || !token) return false;
-
+  if (!token) return false;
   await deleteCampaignMedia({ rpgId: String(id), token });
-
   const client = getSupabaseClient();
   const { data, error } = await client.rpc('excluir_campanha', {
     p_campanha_id: String(id),
     p_token: token
   });
-
   if (error) throw error;
   if (!data) return false;
-
-  const index = RPGS.findIndex(item => item.id === String(id));
-  if (index >= 0) RPGS.splice(index, 1);
+  RPGS = RPGS.filter(item => item.id !== String(id));
   clearMasterSession(id);
-  localStorage.removeItem(`characters:${id}`);
-  localStorage.removeItem(`categories:${id}`);
   return true;
 }
 
@@ -185,13 +141,6 @@ async function getRpgById(id) {
   if (!RPGS.length) await loadRpgs();
   return RPGS.find(item => item.id === String(id)) || RPGS[0] || null;
 }
-
-const DEFAULT_CATEGORIES = [];
-
-let CATEGORIES = [];
-let SUBCATEGORIES = [];
-
-const DEFAULT_CHARACTERS = {};
 
 function getSelectedRpg() {
   const params = new URLSearchParams(location.search);
@@ -240,169 +189,253 @@ function mapCharacter(row) {
   };
 }
 
-function getLocalCategories(rpgId) {
-  const saved = JSON.parse(localStorage.getItem(`categories:${rpgId}`) || '[]');
-  const savedById = new Map(saved.map(category => [String(category.id), category]));
-  const defaults = DEFAULT_CATEGORIES.map(category => ({
-    ...category,
-    ...(savedById.get(String(category.id)) || {}),
-    custom: false
-  }));
-  const custom = saved.filter(category =>
-    !DEFAULT_CATEGORIES.some(defaultCategory => defaultCategory.id === String(category.id))
-  );
-  return [...defaults, ...custom];
-}
-
-function saveLocalCategories(rpgId, categories) {
-  localStorage.setItem(`categories:${rpgId}`, JSON.stringify(categories));
-}
-
 async function loadCategories(rpgId, token = null) {
-  if (isDefaultRpg(rpgId)) {
-    const categories = getLocalCategories(rpgId)
-      .map((category, index) => ({
-        ...category,
-        order: Number(category.order) || index + 1,
-        visible: category.visible !== false
-      }))
-      .sort((left, right) => left.order - right.order);
-    CATEGORIES = token
-      ? categories
-      : categories.filter(category => category.visible);
-    return CATEGORIES;
-  }
-
   const client = getSupabaseClient();
-  const functionName = token
-    ? 'listar_categorias_mestre'
-    : 'listar_categorias';
+  const functionName = token ? 'listar_categorias_mestre' : 'listar_categorias';
   const parameters = token
-    ? {
-        p_campanha_id: String(rpgId),
-        p_token: token
-      }
-    : {
-        p_campanha_id: String(rpgId)
-      };
+    ? { p_campanha_id: String(rpgId), p_token: token }
+    : { p_campanha_id: String(rpgId) };
   const { data, error } = await client.rpc(functionName, parameters);
-
   if (error) throw error;
-  CATEGORIES = (data || [])
-    .map(mapCategory)
-    .sort((left, right) => left.order - right.order);
+  CATEGORIES = (data || []).map(mapCategory).sort((a, b) => a.order - b.order);
   return CATEGORIES;
 }
 
-function getLocalSubcategories(rpgId) {
-  return JSON.parse(localStorage.getItem(`subcategories:${rpgId}`) || '[]');
-}
-
-function saveLocalSubcategories(rpgId, subcategories) {
-  localStorage.setItem(
-    `subcategories:${rpgId}`,
-    JSON.stringify(subcategories)
-  );
-}
-
 async function loadSubcategories(rpgId, token = null) {
-  if (isDefaultRpg(rpgId)) {
-    const subcategories = getLocalSubcategories(rpgId)
-      .map(subcategory => ({
-        ...subcategory,
-        visible: subcategory.visible !== false
-      }))
-      .sort((left, right) => left.order - right.order);
-    SUBCATEGORIES = token
-      ? subcategories
-      : subcategories.filter(subcategory => subcategory.visible);
-    return SUBCATEGORIES;
-  }
-
   const client = getSupabaseClient();
-  const functionName = token
-    ? 'listar_subcategorias_mestre'
-    : 'listar_subcategorias';
+  const functionName = token ? 'listar_subcategorias_mestre' : 'listar_subcategorias';
   const parameters = token
-    ? {
-        p_campanha_id: String(rpgId),
-        p_token: token
-      }
-    : {
-        p_campanha_id: String(rpgId)
-      };
+    ? { p_campanha_id: String(rpgId), p_token: token }
+    : { p_campanha_id: String(rpgId) };
   const { data, error } = await client.rpc(functionName, parameters);
-
   if (error) throw error;
-  SUBCATEGORIES = (data || [])
-    .map(mapSubcategory)
-    .sort((left, right) => left.order - right.order);
+  SUBCATEGORIES = (data || []).map(mapSubcategory).sort((a, b) => a.order - b.order);
   return SUBCATEGORIES;
 }
 
 async function createSubcategory({ rpgId, token, categoryId, name, order, visible = true }) {
-  if (isDefaultRpg(rpgId)) {
-    const siblings = SUBCATEGORIES.filter(item => item.category === String(categoryId));
-    const position = Math.max(1, Math.min(Number(order) || siblings.length + 1, siblings.length + 1));
-    siblings.filter(item => item.order >= position).forEach(item => { item.order += 1; });
-    const subcategory = { id: crypto.randomUUID(), campaignId: String(rpgId), category: String(categoryId), name: name.trim(), order: position, visible: Boolean(visible) };
-    SUBCATEGORIES.push(subcategory); SUBCATEGORIES.sort((left, right) => left.order - right.order); saveLocalSubcategories(rpgId, SUBCATEGORIES); return subcategory;
-  }
   const client = getSupabaseClient();
-  const { data, error } = await client.rpc('criar_subcategoria', { p_campanha_id: String(rpgId), p_categoria_id: String(categoryId), p_token: token, p_nome: name.trim(), p_ordem: Number(order) || 0, p_visivel: Boolean(visible) }).single();
+  const { data, error } = await client.rpc('criar_subcategoria', {
+    p_campanha_id: String(rpgId),
+    p_categoria_id: String(categoryId),
+    p_token: token,
+    p_nome: name.trim(),
+    p_ordem: Number(order) || 0,
+    p_visivel: Boolean(visible)
+  }).single();
   if (error) throw error;
-  const subcategory = mapSubcategory(data); await loadSubcategories(rpgId, token); return SUBCATEGORIES.find(item => item.id === subcategory.id) || subcategory;
+  const subcategory = mapSubcategory(data);
+  await loadSubcategories(rpgId, token);
+  return SUBCATEGORIES.find(item => item.id === subcategory.id) || subcategory;
 }
 
 async function updateSubcategory({ rpgId, token, subcategoryId, name, order, visible = true }) {
-  if (isDefaultRpg(rpgId)) {
-    const subcategory = SUBCATEGORIES.find(item => item.id === String(subcategoryId)); if (!subcategory) return null;
-    const previousOrder = subcategory.order; const siblings = SUBCATEGORIES.filter(item => item.category === subcategory.category && item.id !== subcategory.id);
-    const nextOrder = Math.max(1, Math.min(Number(order) || previousOrder, siblings.length + 1));
-    if (nextOrder < previousOrder) siblings.filter(item => item.order >= nextOrder && item.order < previousOrder).forEach(item => { item.order += 1; });
-    else if (nextOrder > previousOrder) siblings.filter(item => item.order > previousOrder && item.order <= nextOrder).forEach(item => { item.order -= 1; });
-    subcategory.name = name.trim(); subcategory.order = nextOrder; subcategory.visible = Boolean(visible); SUBCATEGORIES.sort((left, right) => left.order - right.order); saveLocalSubcategories(rpgId, SUBCATEGORIES); return subcategory;
-  }
-  const client = getSupabaseClient(); const { data, error } = await client.rpc('editar_subcategoria', { p_campanha_id: String(rpgId), p_subcategoria_id: String(subcategoryId), p_token: token, p_nome: name.trim(), p_ordem: Number(order) || 0, p_visivel: Boolean(visible) }).single();
-  if (error) throw error; const updated = mapSubcategory(data); await loadSubcategories(rpgId, token); if (!SUBCATEGORIES.some(item => item.id === updated.id)) SUBCATEGORIES.push(updated); SUBCATEGORIES.sort((left, right) => left.order - right.order); return SUBCATEGORIES.find(item => item.id === updated.id) || updated;
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('editar_subcategoria', {
+    p_campanha_id: String(rpgId),
+    p_subcategoria_id: String(subcategoryId),
+    p_token: token,
+    p_nome: name.trim(),
+    p_ordem: Number(order) || 0,
+    p_visivel: Boolean(visible)
+  }).single();
+  if (error) throw error;
+  const updated = mapSubcategory(data);
+  await loadSubcategories(rpgId, token);
+  return SUBCATEGORIES.find(item => item.id === updated.id) || updated;
 }
 
 async function deleteSubcategory({ rpgId, token, subcategoryId, deleteCharacters = false, imageUrls = [] }) {
-  if (isDefaultRpg(rpgId)) { const removed = SUBCATEGORIES.find(item => item.id === String(subcategoryId)); SUBCATEGORIES = SUBCATEGORIES.filter(item => item.id !== String(subcategoryId)); if (removed) SUBCATEGORIES.filter(item => item.category === removed.category && item.order > removed.order).forEach(item => { item.order -= 1; }); saveLocalSubcategories(rpgId, SUBCATEGORIES); return true; }
-  if (deleteCharacters && imageUrls.length) await deleteCharacterMedia({ rpgId, token, imageUrls });
-  const client = getSupabaseClient(); const { data, error } = await client.rpc('excluir_subcategoria', { p_campanha_id: String(rpgId), p_subcategoria_id: String(subcategoryId), p_token: token, p_excluir_personagens: Boolean(deleteCharacters) });
-  if (error) throw error; if (data) await loadSubcategories(rpgId, token); return Boolean(data);
+  if (deleteCharacters && imageUrls.length) {
+    await deleteCharacterMedia({ rpgId, token, imageUrls });
+  }
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('excluir_subcategoria', {
+    p_campanha_id: String(rpgId),
+    p_subcategoria_id: String(subcategoryId),
+    p_token: token,
+    p_excluir_personagens: Boolean(deleteCharacters)
+  });
+  if (error) throw error;
+  if (data) await loadSubcategories(rpgId, token);
+  return Boolean(data);
 }
 
 async function createCategory({ rpgId, token, name, description, icon, visible = true }) {
-  if (isDefaultRpg(rpgId)) { const category = { id: crypto.randomUUID(), name: name.trim(), description: description.trim(), icon: icon.trim() || '📁', order: Math.max(0, ...CATEGORIES.map(item => Number(item.order) || 0)) + 1, visible: Boolean(visible), custom: true }; CATEGORIES.push(category); saveLocalCategories(rpgId, CATEGORIES); return category; }
-  const client = getSupabaseClient(); const { data, error } = await client.rpc('criar_categoria', { p_campanha_id: String(rpgId), p_token: token, p_nome: name.trim(), p_descricao: description.trim(), p_icone: icon.trim() || '📁', p_visivel: Boolean(visible) }).single();
-  if (error) throw error; const category = mapCategory(data); CATEGORIES.push(category); return category;
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('criar_categoria', {
+    p_campanha_id: String(rpgId),
+    p_token: token,
+    p_nome: name.trim(),
+    p_descricao: description.trim(),
+    p_icone: icon.trim() || '📁',
+    p_visivel: Boolean(visible)
+  }).single();
+  if (error) throw error;
+  const category = mapCategory(data);
+  CATEGORIES.push(category);
+  return category;
 }
 
 async function updateCategory({ rpgId, token, categoryId, name, description, icon, visible = true }) {
-  if (isDefaultRpg(rpgId)) { const category = CATEGORIES.find(item => item.id === String(categoryId)); if (!category) return null; category.name = name.trim(); category.description = description.trim(); category.icon = icon.trim() || '📁'; category.visible = Boolean(visible); saveLocalCategories(rpgId, CATEGORIES); return category; }
-  const client = getSupabaseClient(); const { data, error } = await client.rpc('editar_categoria', { p_campanha_id: String(rpgId), p_categoria_id: String(categoryId), p_token: token, p_nome: name.trim(), p_descricao: description.trim(), p_icone: icon.trim() || '📁', p_visivel: Boolean(visible) }).single();
-  if (error) throw error; const updated = mapCategory(data); const index = CATEGORIES.findIndex(item => item.id === String(categoryId)); if (index >= 0) CATEGORIES[index] = updated; return updated;
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('editar_categoria', {
+    p_campanha_id: String(rpgId),
+    p_categoria_id: String(categoryId),
+    p_token: token,
+    p_nome: name.trim(),
+    p_descricao: description.trim(),
+    p_icone: icon.trim() || '📁',
+    p_visivel: Boolean(visible)
+  }).single();
+  if (error) throw error;
+  const updated = mapCategory(data);
+  const index = CATEGORIES.findIndex(item => item.id === String(categoryId));
+  if (index >= 0) CATEGORIES[index] = updated;
+  return updated;
 }
 
 async function deleteCategory({ rpgId, token, categoryId, imageUrls = null }) {
-  if (isDefaultRpg(rpgId)) { const category = CATEGORIES.find(item => item.id === String(categoryId)); if (!category?.custom) return false; CATEGORIES = CATEGORIES.filter(item => item.id !== String(categoryId)); SUBCATEGORIES = SUBCATEGORIES.filter(item => item.category !== String(categoryId)); saveLocalCategories(rpgId, CATEGORIES); saveLocalSubcategories(rpgId, SUBCATEGORIES); const remaining = getLocalCharacters(rpgId).filter(character => character.category !== String(categoryId)); saveLocalCharacters(rpgId, remaining); return true; }
   let categoryImageUrls = Array.isArray(imageUrls) ? imageUrls : null;
-  if (!categoryImageUrls) { const categoryCharacters = await loadCharacters(rpgId, token); categoryImageUrls = categoryCharacters.filter(character => character.category === String(categoryId)).map(character => character.image); }
+  if (!categoryImageUrls) {
+    const categoryCharacters = await loadCharacters(rpgId, token);
+    categoryImageUrls = categoryCharacters
+      .filter(character => character.category === String(categoryId))
+      .map(character => character.image);
+  }
   await deleteCharacterMedia({ rpgId, token, imageUrls: categoryImageUrls });
-  const client = getSupabaseClient(); const { data, error } = await client.rpc('excluir_categoria', { p_campanha_id: String(rpgId), p_categoria_id: String(categoryId), p_token: token });
-  if (error) throw error; if (data) { CATEGORIES = CATEGORIES.filter(item => item.id !== String(categoryId)); SUBCATEGORIES = SUBCATEGORIES.filter(item => item.category !== String(categoryId)); } return Boolean(data);
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('excluir_categoria', {
+    p_campanha_id: String(rpgId),
+    p_categoria_id: String(categoryId),
+    p_token: token
+  });
+  if (error) throw error;
+  if (data) {
+    CATEGORIES = CATEGORIES.filter(item => item.id !== String(categoryId));
+    SUBCATEGORIES = SUBCATEGORIES.filter(item => item.category !== String(categoryId));
+  }
+  return Boolean(data);
 }
 
-function getLocalCharacters(rpgId) { const saved = localStorage.getItem(`characters:${rpgId}`); if (saved) return JSON.parse(saved); const initial = DEFAULT_CHARACTERS[rpgId] || []; localStorage.setItem(`characters:${rpgId}`, JSON.stringify(initial)); return initial; }
-function saveLocalCharacters(rpgId, characters) { localStorage.setItem(`characters:${rpgId}`, JSON.stringify(characters)); }
-async function loadCharacters(rpgId, token = null) { if (isDefaultRpg(rpgId)) { const characters = getLocalCharacters(rpgId).map((character, index) => ({ ...character, order: Number(character.order) || index + 1, visible: character.visible !== false })).sort((left, right) => left.order - right.order); return token ? characters : characters.filter(character => character.visible); } const client = getSupabaseClient(); const { data, error } = await client.rpc('listar_personagens', { p_campanha_id: String(rpgId), p_token: token || null }); if (error) throw error; return (data || []).map(mapCharacter).sort((left, right) => left.order - right.order); }
-async function createCharacter({ rpgId, token, name, categoryId, subcategoryId = null, description, image, visible = true }) { const imageUrl = normalizeImgurImageUrl(image); if (isDefaultRpg(rpgId)) { const characters = getLocalCharacters(rpgId); const groupCharacters = characters.filter(character => character.category === String(categoryId) && String(character.subcategory || '') === String(subcategoryId || '')); const character = { id: crypto.randomUUID(), name: name.trim(), category: String(categoryId), subcategory: subcategoryId ? String(subcategoryId) : null, description: description.trim(), image: imageUrl, order: Math.max(0, ...groupCharacters.map(item => Number(item.order) || 0)) + 1, visible: Boolean(visible) }; characters.push(character); saveLocalCharacters(rpgId, characters); return character; } const client = getSupabaseClient(); const { data, error } = await client.rpc('criar_personagem_imagekit', { p_campanha_id: String(rpgId), p_categoria_id: String(categoryId), p_subcategoria_id: subcategoryId ? String(subcategoryId) : null, p_token: token, p_nome: name.trim(), p_descricao: description.trim(), p_imagem_url: imageUrl, p_visivel: Boolean(visible) }).single(); if (error) throw error; return mapCharacter(data); }
-async function updateCharacter({ rpgId, token, characterId, name, categoryId, subcategoryId = null, description, image, visible }) { const imageUrl = normalizeImgurImageUrl(image); if (isDefaultRpg(rpgId)) { const characters = getLocalCharacters(rpgId); const character = characters.find(item => item.id === String(characterId)); if (!character) return null; character.name = name.trim(); character.category = String(categoryId); character.subcategory = subcategoryId ? String(subcategoryId) : null; character.description = description.trim(); character.image = imageUrl; character.visible = Boolean(visible); saveLocalCharacters(rpgId, characters); return { ...character, visible: character.visible !== false }; } const client = getSupabaseClient(); const { data, error } = await client.rpc('editar_personagem_imagekit', { p_campanha_id: String(rpgId), p_personagem_id: String(characterId), p_token: token, p_nome: name.trim(), p_categoria_id: String(categoryId), p_subcategoria_id: subcategoryId ? String(subcategoryId) : null, p_descricao: description.trim(), p_imagem_url: imageUrl, p_visivel: Boolean(visible) }).single(); if (error) throw error; return mapCharacter(data); }
-async function setCharacterVisibility({ rpgId, token, characterId, visible }) { if (isDefaultRpg(rpgId)) { const characters = getLocalCharacters(rpgId); const character = characters.find(item => item.id === String(characterId)); if (!character || !token) return false; character.visible = Boolean(visible); saveLocalCharacters(rpgId, characters); return true; } const client = getSupabaseClient(); const { data, error } = await client.rpc('definir_visibilidade_personagem', { p_campanha_id: String(rpgId), p_personagem_id: String(characterId), p_token: token, p_visivel: Boolean(visible) }); if (error) throw error; return Boolean(data); }
-function applyOrderedIds(items, orderedIds) { const positions = new Map(orderedIds.map((id, index) => [String(id), index + 1])); items.forEach(item => { const position = positions.get(String(item.id)); if (position) item.order = position; }); return items.sort((left, right) => left.order - right.order); }
-async function reorderCategories({ rpgId, token, orderedIds }) { if (isDefaultRpg(rpgId)) { const categories = applyOrderedIds(getLocalCategories(rpgId), orderedIds); CATEGORIES = categories; saveLocalCategories(rpgId, categories); return true; } const client = getSupabaseClient(); const { data, error } = await client.rpc('ordenar_categorias', { p_campanha_id: String(rpgId), p_token: token, p_ids: orderedIds.map(String) }); if (error) throw error; if (data) applyOrderedIds(CATEGORIES, orderedIds); return Boolean(data); }
-async function reorderSubcategories({ rpgId, token, orderedIds }) { if (isDefaultRpg(rpgId)) { applyOrderedIds(SUBCATEGORIES, orderedIds); saveLocalSubcategories(rpgId, SUBCATEGORIES); return true; } const client = getSupabaseClient(); const { data, error } = await client.rpc('ordenar_subcategorias', { p_campanha_id: String(rpgId), p_token: token, p_ids: orderedIds.map(String) }); if (error) throw error; if (data) applyOrderedIds(SUBCATEGORIES, orderedIds); return Boolean(data); }
-async function reorderCharacters({ rpgId, token, categoryId, subcategoryId = null, orderedIds }) { if (isDefaultRpg(rpgId)) { const characters = getLocalCharacters(rpgId); applyOrderedIds(characters, orderedIds); saveLocalCharacters(rpgId, characters); return true; } const client = getSupabaseClient(); const { data, error } = await client.rpc('ordenar_personagens', { p_campanha_id: String(rpgId), p_categoria_id: String(categoryId), p_subcategoria_id: subcategoryId ? String(subcategoryId) : null, p_token: token, p_ids: orderedIds.map(String) }); if (error) throw error; return Boolean(data); }
-async function deleteCharacter({ rpgId, token, characterId, imageUrl = null }) { if (isDefaultRpg(rpgId)) { const remaining = getLocalCharacters(rpgId).filter(character => character.id !== String(characterId)); saveLocalCharacters(rpgId, remaining); return true; } let characterImageUrl = imageUrl; if (!characterImageUrl) { const campaignCharacters = await loadCharacters(rpgId, token); characterImageUrl = campaignCharacters.find(character => character.id === String(characterId))?.image || null; } await deleteCharacterMedia({ rpgId, token, imageUrls: characterImageUrl ? [characterImageUrl] : [] }); const client = getSupabaseClient(); const { data, error } = await client.rpc('excluir_personagem', { p_campanha_id: String(rpgId), p_personagem_id: String(characterId), p_token: token }); if (error) throw error; return Boolean(data); }
+async function loadCharacters(rpgId, token = null) {
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('listar_personagens', {
+    p_campanha_id: String(rpgId),
+    p_token: token || null
+  });
+  if (error) throw error;
+  return (data || []).map(mapCharacter).sort((a, b) => a.order - b.order);
+}
+
+async function createCharacter({ rpgId, token, name, categoryId, subcategoryId = null, description, image, visible = true }) {
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('criar_personagem_imagekit', {
+    p_campanha_id: String(rpgId),
+    p_categoria_id: String(categoryId),
+    p_subcategoria_id: subcategoryId ? String(subcategoryId) : null,
+    p_token: token,
+    p_nome: name.trim(),
+    p_descricao: description.trim(),
+    p_imagem_url: normalizeImgurImageUrl(image),
+    p_visivel: Boolean(visible)
+  }).single();
+  if (error) throw error;
+  return mapCharacter(data);
+}
+
+async function updateCharacter({ rpgId, token, characterId, name, categoryId, subcategoryId = null, description, image, visible }) {
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('editar_personagem_imagekit', {
+    p_campanha_id: String(rpgId),
+    p_personagem_id: String(characterId),
+    p_token: token,
+    p_nome: name.trim(),
+    p_categoria_id: String(categoryId),
+    p_subcategoria_id: subcategoryId ? String(subcategoryId) : null,
+    p_descricao: description.trim(),
+    p_imagem_url: normalizeImgurImageUrl(image),
+    p_visivel: Boolean(visible)
+  }).single();
+  if (error) throw error;
+  return mapCharacter(data);
+}
+
+async function setCharacterVisibility({ rpgId, token, characterId, visible }) {
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('definir_visibilidade_personagem', {
+    p_campanha_id: String(rpgId),
+    p_personagem_id: String(characterId),
+    p_token: token,
+    p_visivel: Boolean(visible)
+  });
+  if (error) throw error;
+  return Boolean(data);
+}
+
+function applyOrderedIds(items, orderedIds) {
+  const positions = new Map(orderedIds.map((id, index) => [String(id), index + 1]));
+  items.forEach(item => {
+    const position = positions.get(String(item.id));
+    if (position) item.order = position;
+  });
+  return items.sort((a, b) => a.order - b.order);
+}
+
+async function reorderCategories({ rpgId, token, orderedIds }) {
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('ordenar_categorias', {
+    p_campanha_id: String(rpgId),
+    p_token: token,
+    p_ids: orderedIds.map(String)
+  });
+  if (error) throw error;
+  if (data) applyOrderedIds(CATEGORIES, orderedIds);
+  return Boolean(data);
+}
+
+async function reorderSubcategories({ rpgId, token, orderedIds }) {
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('ordenar_subcategorias', {
+    p_campanha_id: String(rpgId),
+    p_token: token,
+    p_ids: orderedIds.map(String)
+  });
+  if (error) throw error;
+  if (data) applyOrderedIds(SUBCATEGORIES, orderedIds);
+  return Boolean(data);
+}
+
+async function reorderCharacters({ rpgId, token, categoryId, subcategoryId = null, orderedIds }) {
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('ordenar_personagens', {
+    p_campanha_id: String(rpgId),
+    p_categoria_id: String(categoryId),
+    p_subcategoria_id: subcategoryId ? String(subcategoryId) : null,
+    p_token: token,
+    p_ids: orderedIds.map(String)
+  });
+  if (error) throw error;
+  return Boolean(data);
+}
+
+async function deleteCharacter({ rpgId, token, characterId, imageUrl = null }) {
+  let characterImageUrl = imageUrl;
+  if (!characterImageUrl) {
+    const campaignCharacters = await loadCharacters(rpgId, token);
+    characterImageUrl = campaignCharacters.find(character => character.id === String(characterId))?.image || null;
+  }
+  await deleteCharacterMedia({
+    rpgId,
+    token,
+    imageUrls: characterImageUrl ? [characterImageUrl] : []
+  });
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('excluir_personagem', {
+    p_campanha_id: String(rpgId),
+    p_personagem_id: String(characterId),
+    p_token: token
+  });
+  if (error) throw error;
+  return Boolean(data);
+}
