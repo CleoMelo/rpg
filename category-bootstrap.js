@@ -10,7 +10,7 @@
     'personagem-destaque.js?v=20260819-1',
     'busca-global-personagem.js?v=20260820-1',
     'classificacao-categorias.js?v=20260824-1',
-    'alterar-senha.js?v=20260825-1'
+    'alterar-senha.js?v=20260829-1'
   ];
 
   const loadNext = index => {
