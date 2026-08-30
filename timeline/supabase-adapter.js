@@ -61,6 +61,70 @@
     return data;
   }
 
+  async function campaignInfo(id) {
+    if (!id) return null;
+    if (typeof window.getRpgById === "function") {
+      const rpg = await window.getRpgById(id);
+      if (rpg && String(rpg.id) === String(id)) return rpg;
+    }
+
+    const { data, error } = await client()
+      .from("campanhas")
+      .select("id, nome, descricao, imagem_url")
+      .eq("id", String(id))
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return null;
+
+    return {
+      id: String(data.id),
+      name: data.nome,
+      description: data.descricao || "",
+      image: data.imagem_url || ""
+    };
+  }
+
+  function normalizeName(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("pt-BR")
+      .trim();
+  }
+
+  function isCavaleirosCampaign(campaign) {
+    return normalizeName(campaign?.name).includes("cavaleiros");
+  }
+
+  function applyCampaignUi(campaign) {
+    if (!campaign) return;
+    const name = String(campaign.name || "Campanha").trim() || "Campanha";
+    document.title = editorPage
+      ? `${name} — Timeline`
+      : `${name} — Linha do Tempo`;
+
+    const heading = document.querySelector(".lk17-title-row h1, .hero-copy h1");
+    if (heading) {
+      if (editorPage) {
+        const icon = heading.querySelector(".lk16-hourglass")?.outerHTML || "";
+        heading.innerHTML = `${icon}${name}`;
+      } else {
+        heading.textContent = name;
+      }
+    }
+
+    const publicSubtitle = document.querySelector(".hero-copy p:not(.eyebrow)");
+    if (publicSubtitle) publicSubtitle.textContent = `Timeline pública de ${name}`;
+
+    const encodedId = encodeURIComponent(String(campaign.id));
+    const masterLink = document.querySelector('a[href="../timeline.html"]');
+    if (masterLink) masterLink.href = `../timeline.html?rpg=${encodedId}`;
+
+    const publicLink = document.querySelector('a[href="./timeline/"]');
+    if (publicLink) publicLink.href = `./timeline/?rpg=${encodedId}`;
+  }
+
   function seedUrl() {
     return new URL(editorPage ? "./timeline/timeline.json" : "./timeline.json", location.href).href;
   }
@@ -69,6 +133,46 @@
     const response = await nativeFetch(seedUrl(), { cache: "no-store" });
     if (!response.ok) throw new Error(`Não foi possível carregar a cópia inicial da timeline (HTTP ${response.status}).`);
     return response.json();
+  }
+
+  function createEmptyTimeline(seed, campaign) {
+    const empty = JSON.parse(JSON.stringify(seed));
+    const resource = empty?.resources?.[0];
+    const documentTimeline = resource?.documents?.find(item => item.type === "time");
+
+    if (!resource || !documentTimeline?.content) {
+      throw new Error("O modelo inicial da timeline é inválido.");
+    }
+
+    const name = String(campaign?.name || "Nova campanha").trim() || "Nova campanha";
+    resource.name = name;
+    documentTimeline.name = name;
+    documentTimeline.content.events = [];
+    documentTimeline.content.lanes = [{
+      id: `lane-${String(campaign?.id || "geral").replace(/[^a-z0-9_-]/gi, "-")}`,
+      name: "Geral",
+      color: "#8b5cf6",
+      pos: "a0",
+      size: "sm",
+      isCollapsed: false
+    }];
+
+    const calendar = empty?.calendars?.find(item => item.id === documentTimeline.calendarId);
+    if (calendar) calendar.name = `Calendário de ${name}`;
+
+    empty.exportedAt = new Date().toISOString();
+    return empty;
+  }
+
+  async function initialTimelineForCampaign(id) {
+    const campaign = await campaignInfo(id);
+    if (!campaign) throw new Error("Campanha não encontrada.");
+    applyCampaignUi(campaign);
+
+    const seed = await loadSeed();
+    return isCavaleirosCampaign(campaign)
+      ? seed
+      : createEmptyTimeline(seed, campaign);
   }
 
   async function loadTimeline({ requireMasterSession = false } = {}) {
@@ -83,21 +187,27 @@
       if (!id) return loadSeed();
     }
 
+    const campaign = await campaignInfo(id);
+    if (!campaign) throw new Error("Campanha não encontrada.");
+    applyCampaignUi(campaign);
+
     const stored = await rpc("carregar_timeline", { p_campanha_id: id });
     if (stored) return stored;
 
-    const seed = await loadSeed();
+    const initial = await initialTimelineForCampaign(id);
 
     if (token) {
       await rpc("salvar_timeline", {
         p_campanha_id: id,
         p_token: token,
-        p_data: seed,
-        p_mensagem: "Importação inicial do timeline.json"
+        p_data: initial,
+        p_mensagem: isCavaleirosCampaign(campaign)
+          ? "Associação inicial da timeline de Cavaleiros"
+          : "Criação inicial da timeline da campanha"
       });
     }
 
-    return seed;
+    return initial;
   }
 
   async function handleSupabaseRoute(url, options = {}) {
