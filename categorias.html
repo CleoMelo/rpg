@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Categorias</title>
-  <link rel="stylesheet" href="styles.css?v=20260829-2">
+  <link rel="stylesheet" href="styles.css?v=20260830-1">
 </head>
-<body>
+<body class="categories-page">
   <header class="site-header">
     <a class="brand" href="index.html">ARQUIVO <span>RPG</span></a>
     <nav class="nav-links">
@@ -20,17 +20,23 @@
       <span class="eyebrow" id="roleBadge">Acesso</span>
       <h1 id="campaignName" style="font-size:clamp(2.4rem,6vw,4.6rem)">Campanha</h1>
       <p>Selecione uma categoria para visualizar os personagens.</p>
+      <div class="campaign-page-actions">
+        <button id="editCampaignButton" class="btn secondary" type="button" style="display:none">✎ Editar campanha</button>
+        <button id="deleteCampaignButton" class="btn danger" type="button" style="display:none">Excluir campanha</button>
+      </div>
     </section>
 
     <div id="pageMessage" class="message" aria-live="polite"></div>
 
-    <section>
+    <div class="categories-workspace">
+    <aside class="category-browser" aria-label="Navegação de categorias">
       <div class="toolbar">
-        <h2>Categorias</h2>
+        <div>
+          <span class="section-kicker">Explorar</span>
+          <h2>Categorias</h2>
+        </div>
         <div class="master-toolbar">
           <button id="addCategoryButton" class="btn" type="button" style="display:none">+ Criar categoria</button>
-          <button id="editCampaignButton" class="btn secondary" type="button" style="display:none">✎ Editar campanha</button>
-          <button id="deleteCampaignButton" class="btn danger" type="button" style="display:none">Excluir campanha</button>
         </div>
       </div>
       <div class="filter-panel category-filter-panel">
@@ -52,9 +58,9 @@
         <p id="categoryFilterStatus" class="filter-status" aria-live="polite"></p>
       </div>
       <div id="categoryGrid" class="grid category-grid"></div>
-    </section>
+    </aside>
 
-    <section id="charactersSection" style="margin-top:54px">
+    <section id="charactersSection" class="characters-panel">
       <div class="toolbar">
         <div>
           <h2 id="selectedCategoryTitle">Selecione uma categoria</h2>
@@ -115,6 +121,7 @@
       </div>
       <div id="characterGrid" class="grid character-grid"></div>
     </section>
+    </div>
   </main>
 
   <div id="campaignModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="campaignModalTitle">
