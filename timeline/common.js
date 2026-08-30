@@ -83,9 +83,12 @@
     throw new Error("Não foi possível converter a data.");
   }
 
-  function formatDate(minutes){
+  function formatDate(minutes, calendar=null){
     const d = minutesToDate(minutes);
-    const era = d.era === "before" ? "Antes Grande Mudança" : "Depois Grande Mudança";
+    const system = calendar?.timelineSystem || {};
+    const era = d.era === "before"
+      ? (system.beforeName || "Antes da Grande Mudança")
+      : (system.afterName || "Depois da Grande Mudança");
     return `${d.day} de ${PT_MONTHS[d.month-1]} de ${d.year} — ${String(d.hour).padStart(2,"0")}:${String(d.minute).padStart(2,"0")} · ${era}`;
   }
 

@@ -80,7 +80,7 @@
       card.style.setProperty("--event", C.eventColor(e,lane));
       const duration = e.end != null ? Math.max(0,Number(e.end)-Number(e.start)) : 0;
       card.innerHTML = `
-        <div class="event-date">${C.escapeHtml(C.formatDate(e.start))}</div>
+        <div class="event-date">${C.escapeHtml(C.formatDate(e.start, C.getCalendar(data, doc)))}</div>
         <div class="event-title">${C.escapeHtml(e.name||"Sem nome")}</div>
         <div class="event-meta">
           <span class="chip">${C.escapeHtml(lane?.name||"Sem categoria")}</span>
@@ -97,7 +97,7 @@
     const duration = e.end != null ? Math.max(0,Number(e.end)-Number(e.start)) : 0;
     $("dialogTitle").textContent = e.name || "Sem nome";
     $("dialogBody").innerHTML = `
-      <div><strong>Data</strong><div class="muted">${C.escapeHtml(C.formatDate(e.start))}</div></div>
+      <div><strong>Data</strong><div class="muted">${C.escapeHtml(C.formatDate(e.start, C.getCalendar(data, doc)))}</div></div>
       <div class="detail-row"><strong>Categoria</strong><div class="muted">${C.escapeHtml(lane?.name||"Sem categoria")}</div></div>
       <div class="detail-row"><strong>Importância</strong><div class="muted">${Number(e.detail||0)}</div></div>
       ${duration?`<div class="detail-row"><strong>Duração</strong><div class="muted">${duration} minutos</div></div>`:""}`;

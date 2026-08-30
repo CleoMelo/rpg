@@ -14,13 +14,14 @@
     "#modePointer",
     "#modeAdd",
     "#undoBtn",
-    "#redoBtn"
+    "#redoBtn",
+    "#saveTimeSystem"
   ].join(",");
 
   function blockEdit(event) {
     const target = event.target instanceof Element ? event.target : null;
     const blockedControl = target?.closest(EDIT_ONLY);
-    const blockedForm = event.type === "submit" && target?.closest("#eventForm, #lanesDialog form");
+    const blockedForm = event.type === "submit" && target?.closest("#eventForm, #lanesDialog form, #timeSystemForm");
     if (!blockedControl && !blockedForm) return;
 
     event.preventDefault();

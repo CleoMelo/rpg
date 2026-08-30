@@ -166,11 +166,27 @@
   </dialog>
 
   <dialog id="timeSystemDialog">
-    <div class="dialog-card lk16-small-dialog">
+    <form id="timeSystemForm" class="dialog-card event-dialog-wide">
       <div class="dialog-head"><div><p class="eyebrow">TEMPO</p><h2>Sistema de tempo</h2></div><button class="icon-button" data-close type="button">×</button></div>
       <div id="timeSystemBody" class="event-detail"></div>
-      <div class="dialog-actions"><span class="spacer"></span><button class="button primary" data-close type="button">Fechar</button></div>
-    </div>
+      <div id="timeSystemEditor">
+        <label class="full"><span>Calendário da campanha</span><select id="timePreset"><option value="cavaleiros">Cavaleiros — AGM / DGM</option><option value="fate">Fate — AF / DF</option><option value="real">Calendário da vida real — a.C. / d.C.</option><option value="custom">Personalizado</option></select></label>
+        <div class="event-meta-grid">
+          <label><span>Era anterior</span><input id="timeBeforeName" maxlength="60" required></label>
+          <label><span>Sigla anterior</span><input id="timeBeforeShort" maxlength="10" required></label>
+          <label><span>Era posterior</span><input id="timeAfterName" maxlength="60" required></label>
+          <label><span>Sigla posterior</span><input id="timeAfterShort" maxlength="10" required></label>
+        </div>
+        <div class="event-meta-grid">
+          <label><span>Início — era</span><select id="timeStartEra"><option value="before">Era anterior</option><option value="after">Era posterior</option></select></label>
+          <label><span>Início — ano</span><input id="timeStartYear" type="number" min="1" required></label>
+          <label><span>Fim — era</span><select id="timeEndEra"><option value="before">Era anterior</option><option value="after">Era posterior</option></select></label>
+          <label><span>Fim — ano</span><input id="timeEndYear" type="number" min="1" required></label>
+        </div>
+        <p class="muted">O início e o fim definem o enquadramento completo e a maior escala disponível no Gantt.</p>
+      </div>
+      <div class="dialog-actions"><span class="spacer"></span><button class="button ghost" data-close type="button">Cancelar</button><button id="saveTimeSystem" class="button primary" type="submit">Aplicar configuração</button></div>
+    </form>
   </dialog>
   <dialog id="eventDialog">
     <form id="eventForm" class="dialog-card event-dialog-wide">
@@ -307,7 +323,7 @@
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
   <script src="./timeline/config.js?v=20"></script>
-  <script src="./timeline/common.js?v=20"></script>
-  <script src="./timeline/admin.js?v=20"></script>
+  <script src="./timeline/common.js?v=21"></script>
+  <script src="./timeline/admin.js?v=21"></script>
 </body>
 </html>

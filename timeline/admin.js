@@ -22,6 +22,11 @@
     "#3f968f", "#b77a54", "#8d7ac4", "#87565c",
     "#5f95be", "#a58a56", "#6f9667", "#81879a"
   ];
+  const TIME_PRESETS = {
+    cavaleiros: { calendarName: "Cavaleiros", beforeName: "Antes da Grande Mudança", beforeShort: "AGM", afterName: "Depois da Grande Mudança", afterShort: "DGM" },
+    fate: { calendarName: "Fate", beforeName: "Antes de Fate", beforeShort: "AF", afterName: "Depois de Fate", afterShort: "DF" },
+    real: { calendarName: "Calendário da vida real", beforeName: "Antes de Cristo", beforeShort: "a.C.", afterName: "Depois de Cristo", afterShort: "d.C." }
+  };
 
   let data = null;
   let doc = null;
@@ -140,6 +145,7 @@
     data = await r.json();
     doc = C.getTimeDocument(data);
     lanes = C.laneMap(doc);
+    applyEraLabels();
     fillMonths();
     fillLaneSelects();
     markClean();
@@ -236,14 +242,14 @@
       const lane = lanes.get(event.laneId);
       const laneIndex = doc.content.lanes.findIndex(l => l.id === event.laneId);
       const endText = event.end != null && Number(event.end) > Number(event.start)
-        ? ` → ${C.formatDate(event.end)}`
+        ? ` → ${C.formatDate(event.end, C.getCalendar(data, doc))}`
         : "";
 
       const row = document.createElement("div");
       row.className = "editor-row";
       row.innerHTML = `
         <div class="editor-name"><i class="row-color" style="background:${laneColor(lane, laneIndex)}"></i>${C.escapeHtml(event.name || "Sem nome")}</div>
-        <div class="editor-date">${C.escapeHtml(C.formatDate(event.start))}${C.escapeHtml(endText)}</div>
+        <div class="editor-date">${C.escapeHtml(C.formatDate(event.start, C.getCalendar(data, doc)))}${C.escapeHtml(endText)}</div>
         <div class="editor-lane">${C.escapeHtml(lane?.name || "Sem categoria")}</div>
         <button class="button ghost" type="button">Editar</button>`;
 
@@ -281,6 +287,31 @@
       max = Math.max(max, start, end);
     }
     return { min, max };
+  }
+
+  function timeSettings() {
+    const calendar = C.getCalendar(data, doc);
+    const stored = calendar?.timelineSystem || {};
+    const preset = stored.preset || "cavaleiros";
+    return { preset, ...(TIME_PRESETS[preset] || TIME_PRESETS.cavaleiros), ...stored };
+  }
+
+  function configuredTimelineBounds() {
+    const range = doc?.content?.timelineRange;
+    const start = Number(range?.start);
+    const end = Number(range?.end);
+    return Number.isFinite(start) && Number.isFinite(end) && end > start ? { min: start, max: end } : null;
+  }
+
+  function applyEraLabels() {
+    if (!doc) return;
+    const settings = timeSettings();
+    for (const select of document.querySelectorAll('select[id$="Era"]')) {
+      const before = select.querySelector('option[value="before"]');
+      const after = select.querySelector('option[value="after"]');
+      if (before) before.textContent = settings.beforeName;
+      if (after) after.textContent = settings.afterName;
+    }
   }
 
   function clamp(value, min, max) {
@@ -466,9 +497,10 @@
   }
 
   function fitAll() {
-    const { min, max } = allEventBounds();
+    const configured = configuredTimelineBounds();
+    const { min, max } = configured || allEventBounds();
     const raw = Math.max(DAY, max - min);
-    const margin = Math.max(30 * DAY, raw * 0.025);
+    const margin = configured ? 0 : Math.max(30 * DAY, raw * 0.025);
     ganttStart = Math.floor(min - margin);
     ganttEnd = Math.ceil(max + margin);
     ganttInitialized = true;
@@ -501,6 +533,8 @@
   }
 
   function maximumAllowedSpan() {
+    const configured = configuredTimelineBounds();
+    if (configured) return Math.max(MIN_GANTT_SPAN, configured.max - configured.min);
     const { min, max } = allEventBounds();
     return Math.max(5000 * YEAR, (max - min) * 2);
   }
@@ -662,7 +696,8 @@
   }
 
   function eraShort(date) {
-    return date.era === "before" ? "AGM" : "DGM";
+    const settings = timeSettings();
+    return date.era === "before" ? settings.beforeShort : settings.afterShort;
   }
 
   function formatAxisLabel(minutes, step, major = false) {
@@ -727,13 +762,77 @@
 
   function openTimeSystemInfo() {
     const calendar = C.getCalendar(data, doc);
-    const eras = Array.isArray(calendar?.eras) ? calendar.eras.map(era => era.name).join(" · ") : "—";
+    const settings = timeSettings();
+    const range = configuredTimelineBounds() || allEventBounds();
+    const start = C.minutesToDate(range.min);
+    const end = C.minutesToDate(range.max);
     const months = Array.isArray(calendar?.months) ? calendar.months.map(month => month.name).join(", ") : C.PT_MONTHS.join(", ");
     $("timeSystemBody").innerHTML = `
       <div><strong>${C.escapeHtml(calendar?.name || "Cavaleiros")}</strong><div class="muted">Sistema usado por esta linha do tempo.</div></div>
-      <div class="detail-row"><strong>Eras</strong><div class="muted">${C.escapeHtml(eras)}</div></div>
+      <div class="detail-row"><strong>Eras</strong><div class="muted">${C.escapeHtml(settings.beforeName)} (${C.escapeHtml(settings.beforeShort)}) · ${C.escapeHtml(settings.afterName)} (${C.escapeHtml(settings.afterShort)})</div></div>
+      <div class="detail-row"><strong>Intervalo</strong><div class="muted">${start.year} ${C.escapeHtml(eraShort(start))} — ${end.year} ${C.escapeHtml(eraShort(end))}</div></div>
       <div class="detail-row"><strong>Meses</strong><div class="muted">${C.escapeHtml(months)}</div></div>`;
+
+    $("timePreset").value = settings.preset;
+    $("timeBeforeName").value = settings.beforeName;
+    $("timeBeforeShort").value = settings.beforeShort;
+    $("timeAfterName").value = settings.afterName;
+    $("timeAfterShort").value = settings.afterShort;
+    $("timeStartEra").value = start.era;
+    $("timeStartYear").value = start.year;
+    $("timeEndEra").value = end.era;
+    $("timeEndYear").value = end.year;
+    $("timeSystemEditor").classList.toggle("hidden", window.TIMELINE_READ_ONLY === true);
+    $("saveTimeSystem").classList.toggle("hidden", window.TIMELINE_READ_ONLY === true);
     $("timeSystemDialog").showModal();
+  }
+
+  function applyTimePreset() {
+    const preset = TIME_PRESETS[$("timePreset").value];
+    if (!preset) return;
+    $("timeBeforeName").value = preset.beforeName;
+    $("timeBeforeShort").value = preset.beforeShort;
+    $("timeAfterName").value = preset.afterName;
+    $("timeAfterShort").value = preset.afterShort;
+  }
+
+  function saveTimeSystem(event) {
+    event.preventDefault();
+    if (window.TIMELINE_READ_ONLY === true) return;
+
+    const start = C.dateToMinutes({ era: $("timeStartEra").value, year: Number($("timeStartYear").value), month: 1, day: 1 });
+    const end = C.dateToMinutes({ era: $("timeEndEra").value, year: Number($("timeEndYear").value), month: 12, day: 31, hour: 23, minute: 59 });
+    if (end <= start) {
+      toast("O fim da timeline precisa acontecer depois do início.", true);
+      return;
+    }
+    const outside = doc.content.events.some(item => {
+      const eventStart = Number(item.start);
+      const eventEnd = item.end != null ? Number(item.end) : eventStart;
+      return eventStart < start || eventEnd > end;
+    });
+    if (outside) {
+      toast("Existem acontecimentos fora desse intervalo. Amplie o início ou o fim antes de aplicar.", true);
+      return;
+    }
+
+    const calendar = C.getCalendar(data, doc);
+    const preset = TIME_PRESETS[$("timePreset").value];
+    if (preset) calendar.name = preset.calendarName;
+    calendar.timelineSystem = {
+      preset: $("timePreset").value,
+      beforeName: $("timeBeforeName").value.trim(),
+      beforeShort: $("timeBeforeShort").value.trim(),
+      afterName: $("timeAfterName").value.trim(),
+      afterShort: $("timeAfterShort").value.trim()
+    };
+    doc.content.timelineRange = { start, end };
+    applyEraLabels();
+    resetStableTrackLayout();
+    markDirty("Configuração de tempo alterada");
+    $("timeSystemDialog").close();
+    fitAll();
+    renderAll();
   }
 
   function ticksForStep(step) {
@@ -1016,7 +1115,7 @@
 
     item.innerHTML = `<span class="event-stem"></span>${calendarGlyph()}<span class="event-copy"><strong>${C.escapeHtml(event.name || "Sem nome")}</strong><small>${C.escapeHtml(formatEventDate(event.start))}</small></span>`;
 
-    item.title = `${event.name}\n${C.formatDate(event.start)}\n${lane.name}`;
+    item.title = `${event.name}\n${C.formatDate(event.start, C.getCalendar(data, doc))}\n${lane.name}`;
     installEventInteraction(item, event, geometry);
     return item;
   }
@@ -1042,7 +1141,7 @@
       <span class="event-copy"><strong>${C.escapeHtml(event.name || "Sem nome")}</strong><small>${C.escapeHtml(formatEventDate(event.start))} → ${C.escapeHtml(formatEventDate(event.end))}</small></span>
     `;
 
-    item.title = `${event.name}\n${C.formatDate(event.start)} → ${C.formatDate(event.end)}\n${lane.name}`;
+    item.title = `${event.name}\n${C.formatDate(event.start, C.getCalendar(data, doc))} → ${C.formatDate(event.end, C.getCalendar(data, doc))}\n${lane.name}`;
     installEventInteraction(item, event, geometry);
     return item;
   }
@@ -1052,6 +1151,22 @@
     if (!Number.isFinite(ganttStart) || !Number.isFinite(ganttEnd) || ganttEnd <= ganttStart) {
       initializeGanttRange();
       return;
+    }
+
+    const configured = configuredTimelineBounds();
+    if (configured) {
+      const allowedSpan = configured.max - configured.min;
+      const currentSpan = ganttEnd - ganttStart;
+      if (currentSpan >= allowedSpan) {
+        ganttStart = configured.min;
+        ganttEnd = configured.max;
+      } else if (ganttStart < configured.min) {
+        ganttStart = configured.min;
+        ganttEnd = configured.min + currentSpan;
+      } else if (ganttEnd > configured.max) {
+        ganttEnd = configured.max;
+        ganttStart = configured.max - currentSpan;
+      }
     }
 
     const span = ganttEnd - ganttStart;
@@ -1676,9 +1791,9 @@
         }
 
         $("datePreview").textContent =
-          `${C.formatDate(start)}  →  ${C.formatDate(end)} · duração: ${formatDuration(end - start)}`;
+          `${C.formatDate(start, C.getCalendar(data, doc))}  →  ${C.formatDate(end, C.getCalendar(data, doc))} · duração: ${formatDuration(end - start)}`;
       } else {
-        $("datePreview").textContent = `${C.formatDate(start)} · acontecimento pontual`;
+        $("datePreview").textContent = `${C.formatDate(start, C.getCalendar(data, doc))} · acontecimento pontual`;
       }
     } catch {
       $("datePreview").textContent = "Data inválida";
@@ -1703,6 +1818,12 @@
       }
     } catch {
       toast("Há uma data inválida no formulário.", true);
+      return;
+    }
+
+    const configured = configuredTimelineBounds();
+    if (configured && (start < configured.min || (end ?? start) > configured.max)) {
+      toast("O acontecimento precisa estar entre o início e o fim configurados para a timeline.", true);
       return;
     }
 
@@ -1945,6 +2066,8 @@
   $("jumpDateBtn").addEventListener("click", openJumpDate);
   $("jumpDateForm").addEventListener("submit", applyJumpDate);
   $("timeSystemBtn").addEventListener("click", openTimeSystemInfo);
+  $("timePreset").addEventListener("change", applyTimePreset);
+  $("timeSystemForm").addEventListener("submit", saveTimeSystem);
   $("listQuickBtn").addEventListener("click", () => setView(currentView === "gantt" ? "list" : "gantt"));
   $("helpBtn").addEventListener("click", () => setModeHintVisible(true));
   $("closeModeHint").addEventListener("click", () => setModeHintVisible(false));
