@@ -4,6 +4,7 @@
   const SUPABASE_PREFIX = "supabase://timeline";
   const editorPage = /\/timeline\.html$/i.test(location.pathname);
   const LEGACY_CAVALEIROS_NAME = "cavaleiros divinos e a ordem dos reinos";
+  let legacyCampaignIdPromise = null;
 
   function jsonResponse(payload, status = 200) {
     return new Response(JSON.stringify(payload), {
@@ -62,6 +63,14 @@
     return data;
   }
 
+  function normalizeName(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("pt-BR")
+      .trim();
+  }
+
   async function campaignInfo(id) {
     if (!id) return null;
 
@@ -82,16 +91,32 @@
     };
   }
 
-  function normalizeName(value) {
-    return String(value || "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLocaleLowerCase("pt-BR")
-      .trim();
-  }
+  async function resolveLegacyCampaignId() {
+    if (!legacyCampaignIdPromise) {
+      legacyCampaignIdPromise = (async () => {
+        const { data, error } = await client()
+          .from("campanhas")
+          .select("id, nome");
 
-  function isCavaleirosCampaign(campaign) {
-    return normalizeName(campaign?.name).includes("cavaleiros");
+        if (error) throw error;
+
+        const campaigns = (data || []).map(row => ({
+          id: String(row.id),
+          normalizedName: normalizeName(row.nome)
+        }));
+
+        const exact = campaigns.filter(item => item.normalizedName === LEGACY_CAVALEIROS_NAME);
+        if (exact.length === 1) return exact[0].id;
+
+        const candidates = campaigns.filter(item => item.normalizedName.includes("cavaleiros"));
+        return candidates.length === 1 ? candidates[0].id : "";
+      })().catch(error => {
+        legacyCampaignIdPromise = null;
+        throw error;
+      });
+    }
+
+    return legacyCampaignIdPromise;
   }
 
   function timelineDocument(data) {
@@ -112,7 +137,7 @@
       || documentName.includes("cavaleiros");
   }
 
-  function bindingState(data, campaign) {
+  function bindingState(data, campaign, isLegacyCampaign) {
     if (!data || typeof data !== "object") return "invalid";
 
     const currentId = String(campaign.id);
@@ -122,11 +147,11 @@
     const campaignName = normalizeName(campaign.name);
     const { resourceName, documentName } = timelineNames(data);
 
-    if (isCavaleirosCampaign(campaign) && looksLikeLegacyCavaleiros(data)) {
+    if (isLegacyCampaign && looksLikeLegacyCavaleiros(data)) {
       return "legacy-own";
     }
 
-    if (!isCavaleirosCampaign(campaign)
+    if (!isLegacyCampaign
       && !looksLikeLegacyCavaleiros(data)
       && (resourceName === campaignName || documentName === campaignName)) {
       return "legacy-own";
@@ -230,9 +255,9 @@
     return bindTimelineToCampaign(empty, campaign);
   }
 
-  async function initialTimelineForCampaign(campaign) {
+  async function initialTimelineForCampaign(campaign, isLegacyCampaign) {
     const seed = await loadSeed();
-    return isCavaleirosCampaign(campaign)
+    return isLegacyCampaign
       ? bindTimelineToCampaign(seed, campaign)
       : createEmptyTimeline(seed, campaign);
   }
@@ -247,17 +272,29 @@
   }
 
   async function loadTimeline({ requireMasterSession = false } = {}) {
-    const id = requireMasterSession ? requireMaster().id : requireCampaign();
-    const token = requireMasterSession ? requireMaster().token : masterToken(id);
-    const campaign = await campaignInfo(id);
+    let id;
+    let token = "";
 
+    if (requireMasterSession) {
+      const master = requireMaster();
+      id = master.id;
+      token = master.token;
+    } else {
+      id = requireCampaign();
+      token = masterToken(id);
+    }
+
+    const campaign = await campaignInfo(id);
     if (!campaign) throw new Error("Campanha não encontrada.");
+
+    const legacyCampaignId = await resolveLegacyCampaignId();
+    const isLegacyCampaign = Boolean(legacyCampaignId) && legacyCampaignId === String(id);
     applyCampaignUi(campaign);
 
     const stored = await rpc("carregar_timeline", { p_campanha_id: id });
 
     if (stored) {
-      const state = bindingState(stored, campaign);
+      const state = bindingState(stored, campaign, isLegacyCampaign);
 
       if (state === "bound") return stored;
 
@@ -274,7 +311,7 @@
         return rebound;
       }
 
-      const clean = await initialTimelineForCampaign(campaign);
+      const clean = await initialTimelineForCampaign(campaign, isLegacyCampaign);
       if (token) {
         await persistTimeline(
           id,
@@ -286,13 +323,13 @@
       return clean;
     }
 
-    const initial = await initialTimelineForCampaign(campaign);
+    const initial = await initialTimelineForCampaign(campaign, isLegacyCampaign);
     if (token) {
       await persistTimeline(
         id,
         token,
         initial,
-        isCavaleirosCampaign(campaign)
+        isLegacyCampaign
           ? "Associar timeline de Cavaleiros à campanha"
           : "Criar timeline inicial da campanha"
       );
