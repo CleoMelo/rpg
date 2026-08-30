@@ -31,6 +31,8 @@
 
   function masterToken(id) {
     if (!id || typeof window.getMasterToken !== "function") return "";
+    if (sessionStorage.getItem("role") !== "master"
+      || sessionStorage.getItem("masterRpgId") !== String(id)) return "";
     return String(window.getMasterToken(id) || "").trim();
   }
 
@@ -194,11 +196,8 @@
     const encodedId = encodeURIComponent(String(campaign.id));
     const masterLink = document.querySelector('a[href^="../timeline.html"]');
     if (masterLink) {
-      const token = masterToken(campaign.id);
-      masterLink.href = token
-        ? `../timeline.html?rpg=${encodedId}`
-        : `../timeline.html?rpg=${encodedId}&mode=readonly`;
-      masterLink.textContent = token ? "Área do mestre" : "Ver Gantt";
+      masterLink.href = `../timeline.html?rpg=${encodedId}`;
+      masterLink.textContent = "Ver Gantt";
     }
 
     const publicLink = document.querySelector('a[href^="./timeline/"]');

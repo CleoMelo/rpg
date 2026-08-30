@@ -73,10 +73,8 @@ if (!("historyDrag" in window)) {
 
     const existing = actions.querySelector('a[href^="../timeline.html"]');
     if (existing) {
-      existing.href = masterSession
-        ? `../timeline.html?rpg=${encodedId}`
-        : `../timeline.html?rpg=${encodedId}&mode=readonly`;
-      existing.textContent = masterSession ? "Área do mestre" : "Ver Gantt";
+      existing.href = `../timeline.html?rpg=${encodedId}`;
+      existing.textContent = "Ver Gantt";
     }
 
     let back = document.getElementById("timelineBackToCampaign");

@@ -7,21 +7,21 @@
     if (!rpgId) return;
 
     const nav = document.querySelector('.nav-links');
-    if (!nav || document.getElementById('campaignTimelineLink')) return;
+    if (!nav || document.getElementById('campaignTimelineListLink')) return;
 
-    const master =
-      sessionStorage.getItem('role') === 'master' &&
-      sessionStorage.getItem('masterRpgId') === String(rpgId) &&
-      sessionStorage.getItem(`masterSession:${String(rpgId)}`);
+    const encodedId = encodeURIComponent(rpgId);
+    const listLink = document.createElement('a');
+    listLink.id = 'campaignTimelineListLink';
+    listLink.textContent = 'Lista';
+    listLink.href = `timeline/?rpg=${encodedId}`;
 
-    const link = document.createElement('a');
-    link.id = 'campaignTimelineLink';
-    link.textContent = 'Linha do tempo';
-    link.href = master
-      ? `timeline.html?rpg=${encodeURIComponent(rpgId)}`
-      : `timeline.html?rpg=${encodeURIComponent(rpgId)}&mode=readonly`;
+    const ganttLink = document.createElement('a');
+    ganttLink.id = 'campaignTimelineGanttLink';
+    ganttLink.textContent = 'Gantt';
+    ganttLink.href = `timeline.html?rpg=${encodedId}`;
 
-    nav.prepend(link);
+    nav.prepend(ganttLink);
+    nav.prepend(listLink);
   }
 
   const stylesheet = document.createElement('link');
