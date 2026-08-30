@@ -3,6 +3,7 @@
   const nativeFetch = window.fetch.bind(window);
   const SUPABASE_PREFIX = "supabase://timeline";
   const editorPage = /\/timeline\.html$/i.test(location.pathname);
+  const LEGACY_CAVALEIROS_NAME = "cavaleiros divinos e a ordem dos reinos";
 
   function jsonResponse(payload, status = 200) {
     return new Response(JSON.stringify(payload), {
@@ -63,10 +64,6 @@
 
   async function campaignInfo(id) {
     if (!id) return null;
-    if (typeof window.getRpgById === "function") {
-      const rpg = await window.getRpgById(id);
-      if (rpg && String(rpg.id) === String(id)) return rpg;
-    }
 
     const { data, error } = await client()
       .from("campanhas")
@@ -97,6 +94,57 @@
     return normalizeName(campaign?.name).includes("cavaleiros");
   }
 
+  function timelineDocument(data) {
+    return data?.resources?.[0]?.documents?.find(item => item.type === "time") || null;
+  }
+
+  function timelineNames(data) {
+    const resourceName = normalizeName(data?.resources?.[0]?.name);
+    const documentName = normalizeName(timelineDocument(data)?.name);
+    return { resourceName, documentName };
+  }
+
+  function looksLikeLegacyCavaleiros(data) {
+    const { resourceName, documentName } = timelineNames(data);
+    return resourceName === LEGACY_CAVALEIROS_NAME
+      || documentName === LEGACY_CAVALEIROS_NAME
+      || resourceName.includes("cavaleiros")
+      || documentName.includes("cavaleiros");
+  }
+
+  function bindingState(data, campaign) {
+    if (!data || typeof data !== "object") return "invalid";
+
+    const currentId = String(campaign.id);
+    const boundId = String(data?.timelineMeta?.campaignId || "").trim();
+    if (boundId) return boundId === currentId ? "bound" : "foreign";
+
+    const campaignName = normalizeName(campaign.name);
+    const { resourceName, documentName } = timelineNames(data);
+
+    if (isCavaleirosCampaign(campaign) && looksLikeLegacyCavaleiros(data)) {
+      return "legacy-own";
+    }
+
+    if (!isCavaleirosCampaign(campaign)
+      && !looksLikeLegacyCavaleiros(data)
+      && (resourceName === campaignName || documentName === campaignName)) {
+      return "legacy-own";
+    }
+
+    return "foreign";
+  }
+
+  function bindTimelineToCampaign(data, campaign) {
+    const bound = JSON.parse(JSON.stringify(data));
+    bound.timelineMeta = {
+      schemaVersion: 1,
+      campaignId: String(campaign.id),
+      campaignName: String(campaign.name || "Campanha")
+    };
+    return bound;
+  }
+
   function applyCampaignUi(campaign) {
     if (!campaign) return;
     const name = String(campaign.name || "Campanha").trim() || "Campanha";
@@ -118,10 +166,10 @@
     if (publicSubtitle) publicSubtitle.textContent = `Timeline pública de ${name}`;
 
     const encodedId = encodeURIComponent(String(campaign.id));
-    const masterLink = document.querySelector('a[href="../timeline.html"]');
+    const masterLink = document.querySelector('a[href^="../timeline.html"]');
     if (masterLink) masterLink.href = `../timeline.html?rpg=${encodedId}`;
 
-    const publicLink = document.querySelector('a[href="./timeline/"]');
+    const publicLink = document.querySelector('a[href^="./timeline/"]');
     if (publicLink) publicLink.href = `./timeline/?rpg=${encodedId}`;
   }
 
@@ -131,25 +179,42 @@
 
   async function loadSeed() {
     const response = await nativeFetch(seedUrl(), { cache: "no-store" });
-    if (!response.ok) throw new Error(`Não foi possível carregar a cópia inicial da timeline (HTTP ${response.status}).`);
+    if (!response.ok) {
+      throw new Error(`Não foi possível carregar a timeline base (HTTP ${response.status}).`);
+    }
     return response.json();
+  }
+
+  function newId(prefix) {
+    if (globalThis.crypto?.randomUUID) {
+      return `${prefix}-${globalThis.crypto.randomUUID()}`;
+    }
+    return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   }
 
   function createEmptyTimeline(seed, campaign) {
     const empty = JSON.parse(JSON.stringify(seed));
     const resource = empty?.resources?.[0];
-    const documentTimeline = resource?.documents?.find(item => item.type === "time");
+    const documentTimeline = timelineDocument(empty);
 
     if (!resource || !documentTimeline?.content) {
       throw new Error("O modelo inicial da timeline é inválido.");
     }
 
     const name = String(campaign?.name || "Nova campanha").trim() || "Nova campanha";
+    const calendar = empty?.calendars?.find(item => item.id === documentTimeline.calendarId) || empty?.calendars?.[0];
+    const calendarId = newId("calendar");
+
+    empty.exportId = newId("export");
+    empty.exportedAt = new Date().toISOString();
+    resource.id = newId("resource");
     resource.name = name;
+    documentTimeline.id = newId("timeline");
     documentTimeline.name = name;
+    documentTimeline.calendarId = calendarId;
     documentTimeline.content.events = [];
     documentTimeline.content.lanes = [{
-      id: `lane-${String(campaign?.id || "geral").replace(/[^a-z0-9_-]/gi, "-")}`,
+      id: newId("lane"),
       name: "Geral",
       color: "#8b5cf6",
       pos: "a0",
@@ -157,56 +222,81 @@
       isCollapsed: false
     }];
 
-    const calendar = empty?.calendars?.find(item => item.id === documentTimeline.calendarId);
-    if (calendar) calendar.name = `Calendário de ${name}`;
+    if (calendar) {
+      calendar.id = calendarId;
+      calendar.name = `Calendário de ${name}`;
+    }
 
-    empty.exportedAt = new Date().toISOString();
-    return empty;
+    return bindTimelineToCampaign(empty, campaign);
   }
 
-  async function initialTimelineForCampaign(id) {
-    const campaign = await campaignInfo(id);
-    if (!campaign) throw new Error("Campanha não encontrada.");
-    applyCampaignUi(campaign);
-
+  async function initialTimelineForCampaign(campaign) {
     const seed = await loadSeed();
     return isCavaleirosCampaign(campaign)
-      ? seed
+      ? bindTimelineToCampaign(seed, campaign)
       : createEmptyTimeline(seed, campaign);
   }
 
+  async function persistTimeline(id, token, data, message) {
+    return rpc("salvar_timeline", {
+      p_campanha_id: id,
+      p_token: token,
+      p_data: data,
+      p_mensagem: message
+    });
+  }
+
   async function loadTimeline({ requireMasterSession = false } = {}) {
-    let id;
-    let token = "";
-
-    if (requireMasterSession) {
-      ({ id, token } = requireMaster());
-    } else {
-      id = campaignId();
-      token = masterToken(id);
-      if (!id) return loadSeed();
-    }
-
+    const id = requireMasterSession ? requireMaster().id : requireCampaign();
+    const token = requireMasterSession ? requireMaster().token : masterToken(id);
     const campaign = await campaignInfo(id);
+
     if (!campaign) throw new Error("Campanha não encontrada.");
     applyCampaignUi(campaign);
 
     const stored = await rpc("carregar_timeline", { p_campanha_id: id });
-    if (stored) return stored;
 
-    const initial = await initialTimelineForCampaign(id);
+    if (stored) {
+      const state = bindingState(stored, campaign);
 
-    if (token) {
-      await rpc("salvar_timeline", {
-        p_campanha_id: id,
-        p_token: token,
-        p_data: initial,
-        p_mensagem: isCavaleirosCampaign(campaign)
-          ? "Associação inicial da timeline de Cavaleiros"
-          : "Criação inicial da timeline da campanha"
-      });
+      if (state === "bound") return stored;
+
+      if (state === "legacy-own") {
+        const rebound = bindTimelineToCampaign(stored, campaign);
+        if (token) {
+          await persistTimeline(
+            id,
+            token,
+            rebound,
+            "Associar timeline existente à campanha"
+          );
+        }
+        return rebound;
+      }
+
+      const clean = await initialTimelineForCampaign(campaign);
+      if (token) {
+        await persistTimeline(
+          id,
+          token,
+          clean,
+          "Corrigir timeline associada à campanha errada"
+        );
+      }
+      return clean;
     }
 
+    const initial = await initialTimelineForCampaign(campaign);
+    if (token) {
+      await persistTimeline(
+        id,
+        token,
+        initial,
+        isCavaleirosCampaign(campaign)
+          ? "Associar timeline de Cavaleiros à campanha"
+          : "Criar timeline inicial da campanha"
+      );
+    }
     return initial;
   }
 
@@ -221,13 +311,17 @@
 
       if (method === "POST" && route === "/save") {
         const { id, token } = requireMaster();
+        const campaign = await campaignInfo(id);
+        if (!campaign) throw new Error("Campanha não encontrada.");
+
         const body = JSON.parse(String(options.body || "{}"));
-        const version = await rpc("salvar_timeline", {
-          p_campanha_id: id,
-          p_token: token,
-          p_data: body.data,
-          p_mensagem: "Edição pela timeline"
-        });
+        const boundData = bindTimelineToCampaign(body.data, campaign);
+        const version = await persistTimeline(
+          id,
+          token,
+          boundData,
+          "Edição pela timeline"
+        );
         return jsonResponse({ ok: true, version, backupCreated: true });
       }
 
@@ -295,12 +389,13 @@
       return handleSupabaseRoute(value, options);
     }
 
+    // Compatibilidade com versões antigas de app.js em cache.
     if (isLegacyTimelineJsonRequest(value)) {
       try {
         return jsonResponse(await loadTimeline());
       } catch (error) {
         console.error("[timeline/supabase-public]", error);
-        return nativeFetch(input, options);
+        return jsonResponse({ error: errorMessage(error) }, 500);
       }
     }
 

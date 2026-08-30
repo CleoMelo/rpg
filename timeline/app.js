@@ -1,20 +1,18 @@
 (() => {
   const C = window.TimelineCommon;
-  const cfg = window.TIMELINE_REPO;
   const $ = id => document.getElementById(id);
   let data, doc, lanes, visibleCount = 160;
   const selectedLanes = new Set();
-
-  function rawUrl(){
-    return `https://raw.githubusercontent.com/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}/${encodeURIComponent(cfg.branch)}/${cfg.path}?v=${Date.now()}`;
-  }
 
   async function load(){
     $("syncBadge").textContent = "Atualizando…";
     $("syncBadge").className = "badge warn";
     try{
-      const r = await fetch(rawUrl(), {cache:"no-store"});
-      if(!r.ok) throw new Error(`HTTP ${r.status}`);
+      const r = await fetch("supabase://timeline/timeline", {cache:"no-store"});
+      if(!r.ok){
+        const detail = await r.json().catch(() => ({}));
+        throw new Error(detail.error || detail.message || `HTTP ${r.status}`);
+      }
       data = await r.json();
       doc = C.getTimeDocument(data);
       lanes = C.laneMap(doc);
@@ -70,6 +68,11 @@
       <div class="stat"><strong>${list.length}</strong><span>nos filtros atuais</span></div>
       <div class="stat"><strong>${new Set(doc.content.events.map(e=>e.laneId)).size}</strong><span>categorias em uso</span></div>`;
     $("timeline").innerHTML = "";
+
+    if(!shown.length){
+      $("timeline").innerHTML = `<div class="event-card"><div class="event-title">Nenhum acontecimento nesta timeline.</div><div class="event-meta"><span class="chip">A campanha ainda não possui eventos que correspondam aos filtros.</span></div></div>`;
+    }
+
     shown.forEach(e => {
       const lane = lanes.get(e.laneId);
       const card = document.createElement("article");

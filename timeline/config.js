@@ -1,7 +1,7 @@
 window.TIMELINE_REPO = {
   owner: "CleoMelo",
   repo: "rpg",
-  branch: "import-timeline-cavaleiros",
+  branch: "timeline-por-campanha",
   path: "timeline/timeline.json",
   storage: "supabase",
   workerUrl: "supabase://timeline"
@@ -23,7 +23,7 @@ if (!("historyDrag" in window)) {
     "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
     `${rootPrefix}supabase-config.js?v=20260829-1`,
     `${rootPrefix}data.js?v=20260829-1`,
-    `${timelinePrefix}supabase-adapter.js?v=1`
+    `${timelinePrefix}supabase-adapter.js?v=2`
   ];
 
   for (const src of scripts) {
