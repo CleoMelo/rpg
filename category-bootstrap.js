@@ -19,7 +19,7 @@
     link.textContent = 'Linha do tempo';
     link.href = master
       ? `timeline.html?rpg=${encodeURIComponent(rpgId)}`
-      : `timeline/?rpg=${encodeURIComponent(rpgId)}`;
+      : `timeline.html?rpg=${encodeURIComponent(rpgId)}&mode=readonly`;
 
     nav.prepend(link);
   }

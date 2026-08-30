@@ -3,6 +3,7 @@
   const nativeFetch = window.fetch.bind(window);
   const SUPABASE_PREFIX = "supabase://timeline";
   const editorPage = /\/timeline\.html$/i.test(location.pathname);
+  const readOnlyPage = editorPage && window.TIMELINE_READ_ONLY === true;
   const LEGACY_CAVALEIROS_NAME = "cavaleiros divinos e a ordem dos reinos";
   let legacyCampaignIdPromise = null;
 
@@ -192,7 +193,13 @@
 
     const encodedId = encodeURIComponent(String(campaign.id));
     const masterLink = document.querySelector('a[href^="../timeline.html"]');
-    if (masterLink) masterLink.href = `../timeline.html?rpg=${encodedId}`;
+    if (masterLink) {
+      const token = masterToken(campaign.id);
+      masterLink.href = token
+        ? `../timeline.html?rpg=${encodedId}`
+        : `../timeline.html?rpg=${encodedId}&mode=readonly`;
+      masterLink.textContent = token ? "Área do mestre" : "Ver Gantt";
+    }
 
     const publicLink = document.querySelector('a[href^="./timeline/"]');
     if (publicLink) publicLink.href = `./timeline/?rpg=${encodedId}`;
@@ -343,7 +350,9 @@
 
     try {
       if (method === "GET" && route === "/timeline") {
-        return jsonResponse(await loadTimeline({ requireMasterSession: editorPage }));
+        return jsonResponse(await loadTimeline({
+          requireMasterSession: editorPage && !readOnlyPage
+        }));
       }
 
       if (method === "POST" && route === "/save") {
@@ -426,7 +435,6 @@
       return handleSupabaseRoute(value, options);
     }
 
-    // Compatibilidade com versões antigas de app.js em cache.
     if (isLegacyTimelineJsonRequest(value)) {
       try {
         return jsonResponse(await loadTimeline());
