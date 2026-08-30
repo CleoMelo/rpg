@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0d0a13">
+  <title>Cavaleiros Divinos — Linha do Tempo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">ARQUIVO CRONOLÓGICO</p>
+      <h1>Cavaleiros Divinos e a Ordem dos Reinos</h1>
+      <p>Timeline pública da campanha</p>
+    </div>
+    <div class="hero-actions">
+      <span id="syncBadge" class="badge">Carregando…</span>
+      <a class="button ghost" href="../timeline.html">Ver Gantt</a>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="toolbar panel">
+      <label class="grow">
+        <span>Buscar</span>
+        <input id="search" type="search" placeholder="Evento, personagem, reino...">
+      </label>
+      <label>
+        <span>Ordem</span>
+        <select id="sort">
+          <option value="asc">Mais antigos primeiro</option>
+          <option value="desc">Mais recentes primeiro</option>
+        </select>
+      </label>
+      <label>
+        <span>Importância mínima</span>
+        <select id="detail">
+          <option value="0">Todos</option>
+          <option value="1">1+</option>
+          <option value="2">2+</option>
+          <option value="3">3+</option>
+          <option value="4">4</option>
+        </select>
+      </label>
+      <button id="refresh" class="button ghost" type="button">Atualizar</button>
+    </section>
+
+    <section id="stats" class="stats"></section>
+
+    <div class="content-grid">
+      <aside class="panel sidebar">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">FILTROS</p>
+            <h2>Categorias</h2>
+          </div>
+          <button id="clearLanes" class="link-button" type="button">Limpar</button>
+        </div>
+        <div id="laneFilters" class="lane-list"></div>
+      </aside>
+
+      <section class="panel timeline-panel">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">CRONOLOGIA</p>
+            <h2 id="resultTitle">Acontecimentos</h2>
+          </div>
+          <span id="lastUpdate" class="muted"></span>
+        </div>
+        <div id="timeline" class="timeline"></div>
+        <button id="more" class="button ghost more hidden" type="button">Mostrar mais</button>
+      </section>
+    </div>
+  </main>
+
+  <dialog id="eventDialog">
+    <div class="dialog-card">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">ACONTECIMENTO</p>
+          <h2 id="dialogTitle"></h2>
+        </div>
+        <button class="icon-button" data-close type="button">×</button>
+      </div>
+      <div id="dialogBody" class="event-detail"></div>
+      <div class="dialog-actions">
+        <button class="button primary" data-close type="button">Fechar</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="./config.js"></script>
+  <script src="./common.js?v=21"></script>
+  <script src="./app.js?v=21"></script>
+</body>
+</html>

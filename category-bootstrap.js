@@ -1,6 +1,29 @@
 (function () {
   if (!/\/categorias\.html$/i.test(location.pathname)) return;
 
+  function installTimelineLink() {
+    const params = new URLSearchParams(location.search);
+    const rpgId = params.get('rpg') || localStorage.getItem('selectedRpg') || '';
+    if (!rpgId) return;
+
+    const nav = document.querySelector('.nav-links');
+    if (!nav || document.getElementById('campaignTimelineListLink')) return;
+
+    const encodedId = encodeURIComponent(rpgId);
+    const listLink = document.createElement('a');
+    listLink.id = 'campaignTimelineListLink';
+    listLink.textContent = 'Lista';
+    listLink.href = `timeline/?rpg=${encodedId}`;
+
+    const ganttLink = document.createElement('a');
+    ganttLink.id = 'campaignTimelineGanttLink';
+    ganttLink.textContent = 'Gantt';
+    ganttLink.href = `timeline.html?rpg=${encodedId}`;
+
+    nav.prepend(ganttLink);
+    nav.prepend(listLink);
+  }
+
   const stylesheet = document.createElement('link');
   stylesheet.rel = 'stylesheet';
   stylesheet.href = 'css/classificacoes.css?v=20260829-1';
@@ -25,7 +48,11 @@
     document.body.appendChild(script);
   };
 
-  const start = () => loadNext(0);
+  const start = () => {
+    installTimelineLink();
+    loadNext(0);
+  };
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', start, { once: true });
   } else {
