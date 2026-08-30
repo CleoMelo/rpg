@@ -67,6 +67,7 @@
           <p id="selectedCategoryDescription" class="muted"></p>
         </div>
         <div class="master-toolbar">
+          <button id="toggleTiersButton" class="btn secondary" type="button" disabled>Expandir tiers</button>
           <button id="addSubcategoryButton" class="btn secondary" type="button" style="display:none">+ Criar tier</button>
           <button id="addCharacterButton" class="btn" type="button" style="display:none">+ Adicionar personagem</button>
         </div>
@@ -276,6 +277,8 @@
     let editingCategoryId = null;
     let editingCharacterId = null;
     let editingSubcategoryId = null;
+    let tierExpansionCategory = null;
+    const expandedTierKeys = new Set();
 
     const categoryGrid = document.getElementById('categoryGrid');
     const characterGrid = document.getElementById('characterGrid');
@@ -296,6 +299,7 @@
     const characterSort = document.getElementById('characterSort');
     const clearCharacterFilters = document.getElementById('clearCharacterFilters');
     const characterFilterStatus = document.getElementById('characterFilterStatus');
+    const toggleTiersButton = document.getElementById('toggleTiersButton');
 
     function escapeHtml(value) {
       return String(value ?? '').replace(/[&<>'"]/g, char => ({
@@ -1008,7 +1012,9 @@
         document.getElementById('addSubcategoryButton').style.display = 'inline-flex';
       }
       renderCharacters();
-      document.getElementById('charactersSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (window.innerWidth < 981) {
+        document.getElementById('charactersSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     }
 
     function buildCharacterCard(character) {
@@ -1079,6 +1085,7 @@
 
     function renderCharacters() {
       characterGrid.innerHTML = '';
+      toggleTiersButton.disabled = true;
 
       if (!selectedCategory) {
         clearCharacterFilters.disabled = !characterFiltersAreActive();
@@ -1198,9 +1205,27 @@
         return;
       }
 
+      if (tierExpansionCategory !== selectedCategory) {
+        expandedTierKeys.clear();
+        if (visibleGroups.length) {
+          expandedTierKeys.add(visibleGroups[0].tier?.id || 'without-tier');
+        }
+        tierExpansionCategory = selectedCategory;
+      }
+
+      toggleTiersButton.disabled = filtersActive;
+      toggleTiersButton.textContent = filtersActive
+        ? 'Tiers expandidos'
+        : expandedTierKeys.size >= visibleGroups.length
+          ? 'Recolher tiers'
+          : 'Expandir tiers';
+
       visibleGroups.forEach(group => {
+        const tierKey = group.tier?.id || 'without-tier';
+        const expanded = filtersActive || expandedTierKeys.has(tierKey);
         const section = document.createElement('section');
-        section.className = 'tier-section';
+        section.className = `tier-section${expanded ? '' : ' tier-collapsed'}`;
+        section.dataset.tierKey = tierKey;
 
         if (role === 'master' && group.tier && !filtersActive) {
           attachSortable(section, {
@@ -1220,6 +1245,9 @@
         const header = document.createElement('div');
         header.className = 'tier-header';
         header.innerHTML = `
+          <button class="tier-toggle" type="button" aria-expanded="${expanded}" aria-label="${expanded ? 'Recolher' : 'Expandir'} ${escapeHtml(group.tier?.name || 'Outros')}">
+            <span aria-hidden="true">⌄</span>
+          </button>
           <div>
             ${role === 'master' && group.tier?.visible === false ? '<span class="visibility-badge">Somente para o mestre</span>' : ''}
             <h3>${escapeHtml(group.tier?.name || 'Outros')}</h3>
@@ -1282,6 +1310,17 @@
         }
 
         section.appendChild(grid);
+        header.querySelector('.tier-toggle').addEventListener('click', event => {
+          const willExpand = section.classList.contains('tier-collapsed');
+          section.classList.toggle('tier-collapsed', !willExpand);
+          event.currentTarget.setAttribute('aria-expanded', String(willExpand));
+          event.currentTarget.setAttribute('aria-label', `${willExpand ? 'Recolher' : 'Expandir'} ${group.tier?.name || 'Outros'}`);
+          if (willExpand) expandedTierKeys.add(tierKey);
+          else expandedTierKeys.delete(tierKey);
+          toggleTiersButton.textContent = expandedTierKeys.size >= visibleGroups.length
+            ? 'Recolher tiers'
+            : 'Expandir tiers';
+        });
         characterGrid.appendChild(section);
       });
     }
@@ -1659,6 +1698,20 @@
       document.getElementById('subcategoryModalTitle').textContent = 'Novo tier';
       document.getElementById('subcategoryMessage').textContent = '';
       openModal(subcategoryModal);
+    });
+
+    toggleTiersButton.addEventListener('click', () => {
+      const sections = [...characterGrid.querySelectorAll('.tier-section')];
+      if (!sections.length) return;
+      const expandAll = sections.some(section => section.classList.contains('tier-collapsed'));
+      sections.forEach(section => {
+        section.classList.toggle('tier-collapsed', !expandAll);
+        const toggle = section.querySelector('.tier-toggle');
+        toggle?.setAttribute('aria-expanded', String(expandAll));
+        if (expandAll) expandedTierKeys.add(section.dataset.tierKey);
+        else expandedTierKeys.delete(section.dataset.tierKey);
+      });
+      toggleTiersButton.textContent = expandAll ? 'Recolher tiers' : 'Expandir tiers';
     });
 
     categorySearch.addEventListener('input', renderCategories);
