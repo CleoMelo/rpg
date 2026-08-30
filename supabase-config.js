@@ -6,7 +6,7 @@ window.SUPABASE_CONFIG = {
 
 if (/\/categorias\.html$/i.test(location.pathname)) {
   const script = document.createElement('script');
-  script.src = 'category-bootstrap.js?v=20260830-1';
+  script.src = 'category-bootstrap.js?v=20260830-2';
   script.defer = true;
   document.head.appendChild(script);
 }

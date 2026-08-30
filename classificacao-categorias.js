@@ -3,7 +3,7 @@
   if (!/\/categorias\.html$/i.test(location.pathname)) return;
   const DEFAULT_ID='__personagens__';
   const DEFAULT={id:DEFAULT_ID,nome:'Personagens',icone:'👤',padrao:true};
-  let classifications=[], assignments=new Map(), selected='all', booted=false;
+  let classifications=[], assignments=new Map(), selected='', booted=false;
   const campaignId=()=>typeof getSelectedRpg==='function'?getSelectedRpg():new URLSearchParams(location.search).get('rpg')||'';
   const token=()=>typeof getMasterToken==='function'?getMasterToken(campaignId()):null;
   const master=()=>Boolean(token());
@@ -28,23 +28,42 @@
   function categoryClassification(id){return String(assignments.get(String(id))||classifications.find(x=>x.padrao)?.id||DEFAULT_ID);}
 
   function render(){
-    const panel=document.querySelector('.category-filter-panel');if(!panel)return;
-    let field=document.getElementById('categoryClassificationField');
-    if(!field){
-      field=document.createElement('div');field.id='categoryClassificationField';field.className='filter-field category-type-filter';
-      const clear=document.getElementById('clearCategorySearch');if(clear)panel.insertBefore(field,clear);else panel.appendChild(field);
-    }
-    field.innerHTML=`<label for="categoryTypeFilter">Classificação</label><select id="categoryTypeFilter"><option value="all">Todos</option>${classifications.map(x=>`<option value="${esc(x.id)}">${esc(x.icone)} ${esc(x.nome)}</option>`).join('')}</select>`;
-    const select=field.querySelector('#categoryTypeFilter');select.value=classifications.some(x=>x.id===selected)?selected:'all';select.onchange=()=>{selected=select.value;applyFilter();};
+    const panel=document.querySelector('.category-filter-panel');
+    const grid=document.getElementById('classificationGrid');
+    const explorer=document.getElementById('categoryExplorer');
+    if(!panel||!grid||!explorer)return;
+    const categories=typeof CATEGORIES!=='undefined'?CATEGORIES:[];
+    grid.innerHTML=classifications.map(item=>{
+      const count=categories.filter(category=>categoryClassification(category.id)===item.id).length;
+      return `<button type="button" class="classification-button${item.id===selected?' active':''}" data-classification="${esc(item.id)}"><span class="classification-icon">${esc(item.icone)}</span><span><strong>${esc(item.nome)}</strong><small>${count} categoria${count===1?'':'s'}</small></span><span class="classification-arrow" aria-hidden="true">›</span></button>`;
+    }).join('');
+    grid.querySelectorAll('[data-classification]').forEach(button=>button.onclick=()=>selectClassification(button.dataset.classification));
+    explorer.classList.toggle('hidden',!selected);
 
     let manager=document.getElementById('categoryClassificationManager');
     if(!master()){manager?.remove();return;}
-    if(!manager){manager=document.createElement('section');manager.id='categoryClassificationManager';manager.className='classification-manager';panel.after(manager);}
-    manager.innerHTML=`<div class="classification-manager-head"><strong>Classificações</strong><button type="button" class="btn secondary" data-create-classification>+ Criar classificação</button></div><div class="classification-manager-list">${classifications.map(x=>`<div class="classification-manager-item"><span>${esc(x.icone)} ${esc(x.nome)}</span>${x.padrao?'<small>Padrão</small>':`<span class="classification-manager-actions"><button type="button" data-edit-classification="${esc(x.id)}">Editar</button><button type="button" data-delete-classification="${esc(x.id)}">Excluir</button></span>`}</div>`).join('')}</div>`;
+    if(!manager){manager=document.createElement('details');manager.id='categoryClassificationManager';manager.className='classification-manager';grid.after(manager);}
+    manager.innerHTML=`<summary>Gerenciar classificações</summary><div class="classification-manager-head"><span class="muted">Crie ou organize os grupos de categorias.</span><button type="button" class="btn secondary" data-create-classification>+ Criar classificação</button></div><div class="classification-manager-list">${classifications.map(x=>`<div class="classification-manager-item"><span>${esc(x.icone)} ${esc(x.nome)}</span>${x.padrao?'<small>Padrão</small>':`<span class="classification-manager-actions"><button type="button" data-edit-classification="${esc(x.id)}">Editar</button><button type="button" data-delete-classification="${esc(x.id)}">Excluir</button></span>`}</div>`).join('')}</div>`;
     manager.querySelector('[data-create-classification]').onclick=()=>editClassification();
     manager.querySelectorAll('[data-edit-classification]').forEach(b=>b.onclick=()=>editClassification(b.dataset.editClassification));
     manager.querySelectorAll('[data-delete-classification]').forEach(b=>b.onclick=()=>removeClassification(b.dataset.deleteClassification));
   }
+
+  function selectClassification(id){
+    selected=classifications.some(item=>item.id===String(id))?String(id):'';
+    if(typeof categorySearch!=='undefined')categorySearch.value='';
+    if(typeof selectedCategory!=='undefined')selectedCategory=null;
+    document.querySelectorAll('.category-button').forEach(button=>button.classList.remove('active'));
+    const title=document.getElementById('selectedCategoryTitle');if(title)title.textContent='Selecione uma categoria';
+    const description=document.getElementById('selectedCategoryDescription');if(description)description.textContent='';
+    if(typeof renderCharacters==='function')renderCharacters();
+    render();applyFilter();
+  }
+
+  window.showClassificationForCategory=id=>{
+    selected=categoryClassification(id);
+    render();applyFilter();
+  };
 
   function editClassification(id=''){
     const current=classifications.find(x=>x.id===String(id));const dialog=document.createElement('dialog');dialog.className='classification-editor-modal';
@@ -54,8 +73,13 @@
     dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
   }
 
-  async function removeClassification(id){const current=classifications.find(x=>x.id===String(id));if(!current||current.padrao)return;if(!confirm(`Excluir a classificação "${current.nome}"? As categorias serão movidas para Personagens.`))return;try{const{error}=await client().rpc('excluir_classificacao_categoria',{p_campanha_id:String(campaignId()),p_token:token(),p_classificacao_id:current.id});if(error)throw error;selected='all';await load();if(typeof loadCategories==='function')await loadCategories(campaignId(),token());}catch(error){console.error(error);alert(error.message||'Não foi possível excluir a classificação.');}}
-  function applyFilter(){document.querySelectorAll('#categoryGrid .category-item').forEach(item=>{const button=item.querySelector('.category-button');if(!button)return;item.style.display=selected==='all'||categoryClassification(button.dataset.category)===selected?'':'none';});}
+  async function removeClassification(id){const current=classifications.find(x=>x.id===String(id));if(!current||current.padrao)return;if(!confirm(`Excluir a classificação "${current.nome}"? As categorias serão movidas para Personagens.`))return;try{const{error}=await client().rpc('excluir_classificacao_categoria',{p_campanha_id:String(campaignId()),p_token:token(),p_classificacao_id:current.id});if(error)throw error;selected='';await load();if(typeof loadCategories==='function')await loadCategories(campaignId(),token());}catch(error){console.error(error);alert(error.message||'Não foi possível excluir a classificação.');}}
+  function applyFilter(){
+    let visible=0;
+    document.querySelectorAll('#categoryGrid .category-item').forEach(item=>{const button=item.querySelector('.category-button');if(!button)return;const show=Boolean(selected)&&categoryClassification(button.dataset.category)===selected;item.style.display=show?'':'none';if(show)visible++;});
+    const empty=document.getElementById('classificationCategoryEmpty');if(empty)empty.classList.toggle('hidden',!selected||visible>0);
+    const status=document.getElementById('categoryFilterStatus');if(status&&selected){const current=classifications.find(item=>item.id===selected);status.textContent=`${visible} categoria(s) em ${current?.nome||'classificação selecionada'}`;}
+  }
 
   function renderFormField(){
     const form=document.getElementById('categoryForm');if(!form)return;
@@ -76,7 +100,7 @@
     try{const{error}=await client().rpc('classificar_categoria_por_classificacao',{p_campanha_id:String(campaignId()),p_categoria_id:String(id),p_token:token(),p_classificacao_id:String(classificationId)});if(error)throw error;assignments.set(String(id),String(classificationId));render();applyFilter();}catch(error){console.error('Classificação da categoria:',error);}
   }
 
-  function watchGrid(){const grid=document.getElementById('categoryGrid');if(!grid||grid.dataset.classificationObserver)return;grid.dataset.classificationObserver='true';new MutationObserver(()=>{renderFormField();applyFilter();}).observe(grid,{childList:true,subtree:true});}
+  function watchGrid(){const grid=document.getElementById('categoryGrid');if(!grid||grid.dataset.classificationObserver)return;grid.dataset.classificationObserver='true';new MutationObserver(()=>{render();renderFormField();applyFilter();}).observe(grid,{childList:true,subtree:true});}
   function setup(){if(booted)return;booted=true;load();watchGrid();setTimeout(renderFormField,500);setTimeout(renderFormField,1500);}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
 })();

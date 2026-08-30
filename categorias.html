@@ -30,9 +30,16 @@
 
     <div class="categories-workspace">
     <aside class="category-browser" aria-label="Navegação de categorias">
+      <div class="classification-browser-head">
+        <span class="section-kicker">Primeiro passo</span>
+        <h2>Classificações</h2>
+        <p class="muted">Escolha um grupo para ver suas categorias.</p>
+      </div>
+      <div id="classificationGrid" class="classification-grid" aria-label="Classificações disponíveis"></div>
+      <div id="categoryExplorer" class="category-explorer hidden">
       <div class="toolbar">
         <div>
-          <span class="section-kicker">Explorar</span>
+          <span class="section-kicker">Segundo passo</span>
           <h2>Categorias</h2>
         </div>
         <div class="master-toolbar">
@@ -58,6 +65,8 @@
         <p id="categoryFilterStatus" class="filter-status" aria-live="polite"></p>
       </div>
       <div id="categoryGrid" class="grid category-grid"></div>
+      <div id="classificationCategoryEmpty" class="empty-state compact hidden">Nenhuma categoria nesta classificação.</div>
+      </div>
     </aside>
 
     <section id="charactersSection" class="characters-panel">
@@ -259,7 +268,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-config.js?v=20260829-2"></script>
+  <script src="supabase-config.js?v=20260830-2"></script>
   <script src="data.js?v=20260829-2"></script>
   <script src="media-upload.js?v=20260829-2"></script>
   <script>
@@ -999,6 +1008,7 @@
       selectedCategory = String(categoryId);
       const category = CATEGORIES.find(item => item.id === selectedCategory);
       if (!category) return;
+      window.showClassificationForCategory?.(selectedCategory);
 
       document.querySelectorAll('.category-button').forEach(button => {
         button.classList.toggle('active', button.dataset.category === selectedCategory);

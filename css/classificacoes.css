@@ -5,6 +5,22 @@
 .category-type-badge { display:inline-flex; align-items:center; gap:5px; width:max-content; margin:0 0 5px; padding:3px 8px; border:1px solid rgba(255,255,255,.1); border-radius:999px; background:rgba(255,255,255,.055); font-size:.7rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; opacity:.82; }
 .category-classification-field small { display:block; margin-top:5px; opacity:.62; }
 
+.classification-browser-head h2 { margin:0 0 5px; font-size:clamp(1.45rem,2.3vw,2rem); }
+.classification-browser-head p { margin-bottom:14px; font-size:.86rem; }
+.classification-grid { display:grid; gap:9px; margin-bottom:14px; }
+.classification-button {
+  width:100%; min-height:68px; display:grid; grid-template-columns:42px minmax(0,1fr) auto;
+  align-items:center; gap:12px; padding:12px 13px; border:1px solid var(--border);
+  border-radius:14px; background:rgba(255,255,255,.025); color:var(--text); text-align:left;
+}
+.classification-button:hover { border-color:rgba(139,92,246,.55); background:rgba(139,92,246,.08); }
+.classification-button.active { border-color:var(--accent); background:rgba(139,92,246,.14); box-shadow:inset 3px 0 0 var(--accent); }
+.classification-icon { width:42px; height:42px; display:grid; place-items:center; border-radius:12px; background:rgba(255,255,255,.06); font-size:1.4rem; }
+.classification-button strong,.classification-button small { display:block; }
+.classification-button small { margin-top:3px; color:var(--muted); font-size:.76rem; }
+.classification-arrow { color:var(--muted); font-size:1.5rem; }
+.category-explorer { margin-top:18px; padding-top:18px; border-top:1px solid var(--border); }
+
 /* Classificações também funcionam como filtros rápidos. */
 .category-classification-filters {
   display:flex;
@@ -40,7 +56,9 @@
   box-shadow:0 5px 14px rgba(0,0,0,.12);
 }
 
-.classification-manager { margin: -8px 0 24px; padding: 14px 18px; border: 1px solid var(--border); border-radius: 16px; background: rgba(255,255,255,.025); }
+.classification-manager { margin: 0 0 14px; padding: 11px 13px; border: 1px solid var(--border); border-radius: 14px; background: rgba(255,255,255,.025); }
+.classification-manager summary { cursor:pointer; font-size:.82rem; font-weight:800; color:var(--muted); }
+.classification-manager[open] summary { margin-bottom:12px; color:var(--text); }
 .classification-manager-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
 .classification-manager-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:8px; }
 .classification-manager-item { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:40px; padding:8px 10px; border:1px solid rgba(255,255,255,.08); border-radius:10px; background:rgba(255,255,255,.025); }

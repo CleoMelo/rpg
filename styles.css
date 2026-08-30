@@ -436,7 +436,6 @@ body.sorting-active { cursor: grabbing; user-select: none; }
   grid-template-columns: 1fr auto;
   grid-template-areas:
     "search clear"
-    "classification classification"
     "status status";
   gap: 10px;
   margin-bottom: 14px;
@@ -548,7 +547,7 @@ body.sorting-active { cursor: grabbing; user-select: none; }
   .categories-page .character-filter-panel { grid-template-columns: 1fr; }
   .categories-page .category-filter-panel {
     grid-template-columns: 1fr;
-    grid-template-areas: "search" "classification" "clear" "status";
+    grid-template-areas: "search" "clear" "status";
   }
 }
 
