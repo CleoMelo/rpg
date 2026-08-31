@@ -6,7 +6,11 @@
   let classifications=[], assignments=new Map(), selected='', booted=false;
   const campaignId=()=>typeof getSelectedRpg==='function'?getSelectedRpg():new URLSearchParams(location.search).get('rpg')||'';
   const token=()=>typeof getMasterToken==='function'?getMasterToken(campaignId()):null;
-  const master=()=>Boolean(token());
+  const master=()=>Boolean(
+    token() &&
+    sessionStorage.getItem('role')==='master' &&
+    sessionStorage.getItem('masterRpgId')===String(campaignId())
+  );
   const client=()=>getSupabaseClient();
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -76,9 +80,35 @@
   async function removeClassification(id){const current=classifications.find(x=>x.id===String(id));if(!current||current.padrao)return;if(!confirm(`Excluir a classificação "${current.nome}"? As categorias serão movidas para Personagens.`))return;try{const{error}=await client().rpc('excluir_classificacao_categoria',{p_campanha_id:String(campaignId()),p_token:token(),p_classificacao_id:current.id});if(error)throw error;selected='';await load();if(typeof loadCategories==='function')await loadCategories(campaignId(),token());}catch(error){console.error(error);alert(error.message||'Não foi possível excluir a classificação.');}}
   function applyFilter(){
     let visible=0;
-    document.querySelectorAll('#categoryGrid .category-item').forEach(item=>{const button=item.querySelector('.category-button');if(!button)return;const show=Boolean(selected)&&categoryClassification(button.dataset.category)===selected;item.style.display=show?'':'none';if(show)visible++;});
-    const empty=document.getElementById('classificationCategoryEmpty');if(empty)empty.classList.toggle('hidden',!selected||visible>0);
-    const status=document.getElementById('categoryFilterStatus');if(status&&selected){const current=classifications.find(item=>item.id===selected);status.textContent=`${visible} categoria(s) em ${current?.nome||'classificação selecionada'}`;}
+    document.querySelectorAll('#categoryGrid .category-item').forEach(item=>{
+      const button=item.querySelector('.category-button');
+      if(!button)return;
+      const show=Boolean(selected)&&categoryClassification(button.dataset.category)===selected;
+      item.style.display=show?'':'none';
+      if(show)visible++;
+    });
+
+    const query=typeof categorySearch!=='undefined'
+      ? String(categorySearch.value||'').trim()
+      : '';
+    const nativeEmpty=document.querySelector('#categoryGrid > .empty-state');
+    if(nativeEmpty&&selected)nativeEmpty.style.display='none';
+
+    const empty=document.getElementById('classificationCategoryEmpty');
+    if(empty){
+      empty.textContent=query
+        ? 'Nenhuma categoria corresponde à pesquisa nesta classificação.'
+        : 'Nenhuma categoria nesta classificação.';
+      empty.classList.toggle('hidden',!selected||visible>0);
+    }
+
+    const status=document.getElementById('categoryFilterStatus');
+    if(status&&selected){
+      const current=classifications.find(item=>item.id===selected);
+      status.textContent=query
+        ? `${visible} categoria(s) encontrada(s) em ${current?.nome||'classificação selecionada'}`
+        : `${visible} categoria(s) em ${current?.nome||'classificação selecionada'}`;
+    }
   }
 
   function renderFormField(){
@@ -88,6 +118,15 @@
     group.innerHTML=`<label for="categoryClassification">Classificação</label><select id="categoryClassification" required>${classifications.map(x=>`<option value="${esc(x.id)}">${esc(x.icone)} ${esc(x.nome)}</option>`).join('')}</select>`;
     const select=group.querySelector('#categoryClassification');const currentId=typeof editingCategoryId!=='undefined'?editingCategoryId:null;select.value=currentId?categoryClassification(currentId):(classifications.find(x=>x.padrao)?.id||DEFAULT_ID);
   }
+
+  window.syncCategoryClassificationForm=id=>{
+    renderFormField();
+    const select=document.getElementById('categoryClassification');
+    if(!select)return;
+    select.value=id
+      ? categoryClassification(id)
+      : (classifications.find(x=>x.padrao)?.id||DEFAULT_ID);
+  };
 
   function capture(){
     const select=document.getElementById('categoryClassification');const before=new Set((typeof CATEGORIES!=='undefined'?CATEGORIES:[]).map(x=>String(x.id)));

@@ -67,7 +67,7 @@
       </div>
     </aside>
 
-    <section id="charactersSection" class="characters-panel">
+    <section id="charactersSection" class="characters-panel hidden">
       <div class="toolbar">
         <div>
           <h2 id="selectedCategoryTitle">Selecione uma categoria</h2>
@@ -1097,6 +1097,9 @@
       characterGrid.innerHTML = '';
       toggleTiersButton.disabled = true;
 
+      const charactersSection = document.getElementById('charactersSection');
+      charactersSection?.classList.toggle('hidden', !selectedCategory);
+
       if (!selectedCategory) {
         clearCharacterFilters.disabled = !characterFiltersAreActive();
         characterFilterStatus.textContent = 'Selecione uma categoria para pesquisar personagens.';
@@ -1364,6 +1367,7 @@
       editingCategoryId = String(categoryId);
       const form = document.getElementById('categoryForm');
       form.reset();
+      window.syncCategoryClassificationForm?.(editingCategoryId);
       document.getElementById('categoryModalTitle').textContent = 'Editar categoria';
       document.getElementById('categoryName').value = category.name;
       document.getElementById('categoryIcon').value = category.icon;
@@ -1774,6 +1778,7 @@
       editingCategoryId = null;
       const form = document.getElementById('categoryForm');
       form.reset();
+      window.syncCategoryClassificationForm?.(null);
       document.getElementById('categoryModalTitle').textContent = 'Nova categoria';
       document.getElementById('categoryVisible').checked = true;
       form.querySelector('button[type="submit"]').textContent = 'Criar categoria';
