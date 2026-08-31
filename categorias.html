@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Categorias</title>
-  <link rel="stylesheet" href="styles.css?v=20260830-4">
+  <link rel="stylesheet" href="styles.css?v=20260830-5">
 </head>
 <body class="categories-page">
   <header class="site-header">
@@ -31,7 +31,6 @@
     <div class="categories-workspace">
     <aside class="category-browser navigation-deck" aria-label="Navegação de categorias">
       <div class="classification-browser-head">
-        <span class="section-kicker">Primeiro passo</span>
         <h2>Classificações</h2>
         <p class="muted">Escolha um grupo para ver suas categorias.</p>
       </div>
@@ -39,7 +38,6 @@
       <div id="categoryExplorer" class="category-explorer hidden">
       <div class="toolbar">
         <div>
-          <span class="section-kicker">Segundo passo</span>
           <h2>Categorias</h2>
         </div>
         <div class="master-toolbar">
@@ -116,18 +114,20 @@
             <option value="without">Sem descrição</option>
           </select>
         </div>
-        <div class="filter-field">
-          <label for="characterSort">Ordenar</label>
-          <select id="characterSort">
-            <option value="position">Ordem atual</option>
-            <option value="name-asc">Nome: A–Z</option>
-            <option value="name-desc">Nome: Z–A</option>
-          </select>
+        <div class="character-filter-footer">
+          <div class="filter-field">
+            <label for="characterSort">Ordenar</label>
+            <select id="characterSort">
+              <option value="position">Ordem atual</option>
+              <option value="name-asc">Nome: A–Z</option>
+              <option value="name-desc">Nome: Z–A</option>
+            </select>
+          </div>
+          <p id="characterFilterStatus" class="filter-status" aria-live="polite"></p>
+          <button id="clearCharacterFilters" class="btn secondary filter-clear" type="button">
+            Limpar filtros
+          </button>
         </div>
-        <button id="clearCharacterFilters" class="btn secondary filter-clear" type="button">
-          Limpar filtros
-        </button>
-        <p id="characterFilterStatus" class="filter-status" aria-live="polite"></p>
       </div>
       <div id="characterGrid" class="grid character-grid"></div>
     </section>
