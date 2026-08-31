@@ -26,7 +26,7 @@
 
   const stylesheet = document.createElement('link');
   stylesheet.rel = 'stylesheet';
-  stylesheet.href = 'css/classificacoes.css?v=20260830-3';
+  stylesheet.href = 'css/classificacoes.css?v=20260830-4';
   document.head.appendChild(stylesheet);
 
   const scripts = [
