@@ -190,6 +190,12 @@
       }
     }
 
+    const brand = document.querySelector(".lk16-brand strong");
+    if (brand) brand.textContent = `${name} Timeline`;
+
+    const worldPill = document.querySelector(".lk16-world-pill");
+    if (worldPill) worldPill.textContent = `▣ ${name}`;
+
     const publicSubtitle = document.querySelector(".hero-copy p:not(.eyebrow)");
     if (publicSubtitle) publicSubtitle.textContent = `Timeline pública de ${name}`;
 

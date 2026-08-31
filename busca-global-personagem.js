@@ -25,7 +25,7 @@
     style.textContent = `
       .global-character-search {
         width: 100%;
-        margin: 24px 0 34px;
+        margin: 0 0 24px;
       }
 
       .global-character-search-panel {
@@ -218,8 +218,8 @@
       </div>
     `;
 
-    const categoriesSection = document.querySelector('.category-grid')?.closest('section');
-    if (categoriesSection) categoriesSection.before(section);
+    const campaignHeader = main.querySelector('.section-title');
+    if (campaignHeader) campaignHeader.after(section);
     else main.prepend(section);
 
     const input = document.getElementById('globalCharacterSearchInput');
