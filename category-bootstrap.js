@@ -32,7 +32,7 @@
   const scripts = [
     'personagem-destaque.js?v=20260829-3',
     'busca-global-personagem.js?v=20260831-1',
-    'classificacao-categorias.js?v=20260830-2',
+    'classificacao-categorias.js?v=20260831-2',
     'alterar-senha.js?v=20260829-1'
   ];
 
