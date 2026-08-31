@@ -31,11 +31,11 @@ if (!("historyDrag" in window)) {
     "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
     `${rootPrefix}supabase-config.js?v=20260829-1`,
     `${rootPrefix}data.js?v=20260829-1`,
-    `${timelinePrefix}supabase-adapter.js?v=3`
+    `${timelinePrefix}supabase-adapter.js?v=4`
   ];
 
   if (window.TIMELINE_READ_ONLY) {
-    scripts.push(`${timelinePrefix}readonly-guard.js?v=1`);
+    scripts.push(`${timelinePrefix}readonly-guard.js?v=3`);
   }
 
   for (const src of scripts) {

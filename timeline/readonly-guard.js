@@ -46,7 +46,7 @@
 
     for (const id of [
       "saveAllBtn", "discardBtn", "backupHistoryBtn", "lanesBtn", "newEvent",
-      "modePointer", "modeAdd", "undoBtn", "redoBtn", "listTab", "listQuickBtn"
+      "modePointer", "modeAdd", "undoBtn", "redoBtn"
     ]) {
       const element = document.getElementById(id);
       if (element) element.style.display = "none";
@@ -54,6 +54,9 @@
 
     const hand = document.getElementById("modeHand");
     if (hand && !hand.classList.contains("active")) hand.click();
+
+    const editingToolbar = document.querySelector(".lk16-bottom-toolbar");
+    if (editingToolbar) editingToolbar.style.display = "none";
 
     const badge = document.getElementById("saveBadge");
     if (badge && badge.textContent !== "Somente leitura") {

@@ -1466,13 +1466,50 @@ body.lk16-page{
 .lk16-help-bubble{bottom:74px;max-width:620px;background:rgba(12,13,16,.94);border-color:#30333a;color:#a3a4aa}
 .lk16-page .mode-hint.is-hidden{display:none!important}
 .lk16-small-dialog{max-width:720px}
+.lk16-page #jumpDateForm{
+  width:min(720px,calc(100vw - 24px));
+  margin:auto;
+}
+.lk16-page #jumpDateForm .date-fields{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+}
+.lk16-page #jumpDateForm .date-fields>label{
+  min-width:0;
+}
+.lk16-page #jumpDateForm .date-fields input,
+.lk16-page #jumpDateForm .date-fields select{
+  width:100%;
+  min-width:0;
+}
 .lk16-page dialog::backdrop{background:rgba(0,0,0,.72)}
 .lk16-page .dialog-card{background:#1c1e23;border:1px solid #343740;border-radius:14px}
 .lk16-page .dialog-card input,.lk16-page .dialog-card select{background:#111216;border-color:#353840}
 .lk16-page .button.primary{background:#2f79d9;border-color:#438ae5}
 .lk16-page .admin-list-view{margin:0;border:0;border-radius:0;background:#17191d;box-shadow:none;height:100%;overflow:auto}
+.lk16-page .admin-list-view>.section-head{
+  margin:0;
+  padding:20px 24px 16px;
+}
+.timeline-readonly .editor-row>button{display:none!important}
+@media(min-width:901px){
+  .timeline-readonly .editor-row{
+    grid-template-columns:minmax(220px,1fr) 190px 160px;
+  }
+}
 @media(max-width:900px){
  .lk16-appbar{padding:0 12px}.lk16-dirty-text{display:none}.lk16-shell{padding:8px}.lk16-title-row{padding:18px}.lk16-context-row{padding:0 18px 12px}.lk16-title-row h1{font-size:24px}.lk16-context-right{width:100%;justify-content:flex-end}
+}
+@media(max-width:560px){
+  .lk16-page .admin-list-view>.section-head{
+    padding:16px;
+  }
+  .lk16-page #jumpDateForm .date-fields{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .lk16-page #jumpDateForm .dialog-actions .button{
+    flex:1;
+  }
 }
 
 

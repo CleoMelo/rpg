@@ -251,9 +251,9 @@
         <div class="editor-name"><i class="row-color" style="background:${laneColor(lane, laneIndex)}"></i>${C.escapeHtml(event.name || "Sem nome")}</div>
         <div class="editor-date">${C.escapeHtml(C.formatDate(event.start, C.getCalendar(data, doc)))}${C.escapeHtml(endText)}</div>
         <div class="editor-lane">${C.escapeHtml(lane?.name || "Sem categoria")}</div>
-        <button class="button ghost" type="button">Editar</button>`;
+        ${window.TIMELINE_READ_ONLY ? "" : '<button class="button ghost" type="button">Editar</button>'}`;
 
-      row.querySelector("button").addEventListener("click", () => openEvent(event.id));
+      row.querySelector("button")?.addEventListener("click", () => openEvent(event.id));
       $("editorList").appendChild(row);
     }
   }

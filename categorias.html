@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Categorias</title>
-  <link rel="stylesheet" href="styles.css?v=20260829-2">
+  <link rel="stylesheet" href="styles.css?v=20260831-1">
 </head>
-<body>
+<body class="categories-page">
   <header class="site-header">
     <a class="brand" href="index.html">ARQUIVO <span>RPG</span></a>
     <nav class="nav-links">
@@ -19,18 +19,29 @@
     <section class="section-title">
       <span class="eyebrow" id="roleBadge">Acesso</span>
       <h1 id="campaignName" style="font-size:clamp(2.4rem,6vw,4.6rem)">Campanha</h1>
-      <p>Selecione uma categoria para visualizar os personagens.</p>
+      <p>Escolha uma classificação, depois uma categoria e então explore os personagens.</p>
+      <div class="campaign-page-actions">
+        <button id="editCampaignButton" class="btn secondary" type="button" style="display:none">✎ Editar campanha</button>
+        <button id="deleteCampaignButton" class="btn danger" type="button" style="display:none">Excluir campanha</button>
+      </div>
     </section>
 
     <div id="pageMessage" class="message" aria-live="polite"></div>
 
-    <section>
+    <div class="categories-workspace">
+    <aside class="category-browser navigation-deck" aria-label="Navegação de categorias">
+      <div class="classification-browser-head">
+        <h2>Classificações</h2>
+        <p class="muted">Escolha um grupo para ver suas categorias.</p>
+      </div>
+      <div id="classificationGrid" class="classification-grid" aria-label="Classificações disponíveis"></div>
+      <div id="categoryExplorer" class="category-explorer hidden">
       <div class="toolbar">
-        <h2>Categorias</h2>
+        <div>
+          <h2>Categorias</h2>
+        </div>
         <div class="master-toolbar">
           <button id="addCategoryButton" class="btn" type="button" style="display:none">+ Criar categoria</button>
-          <button id="editCampaignButton" class="btn secondary" type="button" style="display:none">✎ Editar campanha</button>
-          <button id="deleteCampaignButton" class="btn danger" type="button" style="display:none">Excluir campanha</button>
         </div>
       </div>
       <div class="filter-panel category-filter-panel">
@@ -52,15 +63,18 @@
         <p id="categoryFilterStatus" class="filter-status" aria-live="polite"></p>
       </div>
       <div id="categoryGrid" class="grid category-grid"></div>
-    </section>
+      <div id="classificationCategoryEmpty" class="empty-state compact hidden">Nenhuma categoria nesta classificação.</div>
+      </div>
+    </aside>
 
-    <section id="charactersSection" style="margin-top:54px">
+    <section id="charactersSection" class="characters-panel">
       <div class="toolbar">
         <div>
           <h2 id="selectedCategoryTitle">Selecione uma categoria</h2>
           <p id="selectedCategoryDescription" class="muted"></p>
         </div>
         <div class="master-toolbar">
+          <button id="toggleTiersButton" class="btn secondary" type="button" disabled>Expandir tiers</button>
           <button id="addSubcategoryButton" class="btn secondary" type="button" style="display:none">+ Criar tier</button>
           <button id="addCharacterButton" class="btn" type="button" style="display:none">+ Adicionar personagem</button>
         </div>
@@ -100,21 +114,24 @@
             <option value="without">Sem descrição</option>
           </select>
         </div>
-        <div class="filter-field">
-          <label for="characterSort">Ordenar</label>
-          <select id="characterSort">
-            <option value="position">Ordem atual</option>
-            <option value="name-asc">Nome: A–Z</option>
-            <option value="name-desc">Nome: Z–A</option>
-          </select>
+        <div class="character-filter-footer">
+          <div class="filter-field">
+            <label for="characterSort">Ordenar</label>
+            <select id="characterSort">
+              <option value="position">Ordem atual</option>
+              <option value="name-asc">Nome: A–Z</option>
+              <option value="name-desc">Nome: Z–A</option>
+            </select>
+          </div>
+          <p id="characterFilterStatus" class="filter-status" aria-live="polite"></p>
+          <button id="clearCharacterFilters" class="btn secondary filter-clear" type="button">
+            Limpar filtros
+          </button>
         </div>
-        <button id="clearCharacterFilters" class="btn secondary filter-clear" type="button">
-          Limpar filtros
-        </button>
-        <p id="characterFilterStatus" class="filter-status" aria-live="polite"></p>
       </div>
       <div id="characterGrid" class="grid character-grid"></div>
     </section>
+    </div>
   </main>
 
   <div id="campaignModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="campaignModalTitle">
@@ -251,7 +268,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-config.js?v=20260829-2"></script>
+  <script src="supabase-config.js?v=20260830-4"></script>
   <script src="data.js?v=20260829-2"></script>
   <script src="media-upload.js?v=20260829-2"></script>
   <script>
@@ -269,6 +286,8 @@
     let editingCategoryId = null;
     let editingCharacterId = null;
     let editingSubcategoryId = null;
+    let tierExpansionCategory = null;
+    const expandedTierKeys = new Set();
 
     const categoryGrid = document.getElementById('categoryGrid');
     const characterGrid = document.getElementById('characterGrid');
@@ -289,6 +308,7 @@
     const characterSort = document.getElementById('characterSort');
     const clearCharacterFilters = document.getElementById('clearCharacterFilters');
     const characterFilterStatus = document.getElementById('characterFilterStatus');
+    const toggleTiersButton = document.getElementById('toggleTiersButton');
 
     function escapeHtml(value) {
       return String(value ?? '').replace(/[&<>'"]/g, char => ({
@@ -988,6 +1008,7 @@
       selectedCategory = String(categoryId);
       const category = CATEGORIES.find(item => item.id === selectedCategory);
       if (!category) return;
+      window.showClassificationForCategory?.(selectedCategory);
 
       document.querySelectorAll('.category-button').forEach(button => {
         button.classList.toggle('active', button.dataset.category === selectedCategory);
@@ -1001,7 +1022,9 @@
         document.getElementById('addSubcategoryButton').style.display = 'inline-flex';
       }
       renderCharacters();
-      document.getElementById('charactersSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (window.innerWidth < 981) {
+        document.getElementById('charactersSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     }
 
     function buildCharacterCard(character) {
@@ -1072,6 +1095,7 @@
 
     function renderCharacters() {
       characterGrid.innerHTML = '';
+      toggleTiersButton.disabled = true;
 
       if (!selectedCategory) {
         clearCharacterFilters.disabled = !characterFiltersAreActive();
@@ -1191,9 +1215,27 @@
         return;
       }
 
+      if (tierExpansionCategory !== selectedCategory) {
+        expandedTierKeys.clear();
+        if (visibleGroups.length) {
+          expandedTierKeys.add(visibleGroups[0].tier?.id || 'without-tier');
+        }
+        tierExpansionCategory = selectedCategory;
+      }
+
+      toggleTiersButton.disabled = filtersActive;
+      toggleTiersButton.textContent = filtersActive
+        ? 'Tiers expandidos'
+        : expandedTierKeys.size >= visibleGroups.length
+          ? 'Recolher tiers'
+          : 'Expandir tiers';
+
       visibleGroups.forEach(group => {
+        const tierKey = group.tier?.id || 'without-tier';
+        const expanded = filtersActive || expandedTierKeys.has(tierKey);
         const section = document.createElement('section');
-        section.className = 'tier-section';
+        section.className = `tier-section${expanded ? '' : ' tier-collapsed'}`;
+        section.dataset.tierKey = tierKey;
 
         if (role === 'master' && group.tier && !filtersActive) {
           attachSortable(section, {
@@ -1213,6 +1255,9 @@
         const header = document.createElement('div');
         header.className = 'tier-header';
         header.innerHTML = `
+          <button class="tier-toggle" type="button" aria-expanded="${expanded}" aria-label="${expanded ? 'Recolher' : 'Expandir'} ${escapeHtml(group.tier?.name || 'Outros')}">
+            <span aria-hidden="true">⌄</span>
+          </button>
           <div>
             ${role === 'master' && group.tier?.visible === false ? '<span class="visibility-badge">Somente para o mestre</span>' : ''}
             <h3>${escapeHtml(group.tier?.name || 'Outros')}</h3>
@@ -1275,6 +1320,17 @@
         }
 
         section.appendChild(grid);
+        header.querySelector('.tier-toggle').addEventListener('click', event => {
+          const willExpand = section.classList.contains('tier-collapsed');
+          section.classList.toggle('tier-collapsed', !willExpand);
+          event.currentTarget.setAttribute('aria-expanded', String(willExpand));
+          event.currentTarget.setAttribute('aria-label', `${willExpand ? 'Recolher' : 'Expandir'} ${group.tier?.name || 'Outros'}`);
+          if (willExpand) expandedTierKeys.add(tierKey);
+          else expandedTierKeys.delete(tierKey);
+          toggleTiersButton.textContent = expandedTierKeys.size >= visibleGroups.length
+            ? 'Recolher tiers'
+            : 'Expandir tiers';
+        });
         characterGrid.appendChild(section);
       });
     }
@@ -1652,6 +1708,20 @@
       document.getElementById('subcategoryModalTitle').textContent = 'Novo tier';
       document.getElementById('subcategoryMessage').textContent = '';
       openModal(subcategoryModal);
+    });
+
+    toggleTiersButton.addEventListener('click', () => {
+      const sections = [...characterGrid.querySelectorAll('.tier-section')];
+      if (!sections.length) return;
+      const expandAll = sections.some(section => section.classList.contains('tier-collapsed'));
+      sections.forEach(section => {
+        section.classList.toggle('tier-collapsed', !expandAll);
+        const toggle = section.querySelector('.tier-toggle');
+        toggle?.setAttribute('aria-expanded', String(expandAll));
+        if (expandAll) expandedTierKeys.add(section.dataset.tierKey);
+        else expandedTierKeys.delete(section.dataset.tierKey);
+      });
+      toggleTiersButton.textContent = expandAll ? 'Recolher tiers' : 'Expandir tiers';
     });
 
     categorySearch.addEventListener('input', renderCategories);
