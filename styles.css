@@ -644,26 +644,24 @@ body.sorting-active { cursor: grabbing; user-select: none; }
 .categories-page .category-button p { -webkit-line-clamp: 1; }
 .categories-page .characters-panel {
   width: 100%;
-  height: calc(100vh - 150px);
-  min-height: 580px;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
   padding: 20px;
   border-radius: 18px;
 }
 .categories-page .characters-panel > .toolbar {
-  position: sticky;
-  z-index: 4;
-  top: -20px;
-  margin: -20px -20px 14px;
-  padding: 18px 20px 12px;
-  background: rgba(15, 19, 28, .96);
+  position: static;
+  margin: 0 0 14px;
+  padding: 0 0 12px;
+  background: transparent;
   border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(14px);
+  backdrop-filter: none;
 }
 
 @media (max-width: 700px) {
   .categories-page .category-explorer > .category-grid { grid-template-columns: 1fr; }
-  .categories-page .characters-panel { height: auto; min-height: 560px; overflow: visible; }
-  .categories-page .characters-panel > .toolbar { position: static; margin: 0 0 14px; padding: 0 0 12px; }
+  .categories-page .characters-panel { min-height: 0; }
 }
 
 .tier-section {
