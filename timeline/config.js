@@ -21,8 +21,19 @@ if (!("historyDrag" in window)) {
     sessionStorage.getItem("masterRpgId") === String(campaignId) &&
     sessionStorage.getItem(`masterSession:${String(campaignId)}`)
   );
+  const editorSession = Boolean(
+    campaignId &&
+    sessionStorage.getItem("role") === "editor" &&
+    sessionStorage.getItem("editorRpgId") === String(campaignId) &&
+    sessionStorage.getItem(`editorSession:${String(campaignId)}`)
+  );
 
-  window.TIMELINE_READ_ONLY = Boolean(editorPage && !masterSession);
+  window.TIMELINE_ACCESS_ROLE = masterSession
+    ? "master"
+    : editorSession
+      ? "editor"
+      : "player";
+  window.TIMELINE_READ_ONLY = Boolean(editorPage && !masterSession && !editorSession);
 
   const rootPrefix = editorPage ? "./" : "../";
   const timelinePrefix = editorPage ? "./timeline/" : "./";
@@ -30,8 +41,8 @@ if (!("historyDrag" in window)) {
   const scripts = [
     "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
     `${rootPrefix}supabase-config.js?v=20260829-1`,
-    `${rootPrefix}data.js?v=20260829-1`,
-    `${timelinePrefix}supabase-adapter.js?v=4`
+    `${rootPrefix}data.js?v=20260903-1`,
+    `${timelinePrefix}supabase-adapter.js?v=20260903-1`
   ];
 
   if (window.TIMELINE_READ_ONLY) {
@@ -54,6 +65,11 @@ if (!("historyDrag" in window)) {
       if (listLink) {
         listLink.href = `./timeline/?rpg=${encodedId}`;
         listLink.textContent = "Ver lista";
+      }
+
+      const backups = document.getElementById("backupHistoryBtn");
+      if (backups && window.TIMELINE_ACCESS_ROLE === "editor") {
+        backups.classList.add("hidden");
       }
 
       let back = document.getElementById("timelineBackToCampaign");

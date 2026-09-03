@@ -155,7 +155,7 @@ h2 { font-size: clamp(1.8rem, 4vw, 3rem); }
   place-items: center;
 }
 .role-panel { width: min(760px, 100%); padding: 34px; }
-.role-options { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 26px; }
+.role-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 26px; }
 .role-button {
   padding: 30px 20px;
   border: 1px solid var(--border);

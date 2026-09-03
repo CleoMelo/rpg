@@ -13,8 +13,7 @@
     button.type = 'button';
     button.textContent = '🔑 Alterar senha';
 
-    const deleteButton = document.getElementById('deleteCampaignButton');
-    toolbar.insertBefore(button, deleteButton || null);
+    toolbar.appendChild(button);
 
     const backdrop = document.createElement('div');
     backdrop.id = 'masterPasswordModal';

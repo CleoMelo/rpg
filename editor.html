@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Acesso do mestre</title>
-  <link rel="stylesheet" href="styles.css?v=20260829-1">
+  <title>Acesso do editor</title>
+  <link rel="stylesheet" href="styles.css?v=20260903-1">
 </head>
 <body>
   <header class="site-header">
@@ -14,15 +14,15 @@
 
   <main class="page-shell">
     <section class="card form-panel">
-      <span class="eyebrow">Área restrita</span>
-      <h2>Acesso do mestre</h2>
-      <p class="muted">Digite a senha para acessar as ferramentas de administração.</p>
-      <form id="masterForm">
+      <span class="eyebrow">Acesso de edição</span>
+      <h2>Entrar como editor</h2>
+      <p class="muted">Este acesso permite editar personagens públicos e a linha do tempo, sem revelar conteúdo exclusivo do mestre.</p>
+      <form id="editorForm">
         <div class="form-group">
-          <label for="password">Senha</label>
-          <input id="password" type="password" autocomplete="current-password" required placeholder="Digite a senha">
+          <label for="password">Senha do editor</label>
+          <input id="password" type="password" autocomplete="current-password" required placeholder="Digite a senha do editor">
         </div>
-        <button class="btn full" type="submit">Entrar como mestre</button>
+        <button class="btn full" type="submit">Entrar como editor</button>
         <div id="message" class="message"></div>
       </form>
     </section>
@@ -34,7 +34,7 @@
   <script>
     const rpgId = getSelectedRpg();
     document.getElementById('backLink').href = `acesso.html?rpg=${encodeURIComponent(rpgId)}`;
-    document.getElementById('masterForm').addEventListener('submit', async event => {
+    document.getElementById('editorForm').addEventListener('submit', async event => {
       event.preventDefault();
       const password = document.getElementById('password').value;
       const message = document.getElementById('message');
@@ -45,20 +45,21 @@
       submitButton.disabled = true;
 
       try {
-        const masterToken = await authenticateMaster(rpgId, password);
-
-        if (masterToken) {
+        const token = await authenticateEditor(rpgId, password);
+        if (token) {
           message.className = 'message success';
-          message.textContent = 'Acesso liberado.';
+          message.textContent = 'Acesso de editor liberado.';
           location.href = `categorias.html?rpg=${encodeURIComponent(rpgId)}`;
         } else {
           message.className = 'message error';
-          message.textContent = 'Senha incorreta.';
+          message.textContent = 'Senha do editor incorreta ou ainda não configurada.';
         }
       } catch (error) {
         console.error(error);
         message.className = 'message error';
-        message.textContent = 'Não foi possível verificar a senha.';
+        message.textContent = error?.code === 'PGRST202'
+          ? 'Execute a migration de acesso do editor no Supabase.'
+          : 'Não foi possível verificar a senha do editor.';
       } finally {
         submitButton.disabled = false;
       }

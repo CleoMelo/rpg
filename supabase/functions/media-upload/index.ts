@@ -88,6 +88,38 @@ async function verifyMaster(campaignId: string, masterToken: string) {
   return verifyResponse.ok;
 }
 
+async function verifyEditor(campaignId: string, editorToken: string) {
+  const supabaseUrl = requiredSecret("SUPABASE_URL");
+  const serviceKey = requiredSecret("SUPABASE_SERVICE_ROLE_KEY");
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/rpc/token_editor_valido`,
+    {
+      method: "POST",
+      headers: {
+        apikey: serviceKey,
+        authorization: `Bearer ${serviceKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        p_campanha_id: campaignId,
+        p_token: editorToken,
+      }),
+    },
+  );
+  if (!response.ok) return false;
+  return Boolean(await response.json().catch(() => false));
+}
+
+async function verifyAccess(
+  campaignId: string,
+  token: string,
+  accessRole: string,
+) {
+  return accessRole === "editor"
+    ? verifyEditor(campaignId, token)
+    : verifyMaster(campaignId, token);
+}
+
 async function uploadToImageKit(
   file: File,
   campaignId: string,
@@ -540,16 +572,27 @@ Deno.serve(async (req) => {
       }
 
       const campaignId = String(payload.campaignId || "").trim();
-      const masterToken = String(payload.masterToken || "").trim();
-      if (!campaignId || !masterToken) {
-        return json(req, { error: "Acesso do mestre ausente." }, 401);
+      const accessRole = String(payload.accessRole || "master").trim() === "editor"
+        ? "editor"
+        : "master";
+      const accessToken = String(
+        payload.accessToken || payload.masterToken || "",
+      ).trim();
+      if (!campaignId || !accessToken) {
+        return json(req, { error: "Acesso de edição ausente." }, 401);
       }
-      if (!(await verifyMaster(campaignId, masterToken))) {
+      if (!(await verifyAccess(campaignId, accessToken, accessRole))) {
         return json(
           req,
-          { error: "Acesso do mestre inválido ou expirado." },
+          { error: "Acesso de edição inválido ou expirado." },
           403,
         );
+      }
+
+      if (accessRole === "editor" && ![
+        "delete-replaced-media",
+      ].includes(action)) {
+        return json(req, { error: "Ação exclusiva do mestre." }, 403);
       }
 
       if (action === "delete-upload") {
@@ -587,6 +630,9 @@ Deno.serve(async (req) => {
         if (!["campaign", "character"].includes(kind)) {
           return json(req, { error: "Tipo de imagem inválido." }, 400);
         }
+        if (accessRole === "editor" && kind !== "character") {
+          return json(req, { error: "Ação exclusiva do mestre." }, 403);
+        }
         const deleted = await deleteManagedMediaFiles(
           campaignId,
           kind as "campaign" | "character",
@@ -610,17 +656,25 @@ Deno.serve(async (req) => {
     const form = await req.formData();
     const file = form.get("file");
     const campaignId = String(form.get("campaignId") || "").trim();
-    const masterToken = String(form.get("masterToken") || "").trim();
+    const accessRole = String(form.get("accessRole") || "master").trim() === "editor"
+      ? "editor"
+      : "master";
+    const accessToken = String(
+      form.get("accessToken") || form.get("masterToken") || "",
+    ).trim();
     const kind = String(form.get("kind") || "").trim();
 
     if (!(file instanceof File)) {
       return json(req, { error: "Selecione uma imagem." }, 400);
     }
-    if (!campaignId || !masterToken) {
-      return json(req, { error: "Acesso do mestre ausente." }, 401);
+    if (!campaignId || !accessToken) {
+      return json(req, { error: "Acesso de edição ausente." }, 401);
     }
     if (!["campaign", "character"].includes(kind)) {
       return json(req, { error: "Tipo de imagem inválido." }, 400);
+    }
+    if (accessRole === "editor" && kind !== "character") {
+      return json(req, { error: "Ação exclusiva do mestre." }, 403);
     }
     if (!ALLOWED_TYPES.has(file.type)) {
       return json(req, { error: "Use uma imagem JPG, PNG, WebP ou AVIF." }, 415);
@@ -628,8 +682,8 @@ Deno.serve(async (req) => {
     if (file.size > MAX_FILE_SIZE) {
       return json(req, { error: "A imagem deve ter no máximo 5 MB." }, 413);
     }
-    if (!(await verifyMaster(campaignId, masterToken))) {
-      return json(req, { error: "Acesso do mestre inválido ou expirado." }, 403);
+    if (!(await verifyAccess(campaignId, accessToken, accessRole))) {
+      return json(req, { error: "Acesso de edição inválido ou expirado." }, 403);
     }
 
     const imageKit = await uploadToImageKit(file, campaignId, kind);

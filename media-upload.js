@@ -9,12 +9,14 @@ function validateImageFile(file) {
   return file;
 }
 
-async function uploadMediaImage({ file, rpgId, token, kind }) {
+async function uploadMediaImage({ file, rpgId, token, kind, accessRole = 'master' }) {
   validateImageFile(file);
   const body = new FormData();
   body.append('file', file);
   body.append('campaignId', String(rpgId));
   body.append('masterToken', String(token || ''));
+  body.append('accessToken', String(token || ''));
+  body.append('accessRole', accessRole === 'editor' ? 'editor' : 'master');
   body.append('kind', kind === 'campaign' ? 'campaign' : 'character');
   const response = await fetch(MEDIA_UPLOAD_ENDPOINT, {
     method: 'POST',
@@ -89,7 +91,7 @@ async function deleteCharacterMedia({ rpgId, token, imageUrls = [] }) {
   }, 'Não foi possível remover as imagens dos personagens.');
 }
 
-async function deleteReplacedMedia({ rpgId, token, kind, imageUrl }) {
+async function deleteReplacedMedia({ rpgId, token, kind, imageUrl, accessRole = 'master' }) {
   const previousUrl = String(imageUrl || '').trim();
   if (!previousUrl) {
     return { success: true, imagekitDeleted: 0, driveDeleted: 0 };
@@ -98,6 +100,8 @@ async function deleteReplacedMedia({ rpgId, token, kind, imageUrl }) {
     action: 'delete-replaced-media',
     campaignId: String(rpgId),
     masterToken: String(token || ''),
+    accessToken: String(token || ''),
+    accessRole: accessRole === 'editor' ? 'editor' : 'master',
     kind: kind === 'campaign' ? 'campaign' : 'character',
     imageUrls: [previousUrl]
   }, 'A nova imagem foi salva, mas não foi possível remover a anterior.');
