@@ -114,6 +114,7 @@
   function renderFormField(){
     const form=document.getElementById('categoryForm');if(!form)return;
     let group=document.getElementById('categoryClassificationFieldForm');
+    if(!master()){group?.remove();return;}
     if(!group){const description=document.getElementById('categoryDescription')?.closest('.form-group');if(!description)return;group=document.createElement('div');group.id='categoryClassificationFieldForm';group.className='form-group category-classification-field';description.after(group);form.addEventListener('submit',capture,true);}
     group.innerHTML=`<label for="categoryClassification">Classificação</label><select id="categoryClassification" required>${classifications.map(x=>`<option value="${esc(x.id)}">${esc(x.icone)} ${esc(x.nome)}</option>`).join('')}</select>`;
     const select=group.querySelector('#categoryClassification');const currentId=typeof editingCategoryId!=='undefined'?editingCategoryId:null;select.value=currentId?categoryClassification(currentId):(classifications.find(x=>x.padrao)?.id||DEFAULT_ID);

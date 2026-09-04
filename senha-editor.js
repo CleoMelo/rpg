@@ -6,7 +6,7 @@
     if (sessionStorage.getItem('role') !== 'master') return;
     if (document.getElementById('changeEditorPasswordButton')) return;
 
-    const toolbar = document.querySelector('.master-toolbar');
+    const toolbar = document.querySelector('.campaign-page-actions');
     if (!toolbar) return;
 
     const button = document.createElement('button');
@@ -35,7 +35,7 @@
           <button class="close-button" id="closeEditorPasswordModal" type="button" aria-label="Fechar">×</button>
         </div>
         <form id="editorPasswordForm">
-          <p class="muted">A senha do editor permite alterar somente personagens públicos e a linha do tempo. Conteúdo exclusivo do mestre permanece inacessível.</p>
+          <p class="muted">A senha do editor permite alterar personagens públicos, categorias públicas e a linha do tempo. Conteúdo exclusivo do mestre e classificações permanecem inacessíveis.</p>
           <div class="form-group">
             <label for="newEditorPassword">Nova senha do editor</label>
             <input id="newEditorPassword" type="password" minlength="6" maxlength="72" autocomplete="new-password" required>

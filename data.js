@@ -333,6 +333,24 @@ async function updateCategory({ rpgId, token, categoryId, name, description, ico
   return updated;
 }
 
+async function updateCategoryAsEditor({ rpgId, token, categoryId, name, description, icon }) {
+  if (!token) return null;
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('editar_categoria_editor', {
+    p_campanha_id: String(rpgId),
+    p_categoria_id: String(categoryId),
+    p_token: token,
+    p_nome: name.trim(),
+    p_descricao: description.trim(),
+    p_icone: icon.trim() || '📁'
+  }).single();
+  if (error) throw error;
+  const updated = mapCategory(data);
+  const index = CATEGORIES.findIndex(item => item.id === String(categoryId));
+  if (index >= 0) CATEGORIES[index] = updated;
+  return updated;
+}
+
 async function deleteCategory({ rpgId, token, categoryId, imageUrls = null }) {
   let categoryImageUrls = Array.isArray(imageUrls) ? imageUrls : null;
   if (!categoryImageUrls) {
