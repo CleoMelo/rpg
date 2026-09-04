@@ -4,7 +4,7 @@
     if (sessionStorage.getItem('role') !== 'master') return;
     if (document.getElementById('changeMasterPasswordButton')) return;
 
-    const toolbar = document.querySelector('.master-toolbar');
+    const toolbar = document.querySelector('.campaign-page-actions');
     if (!toolbar) return;
 
     const button = document.createElement('button');
@@ -14,7 +14,11 @@
     button.textContent = '🔑 Alterar senha';
 
     const deleteButton = document.getElementById('deleteCampaignButton');
-    toolbar.insertBefore(button, deleteButton || null);
+    if (deleteButton?.parentElement === toolbar) {
+      toolbar.insertBefore(button, deleteButton);
+    } else {
+      toolbar.appendChild(button);
+    }
 
     const backdrop = document.createElement('div');
     backdrop.id = 'masterPasswordModal';

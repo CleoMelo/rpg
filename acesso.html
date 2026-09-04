@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Escolher acesso</title>
-  <link rel="stylesheet" href="styles.css?v=20260829-1">
+  <link rel="stylesheet" href="styles.css?v=20260903-1">
 </head>
 <body>
   <header class="site-header">
@@ -16,23 +16,27 @@
     <section class="card role-panel">
       <span class="eyebrow">Tipo de acesso</span>
       <h2 id="campaignName">Campanha</h2>
-      <p class="lead">Escolha como deseja entrar. Jogadores podem visualizar os personagens. Mestres também podem cadastrar e remover registros.</p>
+      <p class="lead">Escolha como deseja entrar. Jogadores apenas visualizam, editores alteram conteúdo público e mestres administram toda a campanha.</p>
       <div class="role-options">
         <button class="role-button" id="playerButton">
           <strong>🎲 Jogador</strong>
           <span>Acessar categorias e visualizar personagens.</span>
         </button>
+        <button class="role-button" id="editorButton">
+          <strong>✎ Editor</strong>
+          <span>Editar personagens públicos e a linha do tempo.</span>
+        </button>
         <button class="role-button" id="masterButton">
           <strong>👑 Mestre</strong>
-          <span>Entrar com senha para administrar o conteúdo.</span>
+          <span>Administrar todo o conteúdo, inclusive informações restritas.</span>
         </button>
       </div>
     </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-config.js?v=20260829-1"></script>
-  <script src="data.js?v=20260829-1"></script>
+  <script src="supabase-config.js?v=20260903-1"></script>
+  <script src="data.js?v=20260903-1"></script>
   <script>
     const rpgId = getSelectedRpg();
     setSelectedRpg(rpgId);
@@ -49,8 +53,13 @@
 
     document.getElementById('playerButton').onclick = () => {
       clearMasterSession(rpgId);
+      clearEditorSession(rpgId);
       sessionStorage.setItem('role', 'player');
       location.href = `categorias.html?rpg=${encodeURIComponent(rpgId)}`;
+    };
+
+    document.getElementById('editorButton').onclick = () => {
+      location.href = `editor.html?rpg=${encodeURIComponent(rpgId)}`;
     };
 
     document.getElementById('masterButton').onclick = () => {

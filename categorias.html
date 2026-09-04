@@ -269,14 +269,24 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=20260830-4"></script>
-  <script src="data.js?v=20260829-2"></script>
-  <script src="media-upload.js?v=20260829-2"></script>
+  <script src="data.js?v=20260904-1"></script>
+  <script src="media-upload.js?v=20260903-1"></script>
   <script>
     const rpgId = getSelectedRpg();
     const storedRole = sessionStorage.getItem('role');
     const masterToken = getMasterToken(rpgId);
+    const editorToken = typeof getEditorToken === 'function' ? getEditorToken(rpgId) : null;
     const masterMatchesCampaign = sessionStorage.getItem('masterRpgId') === String(rpgId);
-    const role = storedRole === 'master' && masterMatchesCampaign && masterToken ? 'master' : storedRole === 'player' ? 'player' : null;
+    const editorMatchesCampaign = sessionStorage.getItem('editorRpgId') === String(rpgId);
+    const role = storedRole === 'master' && masterMatchesCampaign && masterToken
+      ? 'master'
+      : storedRole === 'editor' && editorMatchesCampaign && editorToken
+        ? 'editor'
+        : storedRole === 'player'
+          ? 'player'
+          : null;
+    const canEditCharacters = role === 'master' || role === 'editor';
+    const characterEditToken = role === 'master' ? masterToken : editorToken;
 
     if (!role) location.href = `acesso.html?rpg=${encodeURIComponent(rpgId)}`;
 
@@ -950,23 +960,25 @@
         });
         wrapper.appendChild(button);
 
-        if (role === 'master') {
+        if (role === 'master' || role === 'editor') {
           const controls = document.createElement('div');
           controls.className = 'entity-controls';
 
-          const visibilityButton = document.createElement('button');
-          visibilityButton.className = 'entity-icon-button visibility';
-          visibilityButton.type = 'button';
-          visibilityButton.title = category.visible === false
-            ? 'Mostrar categoria aos jogadores'
-            : 'Ocultar categoria dos jogadores';
-          visibilityButton.setAttribute('aria-label', visibilityButton.title);
-          visibilityButton.textContent = category.visible === false ? '◉' : '◌';
-          visibilityButton.addEventListener(
-            'click',
-            () => toggleCategoryVisibility(category.id, visibilityButton)
-          );
-          controls.appendChild(visibilityButton);
+          if (role === 'master') {
+            const visibilityButton = document.createElement('button');
+            visibilityButton.className = 'entity-icon-button visibility';
+            visibilityButton.type = 'button';
+            visibilityButton.title = category.visible === false
+              ? 'Mostrar categoria aos jogadores'
+              : 'Ocultar categoria dos jogadores';
+            visibilityButton.setAttribute('aria-label', visibilityButton.title);
+            visibilityButton.textContent = category.visible === false ? '◉' : '◌';
+            visibilityButton.addEventListener(
+              'click',
+              () => toggleCategoryVisibility(category.id, visibilityButton)
+            );
+            controls.appendChild(visibilityButton);
+          }
 
           const editButton = document.createElement('button');
           editButton.className = 'entity-icon-button edit';
@@ -977,7 +989,7 @@
           editButton.addEventListener('click', () => openCategoryEditor(category.id));
           controls.appendChild(editButton);
 
-          if (category.custom) {
+          if (role === 'master' && category.custom) {
             const removeButton = document.createElement('button');
             removeButton.className = 'entity-icon-button remove';
             removeButton.type = 'button';
@@ -1030,17 +1042,17 @@
     function buildCharacterCard(character) {
       const description = String(character.description || '').trim();
       const card = document.createElement('article');
-      card.className = role === 'player'
-        ? 'card character-card player-character-card'
-        : 'card character-card master-character-card';
+      card.className = canEditCharacters
+        ? 'card character-card master-character-card'
+        : 'card character-card player-character-card';
       card.classList.add(
         description ? 'has-description' : 'no-description'
       );
       card.innerHTML = `
-        ${role === 'master' ? `
+        ${canEditCharacters ? `
           <div class="entity-controls character-entity-controls">
             <button class="entity-icon-button edit" type="button" data-edit="${escapeHtml(character.id)}" title="Editar personagem" aria-label="Editar ${escapeHtml(character.name)}">✎</button>
-            <button class="entity-icon-button remove" type="button" data-remove="${escapeHtml(character.id)}" title="Excluir personagem" aria-label="Excluir ${escapeHtml(character.name)}">×</button>
+            ${role === 'master' ? `<button class="entity-icon-button remove" type="button" data-remove="${escapeHtml(character.id)}" title="Excluir personagem" aria-label="Excluir ${escapeHtml(character.name)}">×</button>` : ''}
           </div>
         ` : ''}
         <img src="${escapeHtml(character.image)}" alt="${escapeHtml(character.name)}">
@@ -1340,7 +1352,8 @@
 
     function openCharacterEditor(characterId) {
       const character = characters.find(item => item.id === String(characterId));
-      if (!character) return;
+      if (!character || !canEditCharacters) return;
+      if (role === 'editor' && character.visible === false) return;
 
       editingCharacterId = String(characterId);
       const form = document.getElementById('characterForm');
@@ -1350,6 +1363,8 @@
       categorySelect.value = character.category;
       populateSubcategorySelect(character.category, character.subcategory);
       document.getElementById('characterVisible').checked = character.visible !== false;
+      const visibilityField = document.getElementById('characterVisible')?.closest('.visibility-field');
+      if (visibilityField) visibilityField.style.display = role === 'editor' ? 'none' : '';
       document.getElementById('characterDescription').value = character.description || '';
       setFilePreview(
         document.getElementById('characterImage'),
@@ -1373,6 +1388,8 @@
       document.getElementById('categoryIcon').value = category.icon;
       document.getElementById('categoryDescription').value = category.description || '';
       document.getElementById('categoryVisible').checked = category.visible !== false;
+      const visibilityField = document.getElementById('categoryVisible')?.closest('.visibility-field');
+      if (visibilityField) visibilityField.style.display = role === 'editor' ? 'none' : '';
       form.querySelector('button[type="submit"]').textContent = 'Salvar alterações';
       openModal(categoryModal);
     }
@@ -1678,6 +1695,7 @@
     }
 
     document.getElementById('addCharacterButton').addEventListener('click', () => {
+      if (role !== 'master') return;
       if (!CATEGORIES.length) {
         showPageMessage('Crie uma categoria antes de adicionar personagens.');
         return;
@@ -1858,32 +1876,39 @@
           upload = await uploadMediaImage({
             file: imageFile,
             rpgId,
-            token: masterToken,
-            kind: 'character'
+            token: characterEditToken,
+            kind: 'character',
+            accessRole: role
           });
           image = upload.url;
         }
 
         const values = {
           rpgId,
-          token: masterToken,
+          token: characterEditToken,
           name: document.getElementById('characterName').value,
           categoryId: categorySelect.value,
           subcategoryId: subcategorySelect.value || null,
           description: document.getElementById('characterDescription').value,
           image,
-          visible: document.getElementById('characterVisible').checked
+          visible: role === 'editor' ? true : document.getElementById('characterVisible').checked
         };
 
         let character;
         if (editingCharacterId) {
-          character = await updateCharacter({
-            ...values,
-            characterId: editingCharacterId
-          });
+          character = role === 'editor'
+            ? await updateCharacterAsEditor({
+                ...values,
+                characterId: editingCharacterId
+              })
+            : await updateCharacter({
+                ...values,
+                characterId: editingCharacterId
+              });
           const index = characters.findIndex(item => item.id === editingCharacterId);
           if (index >= 0) characters[index] = character;
         } else {
+          if (role !== 'master') throw new Error('Acesso exclusivo do mestre.');
           character = await createCharacter(values);
           characters.push(character);
         }
@@ -1896,7 +1921,7 @@
               {
                 p_campanha_id: String(rpgId),
                 p_personagem_id: String(character.id),
-                p_token: masterToken,
+                p_token: characterEditToken,
                 p_ficha_url: fichaUrl || null
               }
             );
@@ -1920,9 +1945,10 @@
           try {
             await deleteReplacedMedia({
               rpgId,
-              token: masterToken,
+              token: characterEditToken,
               kind: 'character',
-              imageUrl: existingCharacter.image
+              imageUrl: existingCharacter.image,
+              accessRole: role
             });
           } catch (cleanupError) {
             console.error('Falha ao remover a imagem anterior:', cleanupError);
@@ -1945,7 +1971,7 @@
           showPageMessage(characterWarnings.join(' '));
         }
       } catch (error) {
-        if (!characterSaved && upload) {
+        if (!characterSaved && upload && role === 'master') {
           await deleteUploadedMedia({
             rpgId,
             token: masterToken,
@@ -2023,18 +2049,27 @@
       try {
         const values = {
           rpgId,
-          token: masterToken,
+          token: role === 'master' ? masterToken : editorToken,
           name: document.getElementById('categoryName').value,
           description: document.getElementById('categoryDescription').value,
           icon: document.getElementById('categoryIcon').value,
           visible: document.getElementById('categoryVisible').checked
         };
 
+        if (role === 'editor' && !editingCategoryId) {
+          throw new Error('O acesso de editor não pode criar categorias.');
+        }
+
         const category = editingCategoryId
-          ? await updateCategory({
-              ...values,
-              categoryId: editingCategoryId
-            })
+          ? role === 'editor'
+            ? await updateCategoryAsEditor({
+                ...values,
+                categoryId: editingCategoryId
+              })
+            : await updateCategory({
+                ...values,
+                categoryId: editingCategoryId
+              })
           : await createCategory(values);
 
         editingCategoryId = null;
@@ -2045,7 +2080,7 @@
       } catch (error) {
         console.error(error);
         formMessage.className = 'message error';
-        formMessage.textContent = error?.message || 'Não foi possível criar a categoria.';
+        formMessage.textContent = error?.message || 'Não foi possível salvar a categoria.';
       } finally {
         submitButton.disabled = false;
       }
@@ -2165,7 +2200,11 @@
 
     async function initializePage() {
       document.getElementById('changeAccess').href = `acesso.html?rpg=${encodeURIComponent(rpgId)}`;
-      document.getElementById('roleBadge').textContent = role === 'master' ? 'Acesso de mestre' : 'Acesso de jogador';
+      document.getElementById('roleBadge').textContent = role === 'master'
+        ? 'Acesso de mestre'
+        : role === 'editor'
+          ? 'Acesso de editor'
+          : 'Acesso de jogador';
       categoryGrid.innerHTML = '<div class="empty-state">Carregando categorias...</div>';
       characterGrid.innerHTML = '<div class="empty-state">Carregando personagens...</div>';
 
@@ -2184,6 +2223,9 @@
             document.getElementById('editCampaignButton').style.display = 'inline-flex';
             document.getElementById('deleteCampaignButton').style.display = 'inline-flex';
           }
+        } else if (role === 'editor') {
+          const visibilityField = document.getElementById('characterVisible')?.closest('.visibility-field');
+          if (visibilityField) visibilityField.style.display = 'none';
         }
 
         renderCategories();

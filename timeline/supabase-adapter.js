@@ -36,6 +36,21 @@
     return String(window.getMasterToken(id) || "").trim();
   }
 
+  function editorToken(id) {
+    if (!id || typeof window.getEditorToken !== "function") return "";
+    if (sessionStorage.getItem("role") !== "editor"
+      || sessionStorage.getItem("editorRpgId") !== String(id)) return "";
+    return String(window.getEditorToken(id) || "").trim();
+  }
+
+  function writeAccess(id) {
+    const master = masterToken(id);
+    if (master) return { token: master, role: "master" };
+    const editor = editorToken(id);
+    if (editor) return { token: editor, role: "editor" };
+    return { token: "", role: "player" };
+  }
+
   function client() {
     if (typeof window.getSupabaseClient !== "function") {
       throw new Error("Cliente do Supabase não carregado.");
@@ -58,6 +73,15 @@
       throw new Error("Sessão de mestre não encontrada. Entre como mestre nesta campanha antes de abrir a timeline.");
     }
     return { id, token };
+  }
+
+  function requireWriteAccess() {
+    const id = requireCampaign();
+    const access = writeAccess(id);
+    if (!access.token) {
+      throw new Error("Sessão de edição não encontrada. Entre como mestre ou editor nesta campanha antes de abrir a timeline.");
+    }
+    return { id, ...access };
   }
 
   async function rpc(name, args) {
@@ -274,8 +298,8 @@
       : createEmptyTimeline(seed, campaign);
   }
 
-  async function persistTimeline(id, token, data, message) {
-    return rpc("salvar_timeline", {
+  async function persistTimeline(id, token, data, message, accessRole = "master") {
+    return rpc(accessRole === "editor" ? "salvar_timeline_editor" : "salvar_timeline", {
       p_campanha_id: id,
       p_token: token,
       p_data: data,
@@ -283,17 +307,21 @@
     });
   }
 
-  async function loadTimeline({ requireMasterSession = false } = {}) {
+  async function loadTimeline({ requireWriteSession = false } = {}) {
     let id;
     let token = "";
+    let accessRole = "player";
 
-    if (requireMasterSession) {
-      const master = requireMaster();
-      id = master.id;
-      token = master.token;
+    if (requireWriteSession) {
+      const access = requireWriteAccess();
+      id = access.id;
+      token = access.token;
+      accessRole = access.role;
     } else {
       id = requireCampaign();
-      token = masterToken(id);
+      const access = writeAccess(id);
+      token = access.token;
+      accessRole = access.role;
     }
 
     const campaign = await campaignInfo(id);
@@ -317,7 +345,8 @@
             id,
             token,
             rebound,
-            "Associar timeline existente à campanha"
+            "Associar timeline existente à campanha",
+            accessRole
           );
         }
         return rebound;
@@ -329,7 +358,8 @@
           id,
           token,
           clean,
-          "Corrigir timeline associada à campanha errada"
+          "Corrigir timeline associada à campanha errada",
+          accessRole
         );
       }
       return clean;
@@ -343,7 +373,8 @@
         initial,
         isLegacyCampaign
           ? "Associar timeline de Cavaleiros à campanha"
-          : "Criar timeline inicial da campanha"
+          : "Criar timeline inicial da campanha",
+        accessRole
       );
     }
     return initial;
@@ -356,12 +387,12 @@
     try {
       if (method === "GET" && route === "/timeline") {
         return jsonResponse(await loadTimeline({
-          requireMasterSession: editorPage && !readOnlyPage
+          requireWriteSession: editorPage && !readOnlyPage
         }));
       }
 
       if (method === "POST" && route === "/save") {
-        const { id, token } = requireMaster();
+        const { id, token, role: accessRole } = requireWriteAccess();
         const campaign = await campaignInfo(id);
         if (!campaign) throw new Error("Campanha não encontrada.");
 
@@ -371,7 +402,8 @@
           id,
           token,
           boundData,
-          "Edição pela timeline"
+          "Edição pela timeline",
+          accessRole
         );
         return jsonResponse({ ok: true, version, backupCreated: true });
       }
@@ -418,7 +450,7 @@
     } catch (error) {
       console.error("[timeline/supabase]", error);
       const message = errorMessage(error);
-      const authError = /sessão de mestre|campanha selecionada/i.test(message);
+      const authError = /sessão de mestre|sessão de editor|sessão de edição|campanha selecionada/i.test(message);
       return jsonResponse({ error: message }, authError ? 401 : 500);
     }
   }

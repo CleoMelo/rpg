@@ -57,13 +57,14 @@ function normalizeImgurImageUrl(value) {
   return url.href;
 }
 
-async function createRpg({ name, description, image, password }) {
+async function createRpg({ name, description, image, password, editorPassword }) {
   const client = getSupabaseClient();
-  const { data, error } = await client.rpc('criar_campanha', {
+  const { data, error } = await client.rpc('criar_campanha_com_editor', {
     p_nome: name.trim(),
     p_descricao: description.trim() || 'Campanha personalizada.',
     p_imagem_url: normalizeImgurImageUrl(image),
-    p_senha: password
+    p_senha_mestre: password,
+    p_senha_editor: editorPassword
   }).single();
   if (error) throw error;
   const rpg = mapCampaign(data);
@@ -110,6 +111,41 @@ function clearMasterSession(id) {
   }
 }
 
+function editorSessionKey(id) {
+  return `editorSession:${String(id)}`;
+}
+
+function setEditorSession(id, token) {
+  sessionStorage.setItem(editorSessionKey(id), token);
+  sessionStorage.setItem('role', 'editor');
+  sessionStorage.setItem('editorRpgId', String(id));
+}
+
+function getEditorToken(id) {
+  return sessionStorage.getItem(editorSessionKey(id));
+}
+
+function clearEditorSession(id) {
+  sessionStorage.removeItem(editorSessionKey(id));
+  if (sessionStorage.getItem('editorRpgId') === String(id)) {
+    sessionStorage.removeItem('editorRpgId');
+    sessionStorage.removeItem('role');
+  }
+}
+
+async function authenticateEditor(id, password) {
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('autenticar_editor', {
+    p_campanha_id: String(id),
+    p_senha: password
+  });
+  if (error) throw error;
+  if (!data) return null;
+  clearMasterSession(id);
+  setEditorSession(id, data);
+  return data;
+}
+
 async function authenticateMaster(id, password) {
   const client = getSupabaseClient();
   const { data, error } = await client.rpc('autenticar_mestre', {
@@ -118,6 +154,7 @@ async function authenticateMaster(id, password) {
   });
   if (error) throw error;
   if (!data) return null;
+  clearEditorSession(id);
   setMasterSession(id, data);
   return data;
 }
@@ -134,6 +171,7 @@ async function deleteRpg(id, token) {
   if (!data) return false;
   RPGS = RPGS.filter(item => item.id !== String(id));
   clearMasterSession(id);
+  clearEditorSession(id);
   return true;
 }
 
@@ -295,6 +333,24 @@ async function updateCategory({ rpgId, token, categoryId, name, description, ico
   return updated;
 }
 
+async function updateCategoryAsEditor({ rpgId, token, categoryId, name, description, icon }) {
+  if (!token) return null;
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('editar_categoria_editor', {
+    p_campanha_id: String(rpgId),
+    p_categoria_id: String(categoryId),
+    p_token: token,
+    p_nome: name.trim(),
+    p_descricao: description.trim(),
+    p_icone: icon.trim() || '📁'
+  }).single();
+  if (error) throw error;
+  const updated = mapCategory(data);
+  const index = CATEGORIES.findIndex(item => item.id === String(categoryId));
+  if (index >= 0) CATEGORIES[index] = updated;
+  return updated;
+}
+
 async function deleteCategory({ rpgId, token, categoryId, imageUrls = null }) {
   let categoryImageUrls = Array.isArray(imageUrls) ? imageUrls : null;
   if (!categoryImageUrls) {
@@ -356,6 +412,23 @@ async function updateCharacter({ rpgId, token, characterId, name, categoryId, su
     p_descricao: description.trim(),
     p_imagem_url: normalizeImgurImageUrl(image),
     p_visivel: Boolean(visible)
+  }).single();
+  if (error) throw error;
+  return mapCharacter(data);
+}
+
+async function updateCharacterAsEditor({ rpgId, token, characterId, name, categoryId, subcategoryId = null, description, image }) {
+  if (!token) throw new Error('Sessão de editor não encontrada.');
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('editar_personagem_editor', {
+    p_campanha_id: String(rpgId),
+    p_personagem_id: String(characterId),
+    p_token: token,
+    p_nome: name.trim(),
+    p_categoria_id: String(categoryId),
+    p_subcategoria_id: subcategoryId ? String(subcategoryId) : null,
+    p_descricao: description.trim(),
+    p_imagem_url: normalizeImgurImageUrl(image)
   }).single();
   if (error) throw error;
   return mapCharacter(data);
