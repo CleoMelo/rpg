@@ -76,6 +76,20 @@
         overflow-y:auto;
         overscroll-behavior:contain;
         scrollbar-gutter:stable;
+        scrollbar-width:thin;
+        scrollbar-color:rgba(139,92,246,.62) transparent;
+      }
+      .character-highlight-content::-webkit-scrollbar{width:8px}
+      .character-highlight-content::-webkit-scrollbar-track{background:transparent}
+      .character-highlight-content::-webkit-scrollbar-thumb{
+        background:rgba(139,92,246,.58);
+        border:2px solid transparent;
+        border-radius:999px;
+        background-clip:padding-box;
+      }
+      .character-highlight-content::-webkit-scrollbar-thumb:hover{
+        background:rgba(167,139,250,.9);
+        background-clip:padding-box;
       }
       .character-highlight-content h2{
         font-size:clamp(2rem,5vw,4rem);
