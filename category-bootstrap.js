@@ -30,7 +30,7 @@
   document.head.appendChild(stylesheet);
 
   const scripts = [
-    'personagem-destaque.js?v=20260829-3',
+    'personagem-destaque.js?v=20260905-1',
     'busca-global-personagem.js?v=20260831-1',
     'classificacao-categorias.js?v=20260904-1',
     'alterar-senha.js?v=20260904-1',
