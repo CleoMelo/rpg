@@ -214,7 +214,7 @@
     const form=document.getElementById('characterForm');
     if(!form||document.getElementById('characterFichaUrl'))return;
     const g=document.createElement('div');
-    g.className='form-group';
+    g.className='form-group character-editor-wide';
     g.innerHTML='<label for="characterFichaUrl">Link da ficha do personagem</label><input id="characterFichaUrl" type="url" maxlength="500" placeholder="https://..."><small>Opcional. O link é salvo no Supabase e aparece no destaque do personagem para o mestre.</small>';
     const d=document.getElementById('characterDescription');
     (d?.closest('.form-group')||form.lastElementChild).after(g);

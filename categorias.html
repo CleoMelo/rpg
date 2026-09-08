@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Categorias</title>
-  <link rel="stylesheet" href="styles.css?v=20260831-1">
+  <link rel="stylesheet" href="styles.css?v=20260908-1">
 </head>
 <body class="categories-page">
   <header class="site-header">
@@ -162,48 +162,61 @@
   </div>
 
   <div id="characterModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="characterModalTitle">
-    <section class="card modal">
-      <div class="modal-header">
-        <h2 id="characterModalTitle">Novo personagem</h2>
-        <button class="close-button" id="closeCharacterModal" type="button" aria-label="Fechar">×</button>
+    <section class="card modal character-editor-modal">
+      <button class="close-button character-editor-close" id="closeCharacterModal" type="button" aria-label="Fechar">×</button>
+
+      <div class="character-editor-media">
+        <div id="characterImagePreview" class="campaign-preview upload-preview character-editor-preview">
+          <span>A prévia da imagem aparecerá aqui.</span>
+        </div>
       </div>
-      <form id="characterForm">
-        <div class="form-group">
-          <label for="characterName">Nome</label>
-          <input id="characterName" maxlength="80" required placeholder="Nome do personagem">
-        </div>
-        <div class="form-group">
-          <label for="characterCategory">Categoria</label>
-          <select id="characterCategory" required></select>
-        </div>
-        <div class="form-group">
-          <label for="characterSubcategory">Tier / grupo</label>
-          <select id="characterSubcategory">
-            <option value="">Outros (sem tier)</option>
-          </select>
-          <small>Use os tiers para organizar líderes, funcionários e participantes.</small>
-        </div>
-        <div class="form-group">
-          <label for="characterImage">Imagem do personagem</label>
-          <input id="characterImage" type="file" accept="image/jpeg,image/png,image/webp,image/avif">
-          <small>JPG, PNG, WebP ou AVIF, com no máximo 5 MB. Ao editar, deixe vazio para manter a imagem atual.</small>
-        </div>
-        <div id="characterImagePreview" class="campaign-preview upload-preview"></div>
-        <div class="form-group visibility-field">
-          <label class="visibility-control" for="characterVisible">
-            <input id="characterVisible" type="checkbox" checked>
-            <span>Visível para jogadores</span>
-          </label>
-          <small>Desmarque para que somente o mestre veja este personagem.</small>
-        </div>
-        <div class="form-group">
-          <label for="characterDescription">Descrição detalhada</label>
-          <textarea id="characterDescription" rows="10" maxlength="5000" placeholder="História, personalidade, aparência, relações, objetivos, curiosidades e outras informações do personagem. Quebras de linha e parágrafos serão preservados."></textarea>
-          <small>Até 5.000 caracteres. Você pode organizar o texto em vários parágrafos e seções.</small>
-        </div>
-        <p id="characterMessage" class="message" aria-live="polite"></p>
-        <button class="btn full" type="submit">Salvar personagem</button>
-      </form>
+
+      <div class="character-editor-content">
+        <header class="character-editor-heading">
+          <span class="eyebrow">Personagem</span>
+          <h2 id="characterModalTitle">Novo personagem</h2>
+          <p class="muted">Organize a apresentação, a imagem e os detalhes do personagem.</p>
+        </header>
+
+        <form id="characterForm" class="character-editor-form">
+          <div class="form-group character-editor-wide">
+            <label for="characterName">Nome</label>
+            <input id="characterName" maxlength="80" required placeholder="Nome do personagem">
+          </div>
+          <div class="form-group">
+            <label for="characterCategory">Categoria</label>
+            <select id="characterCategory" required></select>
+          </div>
+          <div class="form-group">
+            <label for="characterSubcategory">Tier / grupo</label>
+            <select id="characterSubcategory">
+              <option value="">Outros (sem tier)</option>
+            </select>
+            <small>Use os tiers para organizar líderes, funcionários e participantes.</small>
+          </div>
+          <div class="form-group character-editor-wide">
+            <label for="characterImage">Imagem do personagem</label>
+            <input id="characterImage" type="file" accept="image/jpeg,image/png,image/webp,image/avif">
+            <small>JPG, PNG, WebP ou AVIF, com no máximo 5 MB. Ao editar, deixe vazio para manter a imagem atual.</small>
+          </div>
+          <div class="form-group visibility-field character-editor-wide">
+            <label class="visibility-control" for="characterVisible">
+              <input id="characterVisible" type="checkbox" checked>
+              <span>Visível para jogadores</span>
+            </label>
+            <small>Desmarque para que somente o mestre veja este personagem.</small>
+          </div>
+          <div class="form-group character-editor-wide">
+            <label for="characterDescription">Descrição detalhada</label>
+            <textarea id="characterDescription" rows="10" maxlength="5000" placeholder="História, personalidade, aparência, relações, objetivos, curiosidades e outras informações do personagem. Quebras de linha e parágrafos serão preservados."></textarea>
+            <small>Até 5.000 caracteres. Você pode organizar o texto em vários parágrafos e seções.</small>
+          </div>
+          <p id="characterMessage" class="message character-editor-wide" aria-live="polite"></p>
+          <div class="character-editor-actions character-editor-wide">
+            <button class="btn" type="submit">Salvar personagem</button>
+          </div>
+        </form>
+      </div>
     </section>
   </div>
 
@@ -269,7 +282,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-config.js?v=20260830-4"></script>
+  <script src="supabase-config.js?v=20260908-1"></script>
   <script src="data.js?v=20260904-1"></script>
   <script src="media-upload.js?v=20260903-1"></script>
   <script>
