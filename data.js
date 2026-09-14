@@ -273,10 +273,19 @@ async function openAccountCampaign(id) {
   });
 }
 
-async function signInAccount({ email, password, campaignId = '' }) {
+async function signInAccount({ login, password, campaignId = '' }) {
   const client = getSupabaseClient();
+  const normalizedLogin = String(login || '').trim().toLowerCase();
+  if (!/^[a-z0-9_-]{2,32}$/.test(normalizedLogin)) {
+    throw new Error('Informe um login válido.');
+  }
+  const { data: authenticationEmail, error: loginError } = await client.rpc('resolver_login_conta', {
+    p_login: normalizedLogin
+  });
+  if (loginError) throw loginError;
+  if (!authenticationEmail) throw new Error('Login ou senha inválido.');
   const { data, error } = await client.auth.signInWithPassword({
-    email: String(email || '').trim().toLowerCase(),
+    email: authenticationEmail,
     password: String(password || '')
   });
   if (error) throw error;
@@ -364,6 +373,14 @@ async function loadMyAccountCampaigns() {
 async function updateMyAccountProfile(name) {
   const { data, error } = await getSupabaseClient().rpc('atualizar_meu_perfil_conta', {
     p_nome_exibicao: String(name || '').trim()
+  });
+  if (error) throw error;
+  return data;
+}
+
+async function updateMyAccountLogin(login) {
+  const { data, error } = await getSupabaseClient().rpc('atualizar_meu_login_conta', {
+    p_login: String(login || '').trim()
   });
   if (error) throw error;
   return data;

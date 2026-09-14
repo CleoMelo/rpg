@@ -21,8 +21,8 @@
       <p id="loginMessage" class="message" aria-live="polite"></p>
       <form id="accountLoginForm">
         <div class="form-group">
-          <label for="accountEmail">E-mail</label>
-          <input id="accountEmail" type="email" autocomplete="username" required placeholder="seu@email.com">
+          <label for="accountLogin">Login</label>
+          <input id="accountLogin" autocomplete="username" minlength="2" maxlength="32" required placeholder="Ex.: cleo">
         </div>
         <div class="form-group">
           <label for="accountPassword">Senha</label>
@@ -45,7 +45,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=20260914-1"></script>
-  <script src="data.js?v=20260914-1"></script>
+  <script src="data.js?v=20260914-2"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const rpgId = params.get('rpg') || '';
@@ -83,7 +83,7 @@
       const user = await getCurrentAccount();
       if (!user) return false;
       document.getElementById('activeAccount').classList.remove('hidden');
-      document.getElementById('activeAccountName').textContent = user.user_metadata?.display_name || user.email || 'usuário';
+      document.getElementById('activeAccountName').textContent = user.user_metadata?.display_name || 'usuário';
       if (!rpgId) {
         location.replace(destination());
         return true;
@@ -110,14 +110,14 @@
       submit.disabled = true;
       try {
         await signInAccount({
-          email: document.getElementById('accountEmail').value,
+          login: document.getElementById('accountLogin').value,
           password: document.getElementById('accountPassword').value,
           campaignId: rpgId
         });
         location.replace(destination());
       } catch (error) {
         message.className = 'message error';
-        message.textContent = error?.message || 'E-mail, senha ou acesso inválido.';
+        message.textContent = error?.message || 'Login, senha ou acesso inválido.';
       } finally {
         submit.disabled = false;
       }

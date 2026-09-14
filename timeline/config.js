@@ -70,7 +70,7 @@ if (!("historyDrag" in window)) {
   const scripts = [
     "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
     `${rootPrefix}supabase-config.js?v=20260914-1`,
-    `${rootPrefix}data.js?v=20260914-1`,
+    `${rootPrefix}data.js?v=20260914-2`,
     `${timelinePrefix}supabase-adapter.js?v=20260914-1`
   ];
 

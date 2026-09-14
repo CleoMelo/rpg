@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const FIXED_HANDLES = ['cleo', 'pedro', 'tigre', 'hana', 'carero'];
@@ -27,9 +27,21 @@ const DEFAULT_ACCESS = [
   { handle: 'cleo', campaign: 'fate', role: 'master' }
 ];
 
+const configArgument = process.argv.slice(2).find(argument => argument !== '--init');
+const configPath = resolve(configArgument || 'scripts/fixed-users.local.json');
+if (process.argv.includes('--init')) {
+  const template = Object.fromEntries(FIXED_HANDLES.map(handle => [handle, {
+    password: 'SENHA_INICIAL_COM_12_OU_MAIS_CARACTERES',
+    displayName: handle.charAt(0).toUpperCase() + handle.slice(1)
+  }]));
+  await writeFile(configPath, `${JSON.stringify(template, null, 2)}\n`, { flag: 'wx' });
+  console.log(`Arquivo local criado: ${configPath}`);
+  console.log('Preencha as cinco senhas antes de executar o script novamente.');
+  process.exit(0);
+}
+
 const supabaseUrl = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 const serviceRoleKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
-const configPath = resolve(process.argv[2] || 'scripts/fixed-users.local.json');
 
 if (!supabaseUrl || !serviceRoleKey) {
   throw new Error('Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY somente neste terminal.');
@@ -75,19 +87,19 @@ async function listAuthUsers() {
 }
 
 function validateAccount(handle, config, existingUser) {
-  const email = String(config?.email || '').trim().toLowerCase();
   const password = String(config?.password || '');
   const displayName = String(config?.displayName || handle).trim();
-  if (!email || !email.includes('@') || email.includes('EMAIL_REAL_')) {
-    throw new Error(`Informe um e-mail real para ${handle}.`);
-  }
   if (!existingUser && (password.length < 12 || password.includes('SENHA_INICIAL_'))) {
     throw new Error(`Informe uma senha inicial de pelo menos 12 caracteres para ${handle}.`);
   }
   if (displayName.length < 2 || displayName.length > 80) {
     throw new Error(`O nome de exibição de ${handle} deve ter entre 2 e 80 caracteres.`);
   }
-  return { email, password, displayName };
+  return { password, displayName };
+}
+
+function authenticationEmail(handle) {
+  return `${handle}@arquivo-rpg.invalid`;
 }
 
 const campaignIds = Object.values(CAMPAIGNS).map(campaign => campaign.id);
@@ -110,8 +122,9 @@ for (const user of existingUsers) {
 
 for (const handle of FIXED_HANDLES) {
   const rawConfig = accountConfig[handle];
+  const internalEmail = authenticationEmail(handle);
   let user = usersByHandle.get(handle) || existingUsers.find(item =>
-    String(item.email || '').toLowerCase() === String(rawConfig?.email || '').trim().toLowerCase()
+    String(item.email || '').toLowerCase() === internalEmail
   );
   const config = validateAccount(handle, rawConfig, user);
 
@@ -119,7 +132,7 @@ for (const handle of FIXED_HANDLES) {
     const created = await request('/auth/v1/admin/users', {
       method: 'POST',
       body: JSON.stringify({
-        email: config.email,
+        email: internalEmail,
         password: config.password,
         email_confirm: true,
         user_metadata: {
@@ -131,7 +144,20 @@ for (const handle of FIXED_HANDLES) {
     user = created?.user || created;
     console.log(`Conta criada: ${handle}`);
   } else {
-    console.log(`Conta preservada: ${handle}`);
+    const updated = await request(`/auth/v1/admin/users/${encodeURIComponent(user.id)}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        email: internalEmail,
+        email_confirm: true,
+        user_metadata: {
+          ...(user.user_metadata || {}),
+          rpg_username: handle,
+          display_name: config.displayName
+        }
+      })
+    });
+    user = updated?.user || updated;
+    console.log(`Conta atualizada para login: ${handle}`);
   }
 
   if (!user?.id) throw new Error(`O Supabase não retornou o ID de ${handle}.`);
@@ -139,10 +165,11 @@ for (const handle of FIXED_HANDLES) {
 
   await request('/rest/v1/perfis_usuario?on_conflict=usuario_id', {
     method: 'POST',
-    headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({
       usuario_id: user.id,
       apelido: handle,
+      email_autenticacao: internalEmail,
       nome_exibicao: config.displayName,
       ativo: true
     })

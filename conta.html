@@ -28,13 +28,9 @@
         <h2>Informações pessoais</h2>
         <form id="profileForm">
           <div class="form-group">
-            <label for="displayName">Nome de exibição</label>
-            <input id="displayName" maxlength="80" required>
-          </div>
-          <div class="form-group">
-            <label for="accountEmail">E-mail</label>
-            <input id="accountEmail" type="email" autocomplete="email" required>
-            <small>A troca de e-mail pode exigir confirmação na caixa de entrada.</small>
+            <label for="accountLogin">Login</label>
+            <input id="accountLogin" autocomplete="username" minlength="2" maxlength="32" required>
+            <small>Use letras, números, hífen ou sublinhado. Não é necessário informar e-mail.</small>
           </div>
           <p id="profileMessage" class="message" aria-live="polite"></p>
           <button class="btn" type="submit">Salvar informações</button>
@@ -81,7 +77,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js?v=20260914-1"></script>
-  <script src="data.js?v=20260914-1"></script>
+  <script src="data.js?v=20260914-2"></script>
   <script>
     const rpgId = new URLSearchParams(location.search).get('rpg') || '';
     const profileForm = document.getElementById('profileForm');
@@ -202,8 +198,7 @@
         loadMyAccountCampaigns()
       ]);
       if (!profile?.ativo) throw new Error('Esta conta não está autorizada.');
-      document.getElementById('displayName').value = profile.nome_exibicao || '';
-      document.getElementById('accountEmail').value = user.email || '';
+      document.getElementById('accountLogin').value = profile.apelido || '';
       renderCampaigns(campaigns);
       await loadAccessManager();
     }
@@ -214,17 +209,11 @@
       submit.disabled = true;
       showMessage(profileMessage, 'Salvando...');
       try {
-        const name = document.getElementById('displayName').value.trim();
-        const email = document.getElementById('accountEmail').value.trim().toLowerCase();
-        const user = await getCurrentAccount();
-        await updateMyAccountProfile(name);
-        const changes = { data: { display_name: name } };
-        if (email && email !== user?.email) changes.email = email;
-        const { error } = await getSupabaseClient().auth.updateUser(changes);
+        const login = document.getElementById('accountLogin').value.trim().toLowerCase();
+        await updateMyAccountLogin(login);
+        const { error } = await getSupabaseClient().auth.updateUser({ data: { display_name: login } });
         if (error) throw error;
-        showMessage(profileMessage, email !== user?.email
-          ? 'Informações salvas. Confirme o novo e-mail, se solicitado.'
-          : 'Informações salvas.', 'success');
+        showMessage(profileMessage, 'Login atualizado.', 'success');
       } catch (error) {
         showMessage(profileMessage, error?.message || 'Não foi possível salvar as informações.', 'error');
       } finally {

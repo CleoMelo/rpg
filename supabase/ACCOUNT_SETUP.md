@@ -8,6 +8,12 @@ O site não possui cadastro público e os papéis podem ser alterados depois por
 No Supabase Dashboard, abra **SQL Editor**, copie todo o conteúdo de
 `supabase/migrations/20260914_user_accounts.sql` e execute uma vez.
 
+No Windows PowerShell, copie sempre como UTF-8 para preservar os acentos:
+
+```powershell
+Get-Content -Raw -Encoding UTF8 "supabase\migrations\20260914_user_accounts.sql" | Set-Clipboard
+```
+
 A migration cria os perfis, os vínculos por campanha, as funções de gerenciamento
 e sessões de oito horas compatíveis com as funções atuais do site.
 
@@ -18,17 +24,22 @@ No Dashboard, abra **Authentication > Sign In / Providers > Email** e desative
 
 O arquivo `supabase/config.toml` já contém a configuração equivalente para ambientes locais.
 
-## 3. Informar os cinco usuários
+## 3. Informar as senhas dos cinco usuários
 
 No PowerShell, dentro do repositório:
 
 ```powershell
-Copy-Item "scripts/fixed-users.example.json" "scripts/fixed-users.local.json"
+node "scripts/bootstrap-fixed-users.mjs" --init
 notepad "scripts/fixed-users.local.json"
 ```
 
-Preencha e-mail real, senha inicial e nome de exibição. O arquivo local está no
-`.gitignore` e não deve ser enviado ao GitHub.
+Preencha a senha inicial e, se quiser, o nome de exibição. O arquivo local está
+no `.gitignore` e não deve ser enviado ao GitHub. Não existe JSON de contas
+versionado no repositório.
+
+Os logins são `cleo`, `pedro`, `tigre`, `hana` e `carero`. O script usa endereços
+internos invisíveis apenas porque o Supabase Auth exige um identificador nesse
+formato; o site nunca pede e-mail ao usuário.
 
 ## 4. Criar as contas e aplicar os acessos iniciais
 
@@ -79,7 +90,7 @@ ID e o nome não correspondem.
 ## Uso no site
 
 - A página `login.html` aceita somente contas existentes.
-- `conta.html` permite alterar nome, e-mail e senha.
+- `conta.html` permite alterar login e senha.
 - Um mestre acessa `conta.html?rpg=ID_DA_CAMPANHA` para conceder, remover ou trocar
   os papéis das cinco contas.
 - Somente uma das cinco contas conectadas pode criar campanha; quem cria recebe o

@@ -32,6 +32,7 @@ revoke all on table private.sessoes_editor from public, anon, authenticated;
 create table if not exists public.perfis_usuario (
   usuario_id uuid primary key references auth.users(id) on delete cascade,
   apelido text not null unique,
+  email_autenticacao text unique,
   nome_exibicao text not null,
   ativo boolean not null default true,
   criado_em timestamptz not null default now(),
@@ -39,6 +40,12 @@ create table if not exists public.perfis_usuario (
   constraint perfis_usuario_apelido_check check (apelido ~ '^[a-z0-9_-]{2,32}$'),
   constraint perfis_usuario_nome_check check (char_length(trim(nome_exibicao)) between 2 and 80)
 );
+
+alter table public.perfis_usuario
+  add column if not exists email_autenticacao text;
+create unique index if not exists perfis_usuario_email_autenticacao_idx
+  on public.perfis_usuario (email_autenticacao)
+  where email_autenticacao is not null;
 
 create table if not exists public.membros_campanha (
   campanha_id text not null references public.campanhas(id) on delete cascade,
@@ -177,6 +184,24 @@ $$;
 revoke all on function public.meu_perfil_conta() from public;
 grant execute on function public.meu_perfil_conta() to authenticated;
 
+create or replace function public.resolver_login_conta(p_login text)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select perfil.email_autenticacao
+  from public.perfis_usuario as perfil
+  where perfil.apelido = lower(trim(coalesce(p_login, '')))
+    and perfil.ativo
+    and perfil.email_autenticacao is not null
+  limit 1;
+$$;
+
+revoke all on function public.resolver_login_conta(text) from public;
+grant execute on function public.resolver_login_conta(text) to anon, authenticated;
+
 create or replace function public.atualizar_meu_perfil_conta(p_nome_exibicao text)
 returns public.perfis_usuario
 language plpgsql
@@ -204,6 +229,43 @@ $$;
 
 revoke all on function public.atualizar_meu_perfil_conta(text) from public;
 grant execute on function public.atualizar_meu_perfil_conta(text) to authenticated;
+
+create or replace function public.atualizar_meu_login_conta(p_login text)
+returns public.perfis_usuario
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_perfil public.perfis_usuario%rowtype;
+  v_login text := lower(trim(coalesce(p_login, '')));
+begin
+  if (select auth.uid()) is null then
+    raise exception 'Entre na sua conta para continuar.' using errcode = '42501';
+  end if;
+  if v_login !~ '^[a-z0-9_-]{2,32}$' then
+    raise exception 'Use de 2 a 32 letras, números, hífen ou sublinhado.' using errcode = '22023';
+  end if;
+
+  update public.perfis_usuario as perfil
+     set apelido = v_login,
+         nome_exibicao = v_login,
+         atualizado_em = now()
+   where perfil.usuario_id = (select auth.uid()) and perfil.ativo
+  returning perfil.* into v_perfil;
+
+  if v_perfil.usuario_id is null then
+    raise exception 'Conta não autorizada.' using errcode = '42501';
+  end if;
+  return v_perfil;
+exception
+  when unique_violation then
+    raise exception 'Esse login já está sendo usado.' using errcode = '23505';
+end;
+$$;
+
+revoke all on function public.atualizar_meu_login_conta(text) from public;
+grant execute on function public.atualizar_meu_login_conta(text) to authenticated;
 
 create or replace function public.meu_acesso_campanha(p_campanha_id text)
 returns text
