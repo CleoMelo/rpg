@@ -63,6 +63,7 @@
         <div><h2>Minhas campanhas</h2><p>O papel é definido separadamente em cada campanha.</p></div>
       </div>
       <div id="accountCampaigns" class="account-campaign-list"></div>
+      <p id="accountCampaignMessage" class="message" aria-live="polite"></p>
     </section>
 
     <section id="accessManager" class="card account-access-card hidden">
@@ -124,11 +125,13 @@
           <button class="btn secondary" type="button">Abrir campanha</button>
         `;
         item.querySelector('button').addEventListener('click', async event => {
+          const campaignMessage = document.getElementById('accountCampaignMessage');
           event.currentTarget.disabled = true;
+          showMessage(campaignMessage, `Abrindo ${campaign.nome}...`);
           try { await openCampaign(campaign.campanha_id); }
           catch (error) {
             event.currentTarget.disabled = false;
-            alert(error?.message || 'Não foi possível abrir a campanha.');
+            showMessage(campaignMessage, error?.message || 'Não foi possível abrir a campanha.', 'error');
           }
         });
         container.appendChild(item);

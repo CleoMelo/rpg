@@ -327,10 +327,12 @@ begin
     raise exception 'Sua conta não possui acesso a esta campanha.' using errcode = '42501';
   end if;
 
-  delete from public.sessoes_mestre
-  where expira_em <= now() or (campanha_id = p_campanha_id and usuario_id = v_usuario_id);
-  delete from private.sessoes_editor
-  where expira_em <= now() or (campanha_id = p_campanha_id and usuario_id = v_usuario_id);
+  delete from public.sessoes_mestre as sessao
+  where sessao.expira_em <= now()
+     or (sessao.campanha_id = p_campanha_id and sessao.usuario_id = v_usuario_id);
+  delete from private.sessoes_editor as sessao
+  where sessao.expira_em <= now()
+     or (sessao.campanha_id = p_campanha_id and sessao.usuario_id = v_usuario_id);
 
   if v_papel = 'master' then
     select coluna.udt_name = 'uuid' into v_token_mestre_uuid
