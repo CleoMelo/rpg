@@ -11,7 +11,13 @@ function getSupabaseClient() {
   if (!configured || !window.supabase) {
     throw new Error('Supabase não configurado. Preencha o arquivo supabase-config.js.');
   }
-  supabaseClient = window.supabase.createClient(config.url, config.anonKey);
+  supabaseClient = window.supabase.createClient(config.url, config.anonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  });
   return supabaseClient;
 }
 
@@ -72,6 +78,19 @@ async function createRpg({ name, description, image, password, editorPassword })
   return rpg;
 }
 
+async function createRpgForAccount({ name, description, image }) {
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('criar_campanha_conta', {
+    p_nome: name.trim(),
+    p_descricao: description.trim() || 'Campanha personalizada.',
+    p_imagem_url: normalizeImgurImageUrl(image)
+  }).single();
+  if (error) throw error;
+  const rpg = mapCampaign(data);
+  RPGS.push(rpg);
+  return rpg;
+}
+
 async function updateRpg({ id, token, name, description, image }) {
   if (!token) return null;
   const client = getSupabaseClient();
@@ -93,6 +112,78 @@ function masterSessionKey(id) {
   return `masterSession:${String(id)}`;
 }
 
+const ACCOUNT_ACTIVE_KEY = 'rpgAccountActive';
+const ACCOUNT_ACCESS_PREFIX = 'rpgAccountAccess:';
+
+function accountAccessKey(id) {
+  return `${ACCOUNT_ACCESS_PREFIX}${String(id)}`;
+}
+
+function readStoredAccountAccess(id) {
+  const key = accountAccessKey(id);
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || 'null');
+    const validRole = value?.role === 'master' || value?.role === 'editor';
+    const validCampaign = String(value?.campaignId || '') === String(id);
+    const validToken = typeof value?.token === 'string' && value.token.trim();
+    const validExpiry = Date.parse(value?.expiresAt || '') > Date.now() + 30_000;
+    if (validRole && validCampaign && validToken && validExpiry) return value;
+  } catch {
+    // Sessões inválidas são descartadas abaixo.
+  }
+  localStorage.removeItem(key);
+  return null;
+}
+
+function restoreStoredAccountAccess(id) {
+  const access = readStoredAccountAccess(id);
+  if (!access) return null;
+  sessionStorage.setItem('role', access.role);
+  if (access.role === 'master') {
+    sessionStorage.setItem(masterSessionKey(id), access.token);
+    sessionStorage.setItem('masterRpgId', String(id));
+    sessionStorage.removeItem(editorSessionKey(id));
+    sessionStorage.removeItem('editorRpgId');
+  } else {
+    sessionStorage.setItem(editorSessionKey(id), access.token);
+    sessionStorage.setItem('editorRpgId', String(id));
+    sessionStorage.removeItem(masterSessionKey(id));
+    sessionStorage.removeItem('masterRpgId');
+  }
+  return access;
+}
+
+function setAccountCampaignSession(id, access) {
+  const normalized = {
+    campaignId: String(id),
+    role: access.role,
+    token: String(access.token || ''),
+    expiresAt: access.expiresAt
+  };
+  localStorage.setItem(accountAccessKey(id), JSON.stringify(normalized));
+  localStorage.setItem(ACCOUNT_ACTIVE_KEY, '1');
+  restoreStoredAccountAccess(id);
+  return normalized;
+}
+
+function clearStoredAccountAccess(id) {
+  localStorage.removeItem(accountAccessKey(id));
+}
+
+function clearAllStoredAccountAccess() {
+  const keys = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (key?.startsWith(ACCOUNT_ACCESS_PREFIX)) keys.push(key);
+  }
+  keys.forEach(key => localStorage.removeItem(key));
+  localStorage.removeItem(ACCOUNT_ACTIVE_KEY);
+}
+
+function accountSessionExpected() {
+  return localStorage.getItem(ACCOUNT_ACTIVE_KEY) === '1';
+}
+
 function setMasterSession(id, token) {
   sessionStorage.setItem(masterSessionKey(id), token);
   sessionStorage.setItem('role', 'master');
@@ -100,11 +191,14 @@ function setMasterSession(id, token) {
 }
 
 function getMasterToken(id) {
-  return sessionStorage.getItem(masterSessionKey(id));
+  const stored = readStoredAccountAccess(id);
+  return sessionStorage.getItem(masterSessionKey(id)) ||
+    (stored?.role === 'master' ? stored.token : null);
 }
 
 function clearMasterSession(id) {
   sessionStorage.removeItem(masterSessionKey(id));
+  if (readStoredAccountAccess(id)?.role === 'master') clearStoredAccountAccess(id);
   if (sessionStorage.getItem('masterRpgId') === String(id)) {
     sessionStorage.removeItem('masterRpgId');
     sessionStorage.removeItem('role');
@@ -122,11 +216,14 @@ function setEditorSession(id, token) {
 }
 
 function getEditorToken(id) {
-  return sessionStorage.getItem(editorSessionKey(id));
+  const stored = readStoredAccountAccess(id);
+  return sessionStorage.getItem(editorSessionKey(id)) ||
+    (stored?.role === 'editor' ? stored.token : null);
 }
 
 function clearEditorSession(id) {
   sessionStorage.removeItem(editorSessionKey(id));
+  if (readStoredAccountAccess(id)?.role === 'editor') clearStoredAccountAccess(id);
   if (sessionStorage.getItem('editorRpgId') === String(id)) {
     sessionStorage.removeItem('editorRpgId');
     sessionStorage.removeItem('role');
@@ -156,6 +253,119 @@ async function authenticateMaster(id, password) {
   if (!data) return null;
   clearEditorSession(id);
   setMasterSession(id, data);
+  return data;
+}
+
+async function openAccountCampaign(id) {
+  const client = getSupabaseClient();
+  const { data, error } = await client.rpc('abrir_sessao_conta', {
+    p_campanha_id: String(id)
+  });
+  if (error) throw error;
+  const access = Array.isArray(data) ? data[0] : data;
+  if (!access?.papel || !access?.token || !access?.expira_em) {
+    throw new Error('O Supabase não retornou uma sessão válida para esta campanha.');
+  }
+  return setAccountCampaignSession(id, {
+    role: access.papel,
+    token: access.token,
+    expiresAt: access.expira_em
+  });
+}
+
+async function signInAccount({ email, password, campaignId = '' }) {
+  const client = getSupabaseClient();
+  const { data, error } = await client.auth.signInWithPassword({
+    email: String(email || '').trim().toLowerCase(),
+    password: String(password || '')
+  });
+  if (error) throw error;
+  if (!data?.user) throw new Error('Não foi possível entrar na conta.');
+  localStorage.setItem(ACCOUNT_ACTIVE_KEY, '1');
+  const access = campaignId ? await openAccountCampaign(campaignId) : null;
+  return { user: data.user, access };
+}
+
+async function restoreAccountCampaign(id) {
+  const client = getSupabaseClient();
+  const { data, error } = await client.auth.getSession();
+  if (error) throw error;
+  if (!data?.session?.user) return null;
+  localStorage.setItem(ACCOUNT_ACTIVE_KEY, '1');
+  return openAccountCampaign(id);
+}
+
+async function ensureCampaignAccess(id, role, token) {
+  if (role !== 'master' && role !== 'editor') return true;
+  const functionName = role === 'master' ? 'token_mestre_valido' : 'token_editor_valido';
+  const { data, error } = await getSupabaseClient().rpc(functionName, {
+    p_campanha_id: String(id),
+    p_token: String(token || '')
+  });
+  if (!error && data === true) return true;
+
+  if (role === 'master') clearMasterSession(id);
+  else clearEditorSession(id);
+
+  if (accountSessionExpected()) {
+    try {
+      await restoreAccountCampaign(id);
+      location.reload();
+    } catch {
+      const returnPath = `${location.pathname.split('/').pop()}${location.search}`;
+      location.href = `login.html?rpg=${encodeURIComponent(id)}&return=${encodeURIComponent(returnPath)}`;
+    }
+  } else {
+    location.href = `acesso.html?rpg=${encodeURIComponent(id)}`;
+  }
+  return false;
+}
+
+async function getCurrentAccount() {
+  const client = getSupabaseClient();
+  const { data, error } = await client.auth.getUser();
+  if (error) return null;
+  return data?.user || null;
+}
+
+async function signOutAccount() {
+  const client = getSupabaseClient();
+  try {
+    const { error } = await client.rpc('revogar_minhas_sessoes_conta', { p_campanha_id: null });
+    if (error) throw error;
+  } catch (error) {
+    console.warn('Não foi possível revogar as sessões de compatibilidade.', error);
+  }
+  await client.auth.signOut();
+  clearAllStoredAccountAccess();
+  sessionStorage.removeItem('role');
+  sessionStorage.removeItem('masterRpgId');
+  sessionStorage.removeItem('editorRpgId');
+  const sessionKeys = [];
+  for (let index = 0; index < sessionStorage.length; index += 1) {
+    const key = sessionStorage.key(index);
+    if (key?.startsWith('masterSession:') || key?.startsWith('editorSession:')) sessionKeys.push(key);
+  }
+  sessionKeys.forEach(key => sessionStorage.removeItem(key));
+}
+
+async function loadMyAccountProfile() {
+  const { data, error } = await getSupabaseClient().rpc('meu_perfil_conta');
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] || null : data;
+}
+
+async function loadMyAccountCampaigns() {
+  const { data, error } = await getSupabaseClient().rpc('minhas_campanhas_conta');
+  if (error) throw error;
+  return data || [];
+}
+
+async function updateMyAccountProfile(name) {
+  const { data, error } = await getSupabaseClient().rpc('atualizar_meu_perfil_conta', {
+    p_nome_exibicao: String(name || '').trim()
+  });
+  if (error) throw error;
   return data;
 }
 

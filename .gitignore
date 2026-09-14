@@ -1,0 +1,4 @@
+scripts/fixed-users.local.json
+.env
+.env.*
+!.env.example

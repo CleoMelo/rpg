@@ -33,8 +33,8 @@
     'personagem-destaque.js?v=20260908-1',
     'busca-global-personagem.js?v=20260831-1',
     'classificacao-categorias.js?v=20260904-1',
-    'alterar-senha.js?v=20260904-1',
-    'senha-editor.js?v=20260904-1'
+    'alterar-senha.js?v=20260914-1',
+    'senha-editor.js?v=20260914-1'
   ];
 
   const loadNext = index => {

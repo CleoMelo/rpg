@@ -1,4 +1,6 @@
 (function () {
+  if (localStorage.getItem('rpgAccountActive') === '1') return;
+
   function initChangePassword() {
     if (!/\/categorias\.html$/i.test(location.pathname)) return;
     if (sessionStorage.getItem('role') !== 'master') return;

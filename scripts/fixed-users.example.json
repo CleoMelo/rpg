@@ -1,0 +1,27 @@
+{
+  "cleo": {
+    "email": "EMAIL_REAL_DA_CLEO",
+    "password": "SENHA_INICIAL_COM_12_OU_MAIS_CARACTERES",
+    "displayName": "Cleo"
+  },
+  "pedro": {
+    "email": "EMAIL_REAL_DO_PEDRO",
+    "password": "SENHA_INICIAL_COM_12_OU_MAIS_CARACTERES",
+    "displayName": "Pedro"
+  },
+  "tigre": {
+    "email": "EMAIL_REAL_DO_TIGRE",
+    "password": "SENHA_INICIAL_COM_12_OU_MAIS_CARACTERES",
+    "displayName": "Tigre"
+  },
+  "hana": {
+    "email": "EMAIL_REAL_DA_HANA",
+    "password": "SENHA_INICIAL_COM_12_OU_MAIS_CARACTERES",
+    "displayName": "Hana"
+  },
+  "carero": {
+    "email": "EMAIL_REAL_DO_CARERO",
+    "password": "SENHA_INICIAL_COM_12_OU_MAIS_CARACTERES",
+    "displayName": "Carero"
+  }
+}

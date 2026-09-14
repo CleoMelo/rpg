@@ -1,5 +1,6 @@
 (function () {
   'use strict';
+  if (localStorage.getItem('rpgAccountActive') === '1') return;
 
   function initEditorPassword() {
     if (!/\/categorias\.html$/i.test(location.pathname)) return;

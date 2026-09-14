@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entrar na conta</title>
+  <link rel="stylesheet" href="styles.css?v=20260914-1">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html">ARQUIVO <span>RPG</span></a>
+    <nav><a id="backLink" href="index.html">Voltar</a></nav>
+  </header>
+
+  <main class="page-shell account-auth-layout">
+    <section class="card account-auth-panel">
+      <span class="eyebrow">Conta individual</span>
+      <h1>Entrar</h1>
+      <p id="campaignContext" class="muted">Use o e-mail e a senha da sua conta.</p>
+
+      <form id="accountLoginForm">
+        <div class="form-group">
+          <label for="accountEmail">E-mail</label>
+          <input id="accountEmail" type="email" autocomplete="username" required placeholder="seu@email.com">
+        </div>
+        <div class="form-group">
+          <label for="accountPassword">Senha</label>
+          <input id="accountPassword" type="password" autocomplete="current-password" required placeholder="Digite sua senha">
+        </div>
+        <p id="loginMessage" class="message" aria-live="polite"></p>
+        <button class="btn full" type="submit">Entrar na conta</button>
+      </form>
+
+      <div id="activeAccount" class="account-active-session hidden">
+        <p>Você já está conectado como <strong id="activeAccountName"></strong>.</p>
+        <div class="form-actions">
+          <a class="btn secondary" href="conta.html">Minha conta</a>
+          <button id="signOutButton" class="btn secondary" type="button">Sair</button>
+        </div>
+      </div>
+
+      <p class="account-auth-note">Não existe cadastro público. Somente as cinco contas autorizadas podem entrar.</p>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js?v=20260914-1"></script>
+  <script src="data.js?v=20260914-1"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const rpgId = params.get('rpg') || '';
+    const requestedReturn = params.get('return') || '';
+    const form = document.getElementById('accountLoginForm');
+    const message = document.getElementById('loginMessage');
+
+    function destination() {
+      if (requestedReturn) {
+        try {
+          const target = new URL(requestedReturn, location.origin);
+          if (target.origin === location.origin && !target.pathname.startsWith('//')) {
+            return `${target.pathname.replace(/^\//, '')}${target.search}${target.hash}`;
+          }
+        } catch {
+          // Usa o destino padrão abaixo.
+        }
+      }
+      return rpgId ? `categorias.html?rpg=${encodeURIComponent(rpgId)}` : 'conta.html';
+    }
+
+    async function showCampaignContext() {
+      if (!rpgId) return;
+      document.getElementById('backLink').href = `acesso.html?rpg=${encodeURIComponent(rpgId)}`;
+      try {
+        const campaign = await getRpgById(rpgId);
+        document.getElementById('campaignContext').textContent =
+          `Entre com uma conta autorizada para acessar ${campaign?.name || 'esta campanha'}.`;
+      } catch {
+        document.getElementById('campaignContext').textContent = 'Entre com uma conta autorizada para acessar esta campanha.';
+      }
+    }
+
+    async function continueExistingSession() {
+      const user = await getCurrentAccount();
+      if (!user) return false;
+      document.getElementById('activeAccount').classList.remove('hidden');
+      document.getElementById('activeAccountName').textContent = user.user_metadata?.display_name || user.email || 'usuário';
+      if (!rpgId) {
+        location.replace(destination());
+        return true;
+      }
+      try {
+        message.className = 'message';
+        message.textContent = 'Restaurando seu acesso...';
+        await restoreAccountCampaign(rpgId);
+        location.replace(destination());
+        return true;
+      } catch (error) {
+        message.className = 'message error';
+        message.textContent = error?.message || 'Sua conta não possui acesso a esta campanha.';
+        form.classList.add('hidden');
+        return false;
+      }
+    }
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const submit = form.querySelector('button[type="submit"]');
+      message.className = 'message';
+      message.textContent = 'Entrando...';
+      submit.disabled = true;
+      try {
+        await signInAccount({
+          email: document.getElementById('accountEmail').value,
+          password: document.getElementById('accountPassword').value,
+          campaignId: rpgId
+        });
+        location.replace(destination());
+      } catch (error) {
+        message.className = 'message error';
+        message.textContent = error?.message || 'E-mail, senha ou acesso inválido.';
+      } finally {
+        submit.disabled = false;
+      }
+    });
+
+    document.getElementById('signOutButton').addEventListener('click', async () => {
+      await signOutAccount();
+      location.reload();
+    });
+
+    showCampaignContext();
+    continueExistingSession();
+  </script>
+</body>
+</html>

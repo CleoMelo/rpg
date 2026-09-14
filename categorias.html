@@ -4,12 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Categorias</title>
-  <link rel="stylesheet" href="styles.css?v=20260908-1">
+  <link rel="stylesheet" href="styles.css?v=20260914-1">
 </head>
 <body class="categories-page">
   <header class="site-header">
     <a class="brand" href="index.html">ARQUIVO <span>RPG</span></a>
     <nav class="nav-links">
+      <a id="accountLink" href="conta.html">Minha conta</a>
       <a id="changeAccess" href="#">Trocar acesso</a>
       <a href="index.html">Trocar campanha</a>
     </nav>
@@ -282,11 +283,12 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-config.js?v=20260908-1"></script>
-  <script src="data.js?v=20260904-1"></script>
+  <script src="supabase-config.js?v=20260914-1"></script>
+  <script src="data.js?v=20260914-1"></script>
   <script src="media-upload.js?v=20260903-1"></script>
   <script>
     const rpgId = getSelectedRpg();
+    restoreStoredAccountAccess(rpgId);
     const storedRole = sessionStorage.getItem('role');
     const masterToken = getMasterToken(rpgId);
     const editorToken = typeof getEditorToken === 'function' ? getEditorToken(rpgId) : null;
@@ -302,7 +304,12 @@
     const canEditCharacters = role === 'master' || role === 'editor';
     const characterEditToken = role === 'master' ? masterToken : editorToken;
 
-    if (!role) location.href = `acesso.html?rpg=${encodeURIComponent(rpgId)}`;
+    if (!role) {
+      const returnPath = `categorias.html?rpg=${encodeURIComponent(rpgId)}`;
+      location.href = accountSessionExpected()
+        ? `login.html?rpg=${encodeURIComponent(rpgId)}&return=${encodeURIComponent(returnPath)}`
+        : `acesso.html?rpg=${encodeURIComponent(rpgId)}`;
+    }
 
     let selectedCategory = null;
     let characters = [];
@@ -2213,6 +2220,8 @@
     });
 
     async function initializePage() {
+      if (!(await ensureCampaignAccess(rpgId, role, characterEditToken))) return;
+      document.getElementById('accountLink').href = `conta.html?rpg=${encodeURIComponent(rpgId)}`;
       document.getElementById('changeAccess').href = `acesso.html?rpg=${encodeURIComponent(rpgId)}`;
       document.getElementById('roleBadge').textContent = role === 'master'
         ? 'Acesso de mestre'

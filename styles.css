@@ -156,6 +156,7 @@ h2 { font-size: clamp(1.8rem, 4vw, 3rem); }
 }
 .role-panel { width: min(760px, 100%); padding: 34px; }
 .role-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 26px; }
+.role-options-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .role-button {
   padding: 30px 20px;
   border: 1px solid var(--border);
@@ -700,6 +701,8 @@ body.sorting-active { cursor: grabbing; user-select: none; }
 .empty-state.compact { padding: 22px; grid-column: 1 / -1; }
 
 body.modal-open { overflow: hidden; }
+
+.hidden { display: none !important; }
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -970,6 +973,124 @@ body.modal-open { overflow: hidden; }
   .character-editor-form { grid-template-columns: 1fr; }
   .character-editor-form > * { grid-column: 1; }
   .character-editor-actions .btn { width: 100%; min-width: 0; }
+}
+
+.account-auth-layout {
+  min-height: calc(100vh - 58px);
+  min-height: calc(100dvh - 58px);
+  display: grid;
+  place-items: center;
+  padding-block: 18px;
+}
+
+.account-auth-panel {
+  width: min(520px, 100%);
+  padding: clamp(26px, 5vw, 48px);
+}
+
+.account-auth-panel h1,
+.account-page-heading h1 {
+  margin: 10px 0 8px;
+  font-size: clamp(2.7rem, 7vw, 4.8rem);
+  line-height: 1;
+  letter-spacing: -.045em;
+}
+
+.account-auth-panel form { margin-top: 28px; }
+.account-auth-note {
+  margin: 24px 0 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: .9rem;
+  line-height: 1.5;
+}
+
+.account-active-session {
+  margin-top: 22px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255,255,255,.025);
+}
+.account-active-session p { margin: 0 0 14px; }
+
+.account-page { padding-bottom: 72px; }
+.account-page-heading { margin: 34px 0 30px; }
+.account-page-heading p { max-width: 720px; }
+
+.account-page-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.account-settings-card,
+.account-campaigns-card,
+.account-access-card {
+  padding: clamp(22px, 4vw, 34px);
+}
+
+.account-settings-card h2,
+.account-campaigns-card h2,
+.account-access-card h2 {
+  margin: 0 0 22px;
+}
+
+.account-campaigns-card,
+.account-access-card { margin-top: 22px; }
+
+.account-campaign-list,
+.account-access-list {
+  display: grid;
+  gap: 12px;
+}
+
+.account-campaign-item,
+.account-access-row {
+  display: grid;
+  align-items: center;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255,255,255,.025);
+}
+
+.account-campaign-item { grid-template-columns: minmax(0, 1fr) auto; }
+.account-campaign-item h3 { margin: 8px 0 5px; font-size: 1.25rem; }
+.account-campaign-item p { margin: 0; color: var(--muted); }
+
+.role-badge {
+  display: inline-flex;
+  padding: 5px 9px;
+  border: 1px solid rgba(139,92,246,.45);
+  border-radius: 999px;
+  background: rgba(139,92,246,.14);
+  color: #d9ceff;
+  font-size: .74rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.role-badge.editor {
+  border-color: rgba(34,197,94,.35);
+  background: rgba(34,197,94,.1);
+  color: #a7f3c0;
+}
+
+.account-access-row {
+  grid-template-columns: minmax(180px, 1fr) minmax(150px, 220px) auto;
+}
+.account-access-row div { display: grid; gap: 4px; }
+.account-access-row span { color: var(--muted); font-size: .9rem; }
+
+@media (max-width: 760px) {
+  .account-page-grid { grid-template-columns: 1fr; }
+  .account-campaign-item,
+  .account-access-row { grid-template-columns: 1fr; }
+  .account-campaign-item .btn,
+  .account-access-row .btn { width: 100%; }
 }
 
 input[type="file"] { padding: 10px; cursor: pointer; }

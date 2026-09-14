@@ -15,6 +15,35 @@ if (!("historyDrag" in window)) {
   const editorPage = /\/timeline\.html$/i.test(location.pathname);
   const params = new URLSearchParams(location.search);
   const campaignId = params.get("rpg") || localStorage.getItem("selectedRpg") || "";
+  let rememberedAccess = null;
+  try {
+    rememberedAccess = JSON.parse(localStorage.getItem(`rpgAccountAccess:${String(campaignId)}`) || "null");
+    const valid = rememberedAccess &&
+      String(rememberedAccess.campaignId || "") === String(campaignId) &&
+      ["master", "editor"].includes(rememberedAccess.role) &&
+      rememberedAccess.token &&
+      Date.parse(rememberedAccess.expiresAt || "") > Date.now() + 30000;
+    if (!valid) {
+      localStorage.removeItem(`rpgAccountAccess:${String(campaignId)}`);
+      rememberedAccess = null;
+    }
+  } catch {
+    localStorage.removeItem(`rpgAccountAccess:${String(campaignId)}`);
+  }
+
+  if (rememberedAccess) {
+    sessionStorage.setItem("role", rememberedAccess.role);
+    sessionStorage.setItem(`${rememberedAccess.role}RpgId`, String(campaignId));
+    sessionStorage.setItem(`${rememberedAccess.role}Session:${String(campaignId)}`, rememberedAccess.token);
+  } else if (
+    editorPage &&
+    sessionStorage.getItem("role") !== "player" &&
+    localStorage.getItem("rpgAccountActive") === "1"
+  ) {
+    const returnPath = `timeline.html${location.search}`;
+    location.replace(`login.html?rpg=${encodeURIComponent(campaignId)}&return=${encodeURIComponent(returnPath)}`);
+    return;
+  }
   const masterSession = Boolean(
     campaignId &&
     sessionStorage.getItem("role") === "master" &&
@@ -40,9 +69,9 @@ if (!("historyDrag" in window)) {
 
   const scripts = [
     "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2",
-    `${rootPrefix}supabase-config.js?v=20260829-1`,
-    `${rootPrefix}data.js?v=20260903-1`,
-    `${timelinePrefix}supabase-adapter.js?v=20260903-1`
+    `${rootPrefix}supabase-config.js?v=20260914-1`,
+    `${rootPrefix}data.js?v=20260914-1`,
+    `${timelinePrefix}supabase-adapter.js?v=20260914-1`
   ];
 
   if (window.TIMELINE_READ_ONLY) {
@@ -81,6 +110,15 @@ if (!("historyDrag" in window)) {
         actions.appendChild(back);
       }
       back.href = `./categorias.html?rpg=${encodedId}`;
+
+      if (localStorage.getItem("rpgAccountActive") === "1" && !document.getElementById("timelineAccountLink")) {
+        const account = document.createElement("a");
+        account.id = "timelineAccountLink";
+        account.className = "lk16-top-btn";
+        account.textContent = "Minha conta";
+        account.href = `./conta.html?rpg=${encodedId}`;
+        actions.appendChild(account);
+      }
       return;
     }
 
@@ -102,6 +140,15 @@ if (!("historyDrag" in window)) {
       actions.appendChild(back);
     }
     back.href = `../categorias.html?rpg=${encodedId}`;
+
+    if (localStorage.getItem("rpgAccountActive") === "1" && !document.getElementById("timelineAccountLink")) {
+      const account = document.createElement("a");
+      account.id = "timelineAccountLink";
+      account.className = "button ghost";
+      account.textContent = "Minha conta";
+      account.href = `../conta.html?rpg=${encodedId}`;
+      actions.appendChild(account);
+    }
   }
 
   window.addEventListener("load", installNavigation);
