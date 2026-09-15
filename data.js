@@ -63,21 +63,6 @@ function normalizeImgurImageUrl(value) {
   return url.href;
 }
 
-async function createRpg({ name, description, image, password, editorPassword }) {
-  const client = getSupabaseClient();
-  const { data, error } = await client.rpc('criar_campanha_com_editor', {
-    p_nome: name.trim(),
-    p_descricao: description.trim() || 'Campanha personalizada.',
-    p_imagem_url: normalizeImgurImageUrl(image),
-    p_senha_mestre: password,
-    p_senha_editor: editorPassword
-  }).single();
-  if (error) throw error;
-  const rpg = mapCampaign(data);
-  RPGS.push(rpg);
-  return rpg;
-}
-
 async function createRpgForAccount({ name, description, image }) {
   const client = getSupabaseClient();
   const { data, error } = await client.rpc('criar_campanha_conta', {
@@ -184,12 +169,6 @@ function accountSessionExpected() {
   return localStorage.getItem(ACCOUNT_ACTIVE_KEY) === '1';
 }
 
-function setMasterSession(id, token) {
-  sessionStorage.setItem(masterSessionKey(id), token);
-  sessionStorage.setItem('role', 'master');
-  sessionStorage.setItem('masterRpgId', String(id));
-}
-
 function getMasterToken(id) {
   const stored = readStoredAccountAccess(id);
   return sessionStorage.getItem(masterSessionKey(id)) ||
@@ -209,12 +188,6 @@ function editorSessionKey(id) {
   return `editorSession:${String(id)}`;
 }
 
-function setEditorSession(id, token) {
-  sessionStorage.setItem(editorSessionKey(id), token);
-  sessionStorage.setItem('role', 'editor');
-  sessionStorage.setItem('editorRpgId', String(id));
-}
-
 function getEditorToken(id) {
   const stored = readStoredAccountAccess(id);
   return sessionStorage.getItem(editorSessionKey(id)) ||
@@ -228,32 +201,6 @@ function clearEditorSession(id) {
     sessionStorage.removeItem('editorRpgId');
     sessionStorage.removeItem('role');
   }
-}
-
-async function authenticateEditor(id, password) {
-  const client = getSupabaseClient();
-  const { data, error } = await client.rpc('autenticar_editor', {
-    p_campanha_id: String(id),
-    p_senha: password
-  });
-  if (error) throw error;
-  if (!data) return null;
-  clearMasterSession(id);
-  setEditorSession(id, data);
-  return data;
-}
-
-async function authenticateMaster(id, password) {
-  const client = getSupabaseClient();
-  const { data, error } = await client.rpc('autenticar_mestre', {
-    p_campanha_id: String(id),
-    p_senha: password
-  });
-  if (error) throw error;
-  if (!data) return null;
-  clearEditorSession(id);
-  setMasterSession(id, data);
-  return data;
 }
 
 async function openAccountCampaign(id) {
@@ -368,14 +315,6 @@ async function loadMyAccountCampaigns() {
   const { data, error } = await getSupabaseClient().rpc('minhas_campanhas_conta');
   if (error) throw error;
   return data || [];
-}
-
-async function updateMyAccountProfile(name) {
-  const { data, error } = await getSupabaseClient().rpc('atualizar_meu_perfil_conta', {
-    p_nome_exibicao: String(name || '').trim()
-  });
-  if (error) throw error;
-  return data;
 }
 
 async function updateMyAccountLogin(login) {
@@ -691,18 +630,6 @@ async function reorderCategories({ rpgId, token, orderedIds }) {
   });
   if (error) throw error;
   if (data) applyOrderedIds(CATEGORIES, orderedIds);
-  return Boolean(data);
-}
-
-async function reorderSubcategories({ rpgId, token, orderedIds }) {
-  const client = getSupabaseClient();
-  const { data, error } = await client.rpc('ordenar_subcategorias', {
-    p_campanha_id: String(rpgId),
-    p_token: token,
-    p_ids: orderedIds.map(String)
-  });
-  if (error) throw error;
-  if (data) applyOrderedIds(SUBCATEGORIES, orderedIds);
   return Boolean(data);
 }
 

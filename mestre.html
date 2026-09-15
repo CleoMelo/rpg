@@ -3,67 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Acesso do mestre</title>
-  <link rel="stylesheet" href="styles.css?v=20260829-1">
-  <script>location.replace(`login.html${location.search}`);</script>
+  <title>Entrar na conta</title>
+  <script>
+    location.replace(`login.html${location.search}${location.hash}`);
+  </script>
 </head>
 <body>
-  <header class="site-header">
-    <a class="brand" href="index.html">ARQUIVO <span>RPG</span></a>
-    <nav class="nav-links"><a id="backLink" href="acesso.html">Voltar</a></nav>
-  </header>
-
-  <main class="page-shell">
-    <section class="card form-panel">
-      <span class="eyebrow">Área restrita</span>
-      <h2>Acesso do mestre</h2>
-      <p class="muted">Digite a senha para acessar as ferramentas de administração.</p>
-      <form id="masterForm">
-        <div class="form-group">
-          <label for="password">Senha</label>
-          <input id="password" type="password" autocomplete="current-password" required placeholder="Digite a senha">
-        </div>
-        <button class="btn full" type="submit">Entrar como mestre</button>
-        <div id="message" class="message"></div>
-      </form>
-    </section>
-  </main>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-config.js?v=20260903-1"></script>
-  <script src="data.js?v=20260903-1"></script>
+  <p>O acesso do mestre agora usa uma conta individual. <a id="loginLink" href="login.html">Ir para o login</a>.</p>
   <script>
-    const rpgId = getSelectedRpg();
-    document.getElementById('backLink').href = `acesso.html?rpg=${encodeURIComponent(rpgId)}`;
-    document.getElementById('masterForm').addEventListener('submit', async event => {
-      event.preventDefault();
-      const password = document.getElementById('password').value;
-      const message = document.getElementById('message');
-      const submitButton = event.currentTarget.querySelector('button[type="submit"]');
-
-      message.className = 'message';
-      message.textContent = 'Verificando...';
-      submitButton.disabled = true;
-
-      try {
-        const masterToken = await authenticateMaster(rpgId, password);
-
-        if (masterToken) {
-          message.className = 'message success';
-          message.textContent = 'Acesso liberado.';
-          location.href = `categorias.html?rpg=${encodeURIComponent(rpgId)}`;
-        } else {
-          message.className = 'message error';
-          message.textContent = 'Senha incorreta.';
-        }
-      } catch (error) {
-        console.error(error);
-        message.className = 'message error';
-        message.textContent = 'Não foi possível verificar a senha.';
-      } finally {
-        submitButton.disabled = false;
-      }
-    });
+    document.getElementById('loginLink').href = `login.html${location.search}${location.hash}`;
   </script>
 </body>
 </html>

@@ -5,11 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Categorias</title>
   <link rel="stylesheet" href="styles.css?v=20260914-1">
+  <link rel="stylesheet" href="css/classificacoes.css?v=20260914-1">
 </head>
 <body class="categories-page">
   <header class="site-header">
     <a class="brand" href="index.html">ARQUIVO <span>RPG</span></a>
     <nav class="nav-links">
+      <a id="campaignTimelineListLink" href="timeline/">Lista</a>
+      <a id="campaignTimelineGanttLink" href="timeline.html">Gantt</a>
       <a id="accountLink" href="conta.html">Minha conta</a>
       <a id="changeAccess" href="#">Trocar acesso</a>
       <a href="index.html">Trocar campanha</a>
@@ -288,6 +291,9 @@
   <script src="media-upload.js?v=20260903-1"></script>
   <script>
     const rpgId = getSelectedRpg();
+    const encodedRpgId = encodeURIComponent(rpgId);
+    document.getElementById('campaignTimelineListLink').href = `timeline/?rpg=${encodedRpgId}`;
+    document.getElementById('campaignTimelineGanttLink').href = `timeline.html?rpg=${encodedRpgId}`;
     restoreStoredAccountAccess(rpgId);
     const storedRole = sessionStorage.getItem('role');
     const masterToken = getMasterToken(rpgId);
@@ -2375,5 +2381,8 @@
 
     initializePage();
   </script>
+  <script src="personagem-destaque.js?v=20260908-1"></script>
+  <script src="busca-global-personagem.js?v=20260831-1"></script>
+  <script src="classificacao-categorias.js?v=20260914-1"></script>
 </body>
 </html>

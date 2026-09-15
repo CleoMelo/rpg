@@ -169,7 +169,6 @@ h2 { font-size: clamp(1.8rem, 4vw, 3rem); }
 .role-button span { color: var(--muted); }
 .role-button:hover { border-color: var(--accent); transform: translateY(-2px); }
 
-.form-panel { width: min(520px, 100%); padding: 30px; margin: 40px auto; }
 .form-group { margin-bottom: 18px; }
 label { display: block; margin-bottom: 8px; font-weight: 700; }
 input, select, textarea {
@@ -186,13 +185,6 @@ select { color-scheme: dark; }
 select option { background: var(--panel); color: var(--text); }
 select option:checked { background: #2563d4; color: #fff; }
 small, .muted { color: var(--muted); }
-.inline-link {
-  color: var(--accent-2);
-  font-weight: 800;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.inline-link:hover { color: #a5f3fc; }
 .message { margin-top: 14px; min-height: 24px; font-weight: 700; }
 .message.error { color: #fca5a5; }
 .message.success { color: #86efac; }
@@ -288,7 +280,6 @@ body.sorting-active { cursor: grabbing; user-select: none; }
     "status status status";
 }
 .category-filter-panel > .filter-field-grow { grid-area: search; }
-.category-filter-panel > .category-type-filter,
 .category-filter-panel > #categoryClassificationField { grid-area: classification; }
 .category-filter-panel > .filter-clear { grid-area: clear; }
 .category-filter-panel > .filter-status { grid-area: status; }
@@ -430,15 +421,6 @@ body.sorting-active { cursor: grabbing; user-select: none; }
 .characters-panel { height: 100%; overflow: auto; padding: 22px; }
 .categories-page .toolbar { margin: 0 0 18px; }
 .categories-page .toolbar h2 { margin: 0; font-size: clamp(1.45rem, 2.3vw, 2rem); }
-.section-kicker {
-  display: block;
-  margin-bottom: 4px;
-  color: var(--accent-2);
-  font-size: .72rem;
-  font-weight: 900;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-}
 .categories-page .category-filter-panel {
   grid-template-columns: 1fr auto;
   grid-template-areas:
@@ -612,7 +594,6 @@ body.sorting-active { cursor: grabbing; user-select: none; }
   display: block;
   margin-bottom: 16px;
 }
-.categories-page .classification-browser-head .section-kicker { margin-bottom: 5px; }
 .categories-page .classification-browser-head h2 { margin: 0 0 5px; }
 .categories-page .classification-browser-head p { margin: 0; }
 .categories-page .category-explorer {

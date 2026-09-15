@@ -1,4 +1,5 @@
 scripts/fixed-users.local.json
+supabase/.temp/
 .env
 .env.*
 !.env.example

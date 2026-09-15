@@ -1,9 +1,5 @@
 window.TIMELINE_REPO = {
-  owner: "CleoMelo",
-  repo: "rpg",
-  branch: "timeline-por-campanha",
   path: "timeline/timeline.json",
-  storage: "supabase",
   workerUrl: "supabase://timeline"
 };
 

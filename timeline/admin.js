@@ -671,10 +671,6 @@
     return 4;
   }
 
-  function detailExplanation() {
-    return "todos os acontecimentos";
-  }
-
   function axisSpec(span) {
     if (span > 2200 * YEAR) return { major: 1000 * YEAR, minor: 250 * YEAR };
     if (span > 900 * YEAR) return { major: 500 * YEAR, minor: 100 * YEAR };
@@ -1080,21 +1076,6 @@
       labelInside: false,
       track: 0
     };
-  }
-
-  function packTracks(geometries) {
-    const ends = [];
-    for (const geometry of geometries.sort((a, b) => a.left - b.left)) {
-      let track = ends.findIndex(end => geometry.left >= end + 10);
-      if (track < 0) {
-        track = ends.length;
-        ends.push(geometry.right);
-      } else {
-        ends[track] = geometry.right;
-      }
-      geometry.track = track;
-    }
-    return ends.length;
   }
 
   function calendarGlyph() {

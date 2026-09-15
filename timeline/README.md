@@ -1,8 +1,8 @@
-# Timeline — Cavaleiros Divinos e a Ordem dos Reinos
+# Timeline das campanhas
 
 A timeline foi integrada ao Supabase já usado pelo projeto `CleoMelo/rpg`.
 
-- `timeline.html`: editor do mestre.
+- `timeline.html`: Gantt; mestre e editor podem editar, jogador acessa em modo somente leitura.
 - `index.html`: visualização pública.
 - `timeline.json`: cópia inicial/fallback usada somente para a primeira migração e recuperação.
 - `supabase-adapter.js`: conecta o frontend às RPCs do Supabase.
