@@ -100,7 +100,6 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
 .date-preview{padding:10px 12px;border-left:3px solid #c7a565;background:#120e17;border-radius:7px;color:#e7d7b7;font-size:13px}
 .row-color{display:inline-block;width:8px;height:22px;border-radius:999px;margin-right:9px;vertical-align:middle}
 
-.gantt-rangebar{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:7px 4px 9px;font-size:11px;color:#d7c7e1;flex-wrap:wrap}
 .gantt-scroller{border:1px solid #3b3044;border-radius:14px;overflow:auto;background:#0d0b11;max-height:68vh;min-height:350px;outline:none}
 .gantt-scroller:focus{box-shadow:0 0 0 3px rgba(155,108,255,.12);border-color:#725a88}
 .gantt-axis-row{display:grid;grid-template-columns:204px minmax(720px,1fr);position:sticky;top:0;z-index:20;background:#15101b;border-bottom:1px solid #44364e;min-width:924px}
@@ -354,9 +353,6 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
 .admin-page .gantt-lane-label{
   width:224px;
 }
-/* v11 — refinamento de leitura */
-.admin-page #customScaleOption{color:#94889b}
-
 /* keep the temporal canvas inside its viewport; labels at the final tick must not create fake horizontal scroll */
 .admin-page .gantt-axis,
 .admin-page .gantt-track{
@@ -643,93 +639,6 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
   pointer-events:none;
   backdrop-filter:blur(6px);
 }
-.floating-tools{
-  position:absolute;
-  left:50%;
-  bottom:14px;
-  z-index:40;
-  transform:translateX(-50%);
-  display:flex;
-  align-items:center;
-  gap:4px;
-  padding:5px;
-  border:1px solid #39323f;
-  border-radius:12px;
-  background:rgba(18,15,21,.96);
-  box-shadow:0 12px 30px rgba(0,0,0,.35);
-  backdrop-filter:blur(10px);
-}
-.tool-button{
-  min-height:40px;
-  display:flex;
-  align-items:center;
-  gap:6px;
-  padding:7px 10px;
-  border:0;
-  border-radius:8px;
-  background:transparent;
-  color:#b9afbf;
-  cursor:pointer;
-}
-.tool-button:hover{
-  background:#211b25;
-  color:#fff;
-}
-.tool-button.active{
-  background:#3a3140;
-  color:#fff;
-  box-shadow:inset 0 0 0 1px #5c4e66;
-}
-.tool-button:disabled{
-  opacity:.35;
-  cursor:not-allowed;
-}
-.tool-icon{
-  font-size:17px;
-}
-.tool-name{
-  font-size:10px;
-  font-weight:700;
-}
-.compact-tool{
-  width:38px;
-  justify-content:center;
-  padding:7px;
-  font-size:18px;
-}
-.tool-separator{
-  width:1px;
-  height:26px;
-  margin:0 3px;
-  background:#37303d;
-}
-.floating-zoom{
-  position:absolute;
-  right:16px;
-  bottom:16px;
-  z-index:40;
-  display:flex;
-  align-items:center;
-  gap:3px;
-  padding:4px;
-  border:1px solid #39323f;
-  border-radius:10px;
-  background:rgba(18,15,21,.96);
-  box-shadow:0 10px 25px rgba(0,0,0,.28);
-}
-.zoom-button{
-  width:36px;
-  height:36px;
-  border:0;
-  border-radius:7px;
-  background:transparent;
-  color:#d6ccd9;
-  font-size:20px;
-  cursor:pointer;
-}
-.zoom-button:hover{
-  background:#241e29;
-}
 #zoomResolutionLabel{
   min-width:70px;
   padding:0 6px;
@@ -740,30 +649,9 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
 .lk-gantt-scroller::before{
   content:none!important;
 }
-@media(max-width:1100px){
-  .lk-timebar{
-    grid-template-columns:1fr;
-  }
-  .timebar-center{
-    justify-items:start;
-  }
-  .timebar-right{
-    flex-wrap:wrap;
-  }
-}
 @media(max-width:720px){
-  .tool-name{
-    display:none;
-  }
   .mode-hint{
     display:none;
-  }
-  .floating-zoom{
-    right:8px;
-    bottom:8px;
-  }
-  .floating-tools{
-    bottom:8px;
   }
 }
 
@@ -794,11 +682,6 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
 }
 
 
-/* v14 — rótulos ancorados sempre à direita */
-.lk-point-event.side-left{
-  justify-content:flex-start!important;
-  text-align:left!important;
-}
 .lk-point-event.side-right,
 .lk-range-event.label-outside{
   overflow:visible;
