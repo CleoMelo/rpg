@@ -317,6 +317,13 @@
       id = access.id;
       token = access.token;
       accessRole = access.role;
+
+      if (typeof window.ensureCampaignAccess === "function") {
+        const valid = await window.ensureCampaignAccess(id, accessRole, token);
+        if (!valid) {
+          throw new Error("Sessão de edição inválida ou expirada.");
+        }
+      }
     } else {
       id = requireCampaign();
       const access = writeAccess(id);

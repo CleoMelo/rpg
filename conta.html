@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minha conta</title>
+  <link rel="stylesheet" href="styles.css?v=20260914-1">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html">ARQUIVO <span>RPG</span></a>
+    <nav>
+      <a id="campaignBackLink" class="hidden" href="index.html">Voltar à campanha</a>
+      <a href="index.html">Campanhas</a>
+      <button id="signOutButton" class="nav-button" type="button">Sair</button>
+    </nav>
+  </header>
+
+  <main class="page-shell account-page">
+    <section class="account-page-heading">
+      <span class="eyebrow">Conta individual</span>
+      <h1>Minha conta</h1>
+      <p class="muted">Atualize seus dados e acesse as campanhas vinculadas ao seu usuário.</p>
+    </section>
+
+    <div class="account-page-grid">
+      <section class="card account-settings-card">
+        <h2>Informações pessoais</h2>
+        <form id="profileForm">
+          <div class="form-group">
+            <label for="accountLogin">Login</label>
+            <input id="accountLogin" autocomplete="username" minlength="2" maxlength="32" required>
+            <small>Use letras, números, hífen ou sublinhado. Não é necessário informar e-mail.</small>
+          </div>
+          <p id="profileMessage" class="message" aria-live="polite"></p>
+          <button class="btn" type="submit">Salvar informações</button>
+        </form>
+      </section>
+
+      <section class="card account-settings-card">
+        <h2>Alterar senha</h2>
+        <form id="passwordForm">
+          <div class="form-group">
+            <label for="newPassword">Nova senha</label>
+            <input id="newPassword" type="password" minlength="12" autocomplete="new-password" required>
+          </div>
+          <div class="form-group">
+            <label for="confirmPassword">Confirmar nova senha</label>
+            <input id="confirmPassword" type="password" minlength="12" autocomplete="new-password" required>
+          </div>
+          <p id="passwordMessage" class="message" aria-live="polite"></p>
+          <button class="btn" type="submit">Alterar senha</button>
+        </form>
+      </section>
+    </div>
+
+    <section class="card account-campaigns-card">
+      <div class="section-title">
+        <div><h2>Minhas campanhas</h2><p>O papel é definido separadamente em cada campanha.</p></div>
+      </div>
+      <div id="accountCampaigns" class="account-campaign-list"></div>
+      <p id="accountCampaignMessage" class="message" aria-live="polite"></p>
+    </section>
+
+    <section id="accessManager" class="card account-access-card hidden">
+      <div class="section-title">
+        <div>
+          <span class="eyebrow">Somente mestre</span>
+          <h2>Acessos da campanha</h2>
+          <p>Altere os papéis das cinco contas autorizadas. Nenhuma conta nova pode ser criada aqui.</p>
+        </div>
+      </div>
+      <div id="accessList" class="account-access-list"></div>
+      <p id="accessMessage" class="message" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js?v=20260914-1"></script>
+  <script src="data.js?v=20260914-2"></script>
+  <script>
+    const rpgId = new URLSearchParams(location.search).get('rpg') || '';
+    const profileForm = document.getElementById('profileForm');
+    const passwordForm = document.getElementById('passwordForm');
+    const profileMessage = document.getElementById('profileMessage');
+    const passwordMessage = document.getElementById('passwordMessage');
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>'"]/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      })[character]);
+    }
+
+    function showMessage(element, text, type = '') {
+      element.className = `message${type ? ` ${type}` : ''}`;
+      element.textContent = text;
+    }
+
+    async function openCampaign(campaignId) {
+      await openAccountCampaign(campaignId);
+      setSelectedRpg(campaignId);
+      location.href = `categorias.html?rpg=${encodeURIComponent(campaignId)}`;
+    }
+
+    function renderCampaigns(campaigns) {
+      const container = document.getElementById('accountCampaigns');
+      if (!campaigns.length) {
+        container.innerHTML = '<div class="empty-state">Esta conta ainda não possui acesso a uma campanha.</div>';
+        return;
+      }
+      container.innerHTML = '';
+      campaigns.forEach(campaign => {
+        const item = document.createElement('article');
+        item.className = 'account-campaign-item';
+        item.innerHTML = `
+          <div>
+            <span class="role-badge ${campaign.papel}">${campaign.papel === 'master' ? 'Mestre' : 'Editor'}</span>
+            <h3>${escapeHtml(campaign.nome)}</h3>
+            <p>${escapeHtml(campaign.descricao || 'Campanha personalizada.')}</p>
+          </div>
+          <button class="btn secondary" type="button">Abrir campanha</button>
+        `;
+        item.querySelector('button').addEventListener('click', async event => {
+          const campaignMessage = document.getElementById('accountCampaignMessage');
+          event.currentTarget.disabled = true;
+          showMessage(campaignMessage, `Abrindo ${campaign.nome}...`);
+          try { await openCampaign(campaign.campanha_id); }
+          catch (error) {
+            event.currentTarget.disabled = false;
+            showMessage(campaignMessage, error?.message || 'Não foi possível abrir a campanha.', 'error');
+          }
+        });
+        container.appendChild(item);
+      });
+    }
+
+    async function loadAccessManager() {
+      if (!rpgId) return;
+      document.getElementById('campaignBackLink').href = `categorias.html?rpg=${encodeURIComponent(rpgId)}`;
+      document.getElementById('campaignBackLink').classList.remove('hidden');
+      const { data: role, error: roleError } = await getSupabaseClient().rpc('meu_acesso_campanha', {
+        p_campanha_id: rpgId
+      });
+      if (roleError || role !== 'master') return;
+
+      const manager = document.getElementById('accessManager');
+      manager.classList.remove('hidden');
+      const { data, error } = await getSupabaseClient().rpc('listar_acessos_campanha', {
+        p_campanha_id: rpgId
+      });
+      if (error) throw error;
+      const list = document.getElementById('accessList');
+      list.innerHTML = '';
+      (data || []).forEach(account => {
+        const row = document.createElement('div');
+        row.className = 'account-access-row';
+        row.innerHTML = `
+          <div><strong>${escapeHtml(account.nome_exibicao)}</strong><span>@${escapeHtml(account.apelido)}</span></div>
+          <select aria-label="Acesso de ${escapeHtml(account.nome_exibicao)}">
+            <option value="">Sem acesso</option>
+            <option value="editor">Editor</option>
+            <option value="master">Mestre</option>
+          </select>
+          <button class="btn secondary" type="button">Salvar</button>
+        `;
+        const select = row.querySelector('select');
+        select.value = account.acesso_ativo ? account.papel || '' : '';
+        row.querySelector('button').addEventListener('click', async event => {
+          event.currentTarget.disabled = true;
+          showMessage(document.getElementById('accessMessage'), 'Salvando acesso...');
+          try {
+            const { error: saveError } = await getSupabaseClient().rpc('definir_acesso_campanha', {
+              p_campanha_id: rpgId,
+              p_usuario_id: account.usuario_id,
+              p_papel: select.value || null
+            });
+            if (saveError) throw saveError;
+            showMessage(document.getElementById('accessMessage'), 'Acesso atualizado.', 'success');
+          } catch (saveError) {
+            showMessage(document.getElementById('accessMessage'), saveError?.message || 'Não foi possível atualizar o acesso.', 'error');
+          } finally {
+            event.currentTarget.disabled = false;
+          }
+        });
+        list.appendChild(row);
+      });
+    }
+
+    async function initializeAccountPage() {
+      const user = await getCurrentAccount();
+      if (!user) {
+        const returnPath = `conta.html${rpgId ? `?rpg=${encodeURIComponent(rpgId)}` : ''}`;
+        location.replace(`login.html?return=${encodeURIComponent(returnPath)}`);
+        return;
+      }
+      const [profile, campaigns] = await Promise.all([
+        loadMyAccountProfile(),
+        loadMyAccountCampaigns()
+      ]);
+      if (!profile?.ativo) throw new Error('Esta conta não está autorizada.');
+      document.getElementById('accountLogin').value = profile.apelido || '';
+      renderCampaigns(campaigns);
+      await loadAccessManager();
+    }
+
+    profileForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const submit = profileForm.querySelector('button[type="submit"]');
+      submit.disabled = true;
+      showMessage(profileMessage, 'Salvando...');
+      try {
+        const login = document.getElementById('accountLogin').value.trim().toLowerCase();
+        await updateMyAccountLogin(login);
+        const { error } = await getSupabaseClient().auth.updateUser({ data: { display_name: login } });
+        if (error) throw error;
+        showMessage(profileMessage, 'Login atualizado.', 'success');
+      } catch (error) {
+        showMessage(profileMessage, error?.message || 'Não foi possível salvar as informações.', 'error');
+      } finally {
+        submit.disabled = false;
+      }
+    });
+
+    passwordForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const password = document.getElementById('newPassword').value;
+      const confirmation = document.getElementById('confirmPassword').value;
+      if (password.length < 12) return showMessage(passwordMessage, 'A senha precisa ter pelo menos 12 caracteres.', 'error');
+      if (password !== confirmation) return showMessage(passwordMessage, 'As senhas não coincidem.', 'error');
+      const submit = passwordForm.querySelector('button[type="submit"]');
+      submit.disabled = true;
+      showMessage(passwordMessage, 'Alterando senha...');
+      try {
+        const { error } = await getSupabaseClient().auth.updateUser({ password });
+        if (error) throw error;
+        passwordForm.reset();
+        showMessage(passwordMessage, 'Senha alterada.', 'success');
+      } catch (error) {
+        showMessage(passwordMessage, error?.message || 'Não foi possível alterar a senha.', 'error');
+      } finally {
+        submit.disabled = false;
+      }
+    });
+
+    document.getElementById('signOutButton').addEventListener('click', async () => {
+      await signOutAccount();
+      location.href = 'index.html';
+    });
+
+    initializeAccountPage().catch(error => {
+      document.querySelector('.account-page').innerHTML = `<div class="message error">${escapeHtml(error?.message || 'Não foi possível carregar a conta.')}</div>`;
+    });
+  </script>
+</body>
+</html>
