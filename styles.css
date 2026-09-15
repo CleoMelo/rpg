@@ -237,6 +237,7 @@ small, .muted { color: var(--muted); }
   box-shadow: 0 6px 16px rgba(0,0,0,.3);
 }
 .entity-icon-button.visibility:hover { border-color: #fde68a; background: #713f12; }
+.entity-icon-button.duplicate:hover { border-color: #c4b5fd; background: #5b21b6; }
 .entity-icon-button.edit:hover { border-color: var(--accent-2); background: #155e75; }
 .entity-icon-button.remove:hover { border-color: #fca5a5; background: var(--danger); }
 .character-entity-controls { position: absolute; }
