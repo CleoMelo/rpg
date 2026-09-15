@@ -27,7 +27,10 @@ const DEFAULT_ACCESS = [
   { handle: 'cleo', campaign: 'fate', role: 'master' }
 ];
 
-const configArgument = process.argv.slice(2).find(argument => argument !== '--init');
+const resetPasswords = process.argv.includes('--reset-passwords');
+const configArgument = process.argv.slice(2).find(argument =>
+  argument !== '--init' && argument !== '--reset-passwords'
+);
 const configPath = resolve(configArgument || 'scripts/fixed-users.local.json');
 if (process.argv.includes('--init')) {
   const template = Object.fromEntries(FIXED_HANDLES.map(handle => [handle, {
@@ -42,12 +45,25 @@ if (process.argv.includes('--init')) {
 
 const supabaseUrl = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 const serviceRoleKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+const defaultPassword = String(process.env.RPG_DEFAULT_PASSWORD || '');
 
 if (!supabaseUrl || !serviceRoleKey) {
   throw new Error('Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY somente neste terminal.');
 }
+if (resetPasswords && defaultPassword.length < 12) {
+  throw new Error('RPG_DEFAULT_PASSWORD precisa ter pelo menos 12 caracteres.');
+}
 
-const accountConfig = JSON.parse(await readFile(configPath, 'utf8'));
+let accountConfig;
+try {
+  accountConfig = JSON.parse(await readFile(configPath, 'utf8'));
+} catch (error) {
+  if (!resetPasswords || error?.code !== 'ENOENT') throw error;
+  accountConfig = Object.fromEntries(FIXED_HANDLES.map(handle => [handle, {
+    password: defaultPassword,
+    displayName: handle.charAt(0).toUpperCase() + handle.slice(1)
+  }]));
+}
 const configuredHandles = Object.keys(accountConfig).sort();
 if (configuredHandles.join(',') !== [...FIXED_HANDLES].sort().join(',')) {
   throw new Error(`O arquivo deve conter somente estas cinco contas: ${FIXED_HANDLES.join(', ')}.`);
@@ -87,9 +103,10 @@ async function listAuthUsers() {
 }
 
 function validateAccount(handle, config, existingUser) {
-  const password = String(config?.password || '');
+  const password = resetPasswords ? defaultPassword : String(config?.password || '');
   const displayName = String(config?.displayName || handle).trim();
-  if (!existingUser && (password.length < 12 || password.includes('SENHA_INICIAL_'))) {
+  if ((!existingUser || resetPasswords) &&
+      (password.length < 12 || password.includes('SENHA_INICIAL_'))) {
     throw new Error(`Informe uma senha inicial de pelo menos 12 caracteres para ${handle}.`);
   }
   if (displayName.length < 2 || displayName.length > 80) {
@@ -149,6 +166,7 @@ for (const handle of FIXED_HANDLES) {
       body: JSON.stringify({
         email: internalEmail,
         email_confirm: true,
+        ...(resetPasswords ? { password: config.password } : {}),
         user_metadata: {
           ...(user.user_metadata || {}),
           rpg_username: handle,
@@ -194,4 +212,7 @@ for (const access of DEFAULT_ACCESS) {
   console.log(`- ${access.handle}: ${CAMPAIGNS[access.campaign].name} (${access.role})`);
 }
 console.log('- hana e carero: sem campanha inicial; um mestre pode conceder acesso depois.');
-console.log('Configuração concluída. Apague fixed-users.local.json após guardar as senhas com segurança.');
+if (resetPasswords) console.log('As cinco senhas foram redefinidas para a senha temporária informada.');
+console.log(resetPasswords
+  ? 'Configuração concluída. Remova RPG_DEFAULT_PASSWORD do terminal.'
+  : 'Configuração concluída. Apague fixed-users.local.json após guardar as senhas com segurança.');

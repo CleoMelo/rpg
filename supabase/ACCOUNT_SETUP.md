@@ -63,6 +63,20 @@ Remove-Item -LiteralPath "scripts/fixed-users.local.json"
 O script pode ser executado novamente. Contas existentes são preservadas e nenhuma
 conta fora da lista fixa é criada.
 
+### Redefinir todas as senhas de uma vez
+
+Para restaurar os cinco logins e aplicar a mesma senha temporária sem criar um JSON:
+
+```powershell
+$env:RPG_DEFAULT_PASSWORD = "COLOQUE_UMA_SENHA_TEMPORARIA_FORTE"
+node "scripts/bootstrap-fixed-users.mjs" --reset-passwords
+Remove-Item Env:\RPG_DEFAULT_PASSWORD
+```
+
+A chave secreta e a URL do Supabase também precisam estar definidas no mesmo
+terminal. A senha não é gravada no repositório. Depois, cada pessoa pode alterá-la
+em **Minha conta**.
+
 ## Acessos iniciais
 
 | Conta | Campanha | Papel |
