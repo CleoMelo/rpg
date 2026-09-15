@@ -76,6 +76,15 @@ async function deleteUploadedMedia({ rpgId, token, imagekitFileId = '', driveFil
   }, 'Não foi possível remover a imagem enviada sem registro.');
 }
 
+async function duplicateCharacterMedia({ rpgId, token, imageUrl }) {
+  return postMediaAction({
+    action: 'duplicate-character-media',
+    campaignId: String(rpgId),
+    masterToken: String(token || ''),
+    sourceUrl: String(imageUrl || '')
+  }, 'Não foi possível duplicar a imagem do personagem.');
+}
+
 async function deleteCharacterMedia({ rpgId, token, imageUrls = [] }) {
   const uniqueUrls = [...new Set(
     imageUrls.map(value => String(value || '').trim()).filter(Boolean)

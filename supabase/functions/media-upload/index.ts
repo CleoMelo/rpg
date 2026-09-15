@@ -225,6 +225,62 @@ async function uploadToDrive(file: File, fileName: string) {
   return result.id as string;
 }
 
+function duplicateSourceAllowed(sourceUrl: string, campaignId: string) {
+  let source: URL;
+  try {
+    source = new URL(sourceUrl);
+  } catch {
+    return false;
+  }
+
+  if (source.protocol !== "https:") return false;
+  if (
+    source.hostname === "i.imgur.com" &&
+    /[.](?:jpe?g|png|webp|avif)$/i.test(source.pathname)
+  ) {
+    return true;
+  }
+
+  const endpoint = new URL(requiredSecret("IMAGEKIT_URL_ENDPOINT"));
+  const endpointPath = endpoint.pathname.replace(/\/+$/, "");
+  const campaignPath =
+    `${endpointPath}/portal-rpg/${sanitizeName(campaignId)}/character/`;
+  return source.origin === endpoint.origin &&
+    source.pathname.startsWith(campaignPath);
+}
+
+async function downloadCharacterImage(sourceUrl: string, campaignId: string) {
+  if (!duplicateSourceAllowed(sourceUrl, campaignId)) {
+    throw new Error("A imagem original não pertence a esta campanha.");
+  }
+
+  const response = await fetch(sourceUrl, { redirect: "follow" });
+  if (!response.ok) {
+    throw new Error("Não foi possível baixar a imagem original.");
+  }
+
+  const type = String(response.headers.get("content-type") || "")
+    .split(";", 1)[0]
+    .trim()
+    .toLowerCase();
+  if (!ALLOWED_TYPES.has(type)) {
+    throw new Error("A imagem original possui um formato incompatível.");
+  }
+
+  const bytes = await response.arrayBuffer();
+  if (bytes.byteLength > MAX_FILE_SIZE) {
+    throw new Error("A imagem original excede o limite de 5 MB.");
+  }
+
+  const extensions: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/avif": "avif",
+  };
+  return new File([bytes], `duplicata.${extensions[type]}`, { type });
+}
+
 async function deleteImageKitCampaignFiles(campaignId: string) {
   const privateKey = requiredSecret("IMAGEKIT_PRIVATE_KEY");
   const authorization = `Basic ${btoa(`${privateKey}:`)}`;
@@ -567,6 +623,7 @@ Deno.serve(async (req) => {
         "delete-upload",
         "delete-character-media",
         "delete-replaced-media",
+        "duplicate-character-media",
       ].includes(action)) {
         return json(req, { error: "Ação inválida." }, 400);
       }
@@ -593,6 +650,32 @@ Deno.serve(async (req) => {
         "delete-replaced-media",
       ].includes(action)) {
         return json(req, { error: "Ação exclusiva do mestre." }, 403);
+      }
+
+      if (action === "duplicate-character-media") {
+        const sourceUrl = String(payload.sourceUrl || "").trim();
+        const file = await downloadCharacterImage(sourceUrl, campaignId);
+        const imageKit = await uploadToImageKit(file, campaignId, "character");
+        let driveFileId: string | null = null;
+        let backupStatus = "completed";
+        let warning: string | null = null;
+
+        try {
+          driveFileId = await uploadToDrive(file, imageKit.fileName);
+        } catch (error) {
+          console.error("Google Drive duplicate backup failed", error);
+          backupStatus = "failed";
+          warning =
+            "Imagem duplicada no ImageKit, mas o backup no Google Drive falhou.";
+        }
+
+        return json(req, {
+          url: imageKit.url,
+          imagekitFileId: imageKit.fileId,
+          driveFileId,
+          backupStatus,
+          warning,
+        });
       }
 
       if (action === "delete-upload") {
