@@ -43,9 +43,8 @@
   let canvasPan = null;
   let overviewPan = null;
   let toastTimer = null;
-  let wheelAccumulator = 0;
-  let wheelResetTimer = null;
-  let lastWheelZoomAt = 0;
+  let smoothWheelZoom = null;
+  let smoothWheelCommitTimer = null;
   let renderFrame = null;
   let editMode = "hand";
   let collapsedLanes = new Set();
@@ -555,6 +554,7 @@
   }
 
   function setGanttSpan(span) {
+    finishSmoothWheelZoom(false);
     span = clamp(Number(span), MIN_GANTT_SPAN, maximumAllowedSpan());
     const center = (ganttStart + ganttEnd) / 2;
     ganttStart = Math.round(center - span / 2);
@@ -595,7 +595,104 @@
     return rect.left + fraction * rect.width;
   }
 
+  function smoothZoomElements() {
+    return [
+      $("ganttAxisMajor"),
+      $("ganttAxisMinor"),
+      ...document.querySelectorAll("#ganttRows .gantt-track")
+    ].filter(Boolean);
+  }
+
+  function clearSmoothWheelPreview() {
+    clearTimeout(smoothWheelCommitTimer);
+    smoothWheelCommitTimer = null;
+    const scroller = $("ganttScroller");
+    scroller.classList.remove("smooth-zooming");
+    scroller.style.removeProperty("--zoom-preview-inverse");
+
+    for (const element of smoothWheelZoom?.elements || []) {
+      element.style.removeProperty("transform");
+      element.style.removeProperty("transform-origin");
+    }
+  }
+
+  function finishSmoothWheelZoom(commit = true) {
+    if (!smoothWheelZoom) return;
+    const target = smoothWheelZoom;
+    clearSmoothWheelPreview();
+    smoothWheelZoom = null;
+
+    if (!commit) return;
+    ganttStart = Math.round(target.targetStart);
+    ganttEnd = Math.round(target.targetStart + target.targetSpan);
+    syncScalePreset(target.targetSpan);
+    renderGantt();
+    updateCursorDateLabel(target.clientX);
+  }
+
+  function constrainZoomWindow(start, span) {
+    span = clamp(Number(span), MIN_GANTT_SPAN, maximumAllowedSpan());
+    const configured = configuredTimelineBounds();
+    if (!configured) return { start, span };
+
+    const allowedSpan = configured.max - configured.min;
+    if (span >= allowedSpan) return { start: configured.min, span: allowedSpan };
+    return {
+      start: clamp(start, configured.min, configured.max - span),
+      span
+    };
+  }
+
+  function smoothZoomByWheel(delta, clientX) {
+    const rect = axisRect();
+    const fraction = clamp((clientX - rect.left) / Math.max(1, rect.width), 0, 1);
+
+    if (!smoothWheelZoom) {
+      const baseSpan = ganttEnd - ganttStart;
+      smoothWheelZoom = {
+        baseStart: ganttStart,
+        baseSpan,
+        targetStart: ganttStart,
+        targetSpan: baseSpan,
+        clientX,
+        elements: smoothZoomElements()
+      };
+
+      const scroller = $("ganttScroller");
+      scroller.classList.add("smooth-zooming");
+      for (const element of smoothWheelZoom.elements) {
+        element.style.transformOrigin = "0 50%";
+        element.style.transform = "matrix(1, 0, 0, 1, 0, 0)";
+      }
+      void scroller.offsetWidth;
+    }
+
+    const state = smoothWheelZoom;
+    const anchorTime = state.targetStart + fraction * state.targetSpan;
+    const zoomFactor = Math.exp(clamp(delta, -240, 240) * 0.0016);
+    const requestedSpan = state.targetSpan * zoomFactor;
+    const requestedStart = anchorTime - fraction * requestedSpan;
+    const constrained = constrainZoomWindow(requestedStart, requestedSpan);
+
+    state.targetStart = constrained.start;
+    state.targetSpan = constrained.span;
+    state.clientX = clientX;
+
+    const scale = state.baseSpan / state.targetSpan;
+    const translation = (state.baseStart - state.targetStart) / state.targetSpan * rect.width;
+    $("ganttScroller").style.setProperty("--zoom-preview-inverse", String(1 / scale));
+    for (const element of state.elements) {
+      element.style.transform = `matrix(${scale}, 0, 0, 1, ${translation}, 0)`;
+    }
+
+    $("liveScaleLabel").textContent = `Janela: ${humanSpan(state.targetSpan)}`;
+    $("zoomResolutionLabel").textContent = zoomResolutionName(state.targetSpan);
+    clearTimeout(smoothWheelCommitTimer);
+    smoothWheelCommitTimer = setTimeout(() => finishSmoothWheelZoom(true), 155);
+  }
+
   function zoomToSpanAtClientX(targetSpan, clientX = null) {
+    finishSmoothWheelZoom(false);
     const oldSpan = ganttEnd - ganttStart;
     targetSpan = clamp(Number(targetSpan), MIN_GANTT_SPAN, maximumAllowedSpan());
 
@@ -614,6 +711,7 @@
   }
 
   function stepZoom(direction, clientX = null) {
+    finishSmoothWheelZoom(true);
     const current = ganttEnd - ganttStart;
     zoomToSpanAtClientX(zoomLevelForDirection(current, direction), clientX);
   }
@@ -1291,6 +1389,7 @@
   }
 
   function renderGantt() {
+    if (smoothWheelZoom) finishSmoothWheelZoom(false);
     if (!doc || currentView !== "gantt") return;
     if (!Number.isFinite(ganttStart) || !Number.isFinite(ganttEnd) || ganttEnd <= ganttStart) {
       initializeGanttRange();
@@ -1731,8 +1830,6 @@
   function installCanvasNavigation() {
     const scroller = $("ganttScroller");
     let pan = null;
-    let wheelAccumulator = 0;
-    let wheelResetTimer = null;
 
     scroller.addEventListener("mousemove", event => {
       updateCursorDateLabel(event.clientX);
@@ -1750,22 +1847,15 @@
       if (event.deltaMode === 1) delta *= 16;
       else if (event.deltaMode === 2) delta *= Math.max(600, window.innerHeight);
 
-      wheelAccumulator += clamp(delta, -120, 120);
-      clearTimeout(wheelResetTimer);
-      wheelResetTimer = setTimeout(() => { wheelAccumulator = 0; }, 180);
-
-      const threshold = 78;
-      if (Math.abs(wheelAccumulator) < threshold) return;
-
-      const direction = wheelAccumulator < 0 ? -1 : 1;
-      wheelAccumulator = 0;
-      stepZoom(direction, event.clientX);
+      smoothZoomByWheel(delta, event.clientX);
     }, { passive: false });
 
     scroller.addEventListener("pointerdown", event => {
       const effectiveMode = temporaryHandMode ? "hand" : editMode;
       if (effectiveMode !== "hand" || event.button !== 0) return;
       if (event.target.closest(".lane-collapse-btn")) return;
+
+      finishSmoothWheelZoom(true);
 
       const rect = axisRect();
 

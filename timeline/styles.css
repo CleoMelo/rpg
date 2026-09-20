@@ -384,6 +384,18 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
 .lk-gantt-scroller.panning .lk-track{
   cursor:grabbing;
 }
+.lk-gantt-scroller.smooth-zooming .axis-tier,
+.lk-gantt-scroller.smooth-zooming .gantt-track{
+  transition:transform 150ms cubic-bezier(.2,.72,.22,1);
+  will-change:transform;
+}
+.lk-gantt-scroller.smooth-zooming .lk-axis-tick span,
+.lk-gantt-scroller.smooth-zooming .event-copy,
+.lk-gantt-scroller.smooth-zooming .calendar-glyph{
+  transform:scaleX(var(--zoom-preview-inverse,1));
+  transform-origin:left center;
+  transition:transform 150ms cubic-bezier(.2,.72,.22,1);
+}
 .lk-gantt-scroller.mode-add .lk-track{
   cursor:crosshair;
 }
@@ -416,6 +428,7 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
   position:relative;
   height:72px!important;
   min-width:0!important;
+  overflow:hidden;
   background:#0e0c11!important;
 }
 .axis-tier{
