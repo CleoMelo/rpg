@@ -595,19 +595,20 @@
     return rect.left + fraction * rect.width;
   }
 
-  function smoothZoomElements() {
-    return [
+  function smoothZoomElements(includeTracks = true) {
+    const elements = [
       $("ganttAxisMajor"),
-      $("ganttAxisMinor"),
-      ...document.querySelectorAll("#ganttRows .gantt-track")
-    ].filter(Boolean);
+      $("ganttAxisMinor")
+    ];
+    if (includeTracks) elements.push(...document.querySelectorAll("#ganttRows .gantt-track"));
+    return elements.filter(Boolean);
   }
 
   function clearSmoothWheelPreview() {
     clearTimeout(smoothWheelCommitTimer);
     smoothWheelCommitTimer = null;
     const scroller = $("ganttScroller");
-    scroller.classList.remove("smooth-zooming");
+    scroller.classList.remove("smooth-zooming", "zooming-in", "zooming-out");
     scroller.style.removeProperty("--zoom-preview-inverse");
 
     for (const element of smoothWheelZoom?.elements || []) {
@@ -625,6 +626,7 @@
     if (!commit) return;
     ganttStart = Math.round(target.targetStart);
     ganttEnd = Math.round(target.targetStart + target.targetSpan);
+    if (target.targetSpan > target.baseSpan) resetStableTrackLayout();
     syncScalePreset(target.targetSpan);
     renderGantt();
     updateCursorDateLabel(target.clientX);
@@ -647,6 +649,11 @@
     const rect = axisRect();
     const pointerFraction = clamp((clientX - rect.left) / Math.max(1, rect.width), 0, 1);
     const fraction = delta > 0 ? 0.5 : pointerFraction;
+    const direction = delta < 0 ? -1 : 1;
+
+    if (smoothWheelZoom && smoothWheelZoom.direction !== direction) {
+      finishSmoothWheelZoom(true);
+    }
 
     if (!smoothWheelZoom) {
       const baseSpan = ganttEnd - ganttStart;
@@ -655,12 +662,13 @@
         baseSpan,
         targetStart: ganttStart,
         targetSpan: baseSpan,
+        direction,
         clientX,
-        elements: smoothZoomElements()
+        elements: smoothZoomElements(direction < 0)
       };
 
       const scroller = $("ganttScroller");
-      scroller.classList.add("smooth-zooming");
+      scroller.classList.add("smooth-zooming", direction < 0 ? "zooming-in" : "zooming-out");
       for (const element of smoothWheelZoom.elements) {
         element.style.transformOrigin = "0 50%";
         element.style.transform = "matrix(1, 0, 0, 1, 0, 0)";
