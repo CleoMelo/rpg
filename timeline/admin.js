@@ -645,7 +645,8 @@
 
   function smoothZoomByWheel(delta, clientX) {
     const rect = axisRect();
-    const fraction = clamp((clientX - rect.left) / Math.max(1, rect.width), 0, 1);
+    const pointerFraction = clamp((clientX - rect.left) / Math.max(1, rect.width), 0, 1);
+    const fraction = delta > 0 ? 0.5 : pointerFraction;
 
     if (!smoothWheelZoom) {
       const baseSpan = ganttEnd - ganttStart;
@@ -2324,7 +2325,7 @@
   $("recentBtn").addEventListener("click", focusRecent);
   $("fitBtn").addEventListener("click", fitAll);
   $("zoomIn").addEventListener("click", () => stepZoom(-1, lastCursorClientX));
-  $("zoomOut").addEventListener("click", () => stepZoom(1, lastCursorClientX));
+  $("zoomOut").addEventListener("click", () => stepZoom(1, null));
   $("scalePreset").addEventListener("change", event => setGanttSpan(Number(event.target.value)));
 
   $("modePointer").addEventListener("click", () => setEditMode("pointer"));
