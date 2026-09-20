@@ -422,6 +422,7 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
   position:absolute;
   left:0;
   right:0;
+  overflow:hidden;
 }
 .axis-major{
   top:0;
@@ -436,6 +437,8 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
   position:absolute;
   top:0;
   bottom:0;
+  box-sizing:border-box;
+  overflow:hidden;
   border-left:1px solid var(--lk-grid);
 }
 .lk-axis-tick.major-tick{
@@ -445,9 +448,13 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
   position:absolute;
   left:8px;
   top:8px;
+  display:block;
+  max-width:calc(100% - 12px);
+  overflow:hidden;
   color:#aaa0ae;
   font-size:10px;
   font-weight:650;
+  text-overflow:ellipsis;
   white-space:nowrap;
 }
 .major-tick span{

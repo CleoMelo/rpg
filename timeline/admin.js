@@ -844,6 +844,57 @@
     return ticks;
   }
 
+  function axisLabelLayout(step, major, ticks) {
+    const span = Math.max(1, ganttEnd - ganttStart);
+    const axisWidth = Math.max($("ganttAxis").clientWidth, 720);
+    const intervalWidth = axisWidth * step / span;
+    const longestLabel = ticks.reduce((longest, tick) => {
+      const label = formatAxisLabel(tick.value, step, major);
+      return label.length > longest.length ? label : longest;
+    }, "");
+    const estimatedLabelWidth = Math.min(
+      major ? 180 : 90,
+      Math.max(major ? 70 : 42, longestLabel.length * (major ? 7 : 6.25) + 16)
+    );
+    const requiredStride = Math.max(1, Math.ceil(estimatedLabelWidth / Math.max(intervalWidth, 1)));
+    let stride = 1;
+    while (stride < requiredStride) stride *= 2;
+
+    return {
+      axisWidth,
+      estimatedLabelWidth,
+      intervalPct: step / span * 100,
+      stride
+    };
+  }
+
+  function renderAxisTier(container, step, major) {
+    const ticks = ticksForStep(step);
+    const layout = axisLabelLayout(step, major, ticks);
+
+    for (const tick of ticks) {
+      const el = document.createElement("div");
+      const ordinal = Math.round(tick.value / step);
+      const normalizedOrdinal = ((ordinal % layout.stride) + layout.stride) % layout.stride;
+      const showLabel = normalizedOrdinal === 0;
+      const cellWidthPct = layout.intervalPct * (showLabel ? layout.stride : 1);
+      const visibleStartPct = Math.max(0, tick.pct);
+      const visibleEndPct = Math.min(100, tick.pct + cellWidthPct);
+      const visibleWidth = Math.max(0, visibleEndPct - visibleStartPct) / 100 * layout.axisWidth;
+
+      el.className = `lk-axis-tick ${major ? "major-tick" : "minor-tick"}`;
+      el.style.left = `${tick.pct}%`;
+      el.style.width = `${Math.max(0, Math.min(cellWidthPct, 100 - tick.pct))}%`;
+
+      if (showLabel && visibleWidth >= layout.estimatedLabelWidth * 0.65) {
+        const label = formatAxisLabel(tick.value, step, major);
+        el.innerHTML = `<span title="${C.escapeHtml(label)}">${C.escapeHtml(label)}</span>`;
+      }
+
+      container.appendChild(el);
+    }
+  }
+
   function renderAxis() {
     const span = ganttEnd - ganttStart;
     const spec = axisSpec(span);
@@ -852,21 +903,8 @@
     major.innerHTML = "";
     minor.innerHTML = "";
 
-    for (const tick of ticksForStep(spec.major)) {
-      const el = document.createElement("div");
-      el.className = "lk-axis-tick major-tick";
-      el.style.left = `${tick.pct}%`;
-      el.innerHTML = `<span>${C.escapeHtml(formatAxisLabel(tick.value, spec.major, true))}</span>`;
-      major.appendChild(el);
-    }
-
-    for (const tick of ticksForStep(spec.minor)) {
-      const el = document.createElement("div");
-      el.className = "lk-axis-tick minor-tick";
-      el.style.left = `${tick.pct}%`;
-      el.innerHTML = `<span>${C.escapeHtml(formatAxisLabel(tick.value, spec.minor, false))}</span>`;
-      minor.appendChild(el);
-    }
+    renderAxisTier(major, spec.major, true);
+    renderAxisTier(minor, spec.minor, false);
   }
 
   function addGridLines(track) {
