@@ -390,13 +390,13 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
 .lk-axis-row{
   grid-template-columns:220px minmax(0,1fr)!important;
   min-width:0!important;
-  height:64px;
+  height:72px;
   background:#111015;
   border-bottom:1px solid #403946;
 }
 .lk-corner{
   width:220px!important;
-  height:64px!important;
+  height:72px!important;
   display:flex!important;
   align-items:center!important;
   justify-content:space-between;
@@ -414,7 +414,7 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
 }
 .lk-axis{
   position:relative;
-  height:64px!important;
+  height:72px!important;
   min-width:0!important;
   background:#0e0c11!important;
 }
@@ -426,11 +426,11 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
 }
 .axis-major{
   top:0;
-  height:32px;
+  height:40px;
   border-bottom:1px solid #342f38;
 }
 .axis-minor{
-  top:32px;
+  top:40px;
   height:32px;
 }
 .lk-axis-tick{
@@ -1075,7 +1075,8 @@ body.lk16-page{
   height:40px;
 }
 .lk16-page .axis-minor{
-  height:30px;
+  top:40px;
+  height:32px;
 }
 .lk16-page .major-tick span{
   top:11px;

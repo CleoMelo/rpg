@@ -7,10 +7,10 @@
   const YEAR = 525600;
   const HOUR = 60;
   const LANE_WIDTH = 220;
-  const MIN_GANTT_SPAN = 6 * HOUR;
+  const MIN_GANTT_SPAN = 30;
   const MAX_GANTT_SPAN = 10000 * YEAR;
   const ZOOM_LEVELS = [
-    6 * HOUR, 12 * HOUR,
+    30, HOUR, 3 * HOUR, 6 * HOUR, 12 * HOUR,
     DAY, 3 * DAY, 7 * DAY, 14 * DAY, 30 * DAY, 90 * DAY, 180 * DAY,
     YEAR, 2 * YEAR, 3 * YEAR, 5 * YEAR, 10 * YEAR, 20 * YEAR, 30 * YEAR,
     50 * YEAR, 100 * YEAR, 200 * YEAR, 300 * YEAR, 500 * YEAR,
@@ -54,6 +54,7 @@
   let redoStack = [];
   let temporaryHandMode = false;
   let lastCursorClientX = null;
+  let currentAxisLayout = { major: [], minor: [] };
 
   // Layout vertical estável por nível de zoom.
   // O antigo renderer reempacotava apenas os eventos dentro da janela visível;
@@ -646,7 +647,10 @@
 
   function snapMinutes() {
     const span = ganttEnd - ganttStart;
-    if (span <= DAY) return 15;
+    if (span <= HOUR) return 1;
+    if (span <= 3 * HOUR) return 5;
+    if (span <= 12 * HOUR) return 15;
+    if (span <= DAY) return 30;
     if (span <= 7 * DAY) return 60;
     if (span <= 30 * DAY) return 6 * HOUR;
     if (span <= YEAR) return DAY;
@@ -672,19 +676,24 @@
   }
 
   function axisSpec(span) {
-    if (span > 2200 * YEAR) return { major: 1000 * YEAR, minor: 250 * YEAR };
-    if (span > 900 * YEAR) return { major: 500 * YEAR, minor: 100 * YEAR };
-    if (span > 250 * YEAR) return { major: 100 * YEAR, minor: 20 * YEAR };
-    if (span > 80 * YEAR) return { major: 50 * YEAR, minor: 10 * YEAR };
-    if (span > 20 * YEAR) return { major: 10 * YEAR, minor: 2 * YEAR };
-    if (span > 5 * YEAR) return { major: 5 * YEAR, minor: YEAR };
-    if (span > 18 * 30 * DAY) return { major: YEAR, minor: 90 * DAY };
-    if (span > 180 * DAY) return { major: 90 * DAY, minor: 30 * DAY };
-    if (span > 60 * DAY) return { major: 30 * DAY, minor: 7 * DAY };
-    if (span > 14 * DAY) return { major: 7 * DAY, minor: DAY };
-    if (span > 3 * DAY) return { major: DAY, minor: 6 * HOUR };
-    if (span > DAY) return { major: 12 * HOUR, minor: 3 * HOUR };
-    return { major: 6 * HOUR, minor: HOUR };
+    if (span <= HOUR) return { major: { kind: "day" }, minor: { kind: "fixed", step: 5 } };
+    if (span <= 3 * HOUR) return { major: { kind: "day" }, minor: { kind: "fixed", step: 15 } };
+    if (span <= 6 * HOUR) return { major: { kind: "day" }, minor: { kind: "fixed", step: 30 } };
+    if (span <= 12 * HOUR) return { major: { kind: "day" }, minor: { kind: "fixed", step: HOUR } };
+    if (span <= 2 * DAY) return { major: { kind: "day" }, minor: { kind: "fixed", step: 3 * HOUR } };
+    if (span <= 7 * DAY) return { major: { kind: "day" }, minor: { kind: "fixed", step: 6 * HOUR } };
+    if (span <= 21 * DAY) return { major: { kind: "month" }, minor: { kind: "day" } };
+    if (span <= 60 * DAY) return { major: { kind: "month" }, minor: { kind: "month-days", amount: 4 } };
+    if (span <= 240 * DAY) return { major: { kind: "month" }, minor: { kind: "month-halves" } };
+    if (span <= 3 * YEAR) return { major: { kind: "year" }, minor: { kind: "month" } };
+    if (span <= 5 * YEAR) return { major: { kind: "year" }, minor: { kind: "month", amount: 3 } };
+    if (span <= 10 * YEAR) return { major: { kind: "year" }, minor: { kind: "month", amount: 6 } };
+    if (span <= 30 * YEAR) return { major: { kind: "year", amount: 5 }, minor: { kind: "year" } };
+    if (span <= 100 * YEAR) return { major: { kind: "year", amount: 20 }, minor: { kind: "year", amount: 5 } };
+    if (span <= 300 * YEAR) return { major: { kind: "year", amount: 50 }, minor: { kind: "year", amount: 10 } };
+    if (span <= 1000 * YEAR) return { major: { kind: "year", amount: 200 }, minor: { kind: "year", amount: 50 } };
+    if (span <= 2200 * YEAR) return { major: { kind: "year", amount: 500 }, minor: { kind: "year", amount: 100 } };
+    return { major: { kind: "year", amount: 1000 }, minor: { kind: "year", amount: 250 } };
   }
 
   function shortMonth(month) {
@@ -696,18 +705,155 @@
     return date.era === "before" ? settings.beforeShort : settings.afterShort;
   }
 
-  function formatAxisLabel(minutes, step, major = false) {
-    const date = C.minutesToDate(Math.round(minutes));
+  function astronomicalYear(date) {
+    return date.era === "before" ? 1 - Number(date.year) : Number(date.year);
+  }
 
-    if (step >= YEAR) return `${date.year} ${eraShort(date)}`;
-    if (step >= 30 * DAY) return `${shortMonth(date.month)} ${date.year} ${eraShort(date)}`;
-    if (step >= DAY) return major
-      ? `${date.day} ${shortMonth(date.month)} ${date.year}`
-      : `${date.day} ${shortMonth(date.month)}`;
+  function eraYearFromAstronomical(year) {
+    return year <= 0
+      ? { era: "before", year: 1 - year }
+      : { era: "after", year };
+  }
 
-    return major
-      ? `${date.day} ${shortMonth(date.month)}`
-      : `${String(date.hour).padStart(2, "0")}:${String(date.minute).padStart(2, "0")}`;
+  function monthIndexForDate(date) {
+    return astronomicalYear(date) * 12 + Number(date.month) - 1;
+  }
+
+  function monthPartsFromIndex(index) {
+    const year = Math.floor(index / 12);
+    return { year, month: index - year * 12 + 1 };
+  }
+
+  function monthStartFromIndex(index) {
+    const parts = monthPartsFromIndex(index);
+    const eraYear = eraYearFromAstronomical(parts.year);
+    return C.dateToMinutes({ ...eraYear, month: parts.month, day: 1 });
+  }
+
+  function yearStartFromAstronomical(year) {
+    return C.dateToMinutes({ ...eraYearFromAstronomical(year), month: 1, day: 1 });
+  }
+
+  function fixedAxisSegments(step) {
+    const segments = [];
+    let start = Math.floor(ganttStart / step) * step;
+
+    while (start < ganttEnd && segments.length < 320) {
+      segments.push({ start, end: start + step });
+      start += step;
+    }
+    return segments;
+  }
+
+  function monthAxisSegments(amount = 1) {
+    const segments = [];
+    const currentIndex = monthIndexForDate(C.minutesToDate(ganttStart));
+    let index = Math.floor(currentIndex / amount) * amount;
+
+    while (segments.length < 320) {
+      const start = monthStartFromIndex(index);
+      const end = monthStartFromIndex(index + amount);
+      if (start >= ganttEnd) break;
+      segments.push({ start, end });
+      index += amount;
+    }
+    return segments;
+  }
+
+  function yearAxisSegments(amount = 1) {
+    const segments = [];
+    const currentYear = astronomicalYear(C.minutesToDate(ganttStart));
+    let year = Math.floor(currentYear / amount) * amount;
+
+    while (segments.length < 320) {
+      const start = yearStartFromAstronomical(year);
+      const end = yearStartFromAstronomical(year + amount);
+      if (start >= ganttEnd) break;
+      segments.push({ start, end });
+      year += amount;
+    }
+    return segments;
+  }
+
+  function monthDayAxisSegments(amount = 4, halves = false) {
+    const segments = [];
+    let monthIndex = monthIndexForDate(C.minutesToDate(ganttStart));
+
+    while (segments.length < 320) {
+      const monthStart = monthStartFromIndex(monthIndex);
+      const monthEnd = monthStartFromIndex(monthIndex + 1);
+      if (monthStart >= ganttEnd) break;
+      const startDate = C.minutesToDate(monthStart);
+      const finalDay = C.minutesToDate(monthEnd - 1).day;
+      const starts = halves
+        ? [1, 16].filter(day => day <= finalDay)
+        : Array.from({ length: Math.ceil(finalDay / amount) }, (_, index) => index * amount + 1);
+
+      for (const startDay of starts) {
+        const endDay = halves ? (startDay === 1 ? 16 : finalDay + 1) : Math.min(finalDay + 1, startDay + amount);
+        const start = C.dateToMinutes({ ...startDate, day: startDay, hour: 0, minute: 0 });
+        const end = endDay > finalDay
+          ? monthEnd
+          : C.dateToMinutes({ ...startDate, day: endDay, hour: 0, minute: 0 });
+        segments.push({ start, end, startDay, endDay: endDay - 1 });
+      }
+      monthIndex += 1;
+    }
+    return segments;
+  }
+
+  function axisSegmentLabel(segment, scale, major) {
+    const start = C.minutesToDate(Math.round(segment.start));
+    const end = C.minutesToDate(Math.round(segment.end - 1));
+
+    if (scale.kind === "fixed") {
+      return `${String(start.hour).padStart(2, "0")}:${String(start.minute).padStart(2, "0")}`;
+    }
+    if (scale.kind === "day") {
+      return major
+        ? `${start.day} ${C.PT_MONTHS[start.month - 1]} ${start.year} ${eraShort(start)}`
+        : String(start.day).padStart(2, "0");
+    }
+    if (scale.kind === "month-days" || scale.kind === "month-halves") {
+      return segment.startDay === segment.endDay
+        ? String(segment.startDay).padStart(2, "0")
+        : `${segment.startDay}–${segment.endDay}`;
+    }
+    if (scale.kind === "month") {
+      if (major) return `${C.PT_MONTHS[start.month - 1]} ${start.year} ${eraShort(start)}`;
+      if ((scale.amount || 1) === 1) {
+        return ganttEnd - ganttStart <= YEAR ? C.PT_MONTHS[start.month - 1] : shortMonth(start.month);
+      }
+      return `${shortMonth(start.month)}–${shortMonth(end.month)}`;
+    }
+    if (scale.kind === "year") {
+      if (start.year === end.year && start.era === end.era) {
+        return major ? `${start.year} ${eraShort(start)}` : String(start.year);
+      }
+      if (start.era === end.era) {
+        return major
+          ? `${start.year}–${end.year} ${eraShort(start)}`
+          : `${start.year}–${end.year}`;
+      }
+      return `${start.year} ${eraShort(start)}–${end.year} ${eraShort(end)}`;
+    }
+    return "";
+  }
+
+  function axisSegments(scale, major) {
+    const amount = Math.max(1, Number(scale.amount) || 1);
+    let segments;
+
+    if (scale.kind === "fixed") segments = fixedAxisSegments(scale.step);
+    else if (scale.kind === "day") segments = fixedAxisSegments(DAY);
+    else if (scale.kind === "month") segments = monthAxisSegments(amount);
+    else if (scale.kind === "year") segments = yearAxisSegments(amount);
+    else if (scale.kind === "month-halves") segments = monthDayAxisSegments(15, true);
+    else segments = monthDayAxisSegments(amount, false);
+
+    return segments
+      .filter(segment => segment.end > ganttStart && segment.start < ganttEnd)
+      .map(segment => ({ ...segment, label: axisSegmentLabel(segment, scale, major) }));
   }
 
   function formatEventDate(minutes, span = ganttEnd - ganttStart) {
@@ -831,64 +977,30 @@
     renderAll();
   }
 
-  function ticksForStep(step) {
-    const start = Math.floor(ganttStart / step) * step;
-    const ticks = [];
-    for (let value = start; value <= ganttEnd + step; value += step) {
-      if (value < ganttStart - step * 0.02) continue;
-      const pct = ((value - ganttStart) / (ganttEnd - ganttStart)) * 100;
-      if (pct < -1 || pct > 101) continue;
-      ticks.push({ value, pct });
-      if (ticks.length > 160) break;
-    }
-    return ticks;
+  function percentForTime(minutes) {
+    return (Number(minutes) - ganttStart) / Math.max(1, ganttEnd - ganttStart) * 100;
   }
 
-  function axisLabelLayout(step, major, ticks) {
-    const span = Math.max(1, ganttEnd - ganttStart);
+  function renderAxisTier(container, segments, major) {
     const axisWidth = Math.max($("ganttAxis").clientWidth, 720);
-    const intervalWidth = axisWidth * step / span;
-    const longestLabel = ticks.reduce((longest, tick) => {
-      const label = formatAxisLabel(tick.value, step, major);
-      return label.length > longest.length ? label : longest;
-    }, "");
-    const estimatedLabelWidth = Math.min(
-      major ? 180 : 90,
-      Math.max(major ? 70 : 42, longestLabel.length * (major ? 7 : 6.25) + 16)
-    );
-    const requiredStride = Math.max(1, Math.ceil(estimatedLabelWidth / Math.max(intervalWidth, 1)));
-    let stride = 1;
-    while (stride < requiredStride) stride *= 2;
 
-    return {
-      axisWidth,
-      estimatedLabelWidth,
-      intervalPct: step / span * 100,
-      stride
-    };
-  }
-
-  function renderAxisTier(container, step, major) {
-    const ticks = ticksForStep(step);
-    const layout = axisLabelLayout(step, major, ticks);
-
-    for (const tick of ticks) {
+    for (const segment of segments) {
+      const visibleStart = Math.max(ganttStart, segment.start);
+      const visibleEnd = Math.min(ganttEnd, segment.end);
+      const left = percentForTime(visibleStart);
+      const width = percentForTime(visibleEnd) - left;
+      const widthPixels = width / 100 * axisWidth;
+      const minimumLabelWidth = major ? 58 : 28;
       const el = document.createElement("div");
-      const ordinal = Math.round(tick.value / step);
-      const normalizedOrdinal = ((ordinal % layout.stride) + layout.stride) % layout.stride;
-      const showLabel = normalizedOrdinal === 0;
-      const cellWidthPct = layout.intervalPct * (showLabel ? layout.stride : 1);
-      const visibleStartPct = Math.max(0, tick.pct);
-      const visibleEndPct = Math.min(100, tick.pct + cellWidthPct);
-      const visibleWidth = Math.max(0, visibleEndPct - visibleStartPct) / 100 * layout.axisWidth;
 
       el.className = `lk-axis-tick ${major ? "major-tick" : "minor-tick"}`;
-      el.style.left = `${tick.pct}%`;
-      el.style.width = `${Math.max(0, Math.min(cellWidthPct, 100 - tick.pct))}%`;
+      el.style.left = `${left}%`;
+      el.style.width = `${Math.max(0, width)}%`;
+      el.dataset.start = String(segment.start);
+      el.dataset.end = String(segment.end);
 
-      if (showLabel && visibleWidth >= layout.estimatedLabelWidth * 0.65) {
-        const label = formatAxisLabel(tick.value, step, major);
-        el.innerHTML = `<span title="${C.escapeHtml(label)}">${C.escapeHtml(label)}</span>`;
+      if (widthPixels >= minimumLabelWidth) {
+        el.innerHTML = `<span title="${C.escapeHtml(segment.label)}">${C.escapeHtml(segment.label)}</span>`;
       }
 
       container.appendChild(el);
@@ -903,25 +1015,28 @@
     major.innerHTML = "";
     minor.innerHTML = "";
 
-    renderAxisTier(major, spec.major, true);
-    renderAxisTier(minor, spec.minor, false);
+    currentAxisLayout = {
+      major: axisSegments(spec.major, true),
+      minor: axisSegments(spec.minor, false)
+    };
+    renderAxisTier(major, currentAxisLayout.major, true);
+    renderAxisTier(minor, currentAxisLayout.minor, false);
   }
 
   function addGridLines(track) {
-    const span = ganttEnd - ganttStart;
-    const spec = axisSpec(span);
-
-    for (const tick of ticksForStep(spec.minor)) {
+    for (const segment of currentAxisLayout.minor) {
+      if (segment.start <= ganttStart || segment.start >= ganttEnd) continue;
       const line = document.createElement("i");
       line.className = "gantt-gridline minor-gridline";
-      line.style.left = `${tick.pct}%`;
+      line.style.left = `${percentForTime(segment.start)}%`;
       track.appendChild(line);
     }
 
-    for (const tick of ticksForStep(spec.major)) {
+    for (const segment of currentAxisLayout.major) {
+      if (segment.start <= ganttStart || segment.start >= ganttEnd) continue;
       const line = document.createElement("i");
       line.className = "gantt-gridline major-gridline";
-      line.style.left = `${tick.pct}%`;
+      line.style.left = `${percentForTime(segment.start)}%`;
       track.appendChild(line);
     }
   }
