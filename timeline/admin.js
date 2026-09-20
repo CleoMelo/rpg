@@ -675,6 +675,14 @@
     return 4;
   }
 
+  function yearMarkerStep(span) {
+    const target = Math.max(1, span / YEAR / 10);
+    const magnitude = 10 ** Math.floor(Math.log10(target));
+    const normalized = target / magnitude;
+    const factor = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+    return Math.max(1, Math.round(factor * magnitude));
+  }
+
   function axisSpec(span) {
     if (span <= HOUR) return { major: { kind: "day" }, minor: { kind: "fixed", step: 5 } };
     if (span <= 3 * HOUR) return { major: { kind: "day" }, minor: { kind: "fixed", step: 15 } };
@@ -685,15 +693,17 @@
     if (span <= 21 * DAY) return { major: { kind: "month" }, minor: { kind: "day" } };
     if (span <= 60 * DAY) return { major: { kind: "month" }, minor: { kind: "month-days", amount: 4 } };
     if (span <= 240 * DAY) return { major: { kind: "month" }, minor: { kind: "month-halves" } };
-    if (span <= 3 * YEAR) return { major: { kind: "year" }, minor: { kind: "month" } };
-    if (span <= 5 * YEAR) return { major: { kind: "year" }, minor: { kind: "month", amount: 3 } };
-    if (span <= 10 * YEAR) return { major: { kind: "year" }, minor: { kind: "month", amount: 6 } };
-    if (span <= 30 * YEAR) return { major: { kind: "year", amount: 5 }, minor: { kind: "year" } };
-    if (span <= 100 * YEAR) return { major: { kind: "year", amount: 20 }, minor: { kind: "year", amount: 5 } };
-    if (span <= 300 * YEAR) return { major: { kind: "year", amount: 50 }, minor: { kind: "year", amount: 10 } };
-    if (span <= 1000 * YEAR) return { major: { kind: "year", amount: 200 }, minor: { kind: "year", amount: 50 } };
-    if (span <= 2200 * YEAR) return { major: { kind: "year", amount: 500 }, minor: { kind: "year", amount: 100 } };
-    return { major: { kind: "year", amount: 1000 }, minor: { kind: "year", amount: 250 } };
+    if (span <= YEAR) return { major: { kind: "year" }, minor: { kind: "month" } };
+    if (span <= 5 * YEAR) return { major: { kind: "year" }, minor: { kind: "month", amount: 6 } };
+
+    const majorYears = yearMarkerStep(span);
+    const minorYears = majorYears > 1
+      ? (majorYears % 2 === 0 ? majorYears / 2 : 1)
+      : 1;
+    return {
+      major: { kind: "year", amount: majorYears, markersOnly: true },
+      minor: { kind: "year", amount: minorYears, labels: false }
+    };
   }
 
   function shortMonth(month) {
@@ -827,15 +837,8 @@
       return `${shortMonth(start.month)}–${shortMonth(end.month)}`;
     }
     if (scale.kind === "year") {
-      if (start.year === end.year && start.era === end.era) {
-        return major ? `${start.year} ${eraShort(start)}` : String(start.year);
-      }
-      if (start.era === end.era) {
-        return major
-          ? `${start.year}–${end.year} ${eraShort(start)}`
-          : `${start.year}–${end.year}`;
-      }
-      return `${start.year} ${eraShort(start)}–${end.year} ${eraShort(end)}`;
+      if (scale.labels === false) return "";
+      return major ? `${start.year} ${eraShort(start)}` : String(start.year);
     }
     return "";
   }
@@ -853,7 +856,14 @@
 
     return segments
       .filter(segment => segment.end > ganttStart && segment.start < ganttEnd)
-      .map(segment => ({ ...segment, label: axisSegmentLabel(segment, scale, major) }));
+      .map(segment => {
+        let label = axisSegmentLabel(segment, scale, major);
+        if (major && scale.kind === "year" && scale.markersOnly && segment.start < ganttStart) {
+          const visibleStart = C.minutesToDate(ganttStart);
+          label = `${visibleStart.year} ${eraShort(visibleStart)}`;
+        }
+        return { ...segment, label };
+      });
   }
 
   function formatEventDate(minutes, span = ganttEnd - ganttStart) {
@@ -999,7 +1009,7 @@
       el.dataset.start = String(segment.start);
       el.dataset.end = String(segment.end);
 
-      if (widthPixels >= minimumLabelWidth) {
+      if (segment.label && widthPixels >= minimumLabelWidth) {
         el.innerHTML = `<span title="${C.escapeHtml(segment.label)}">${C.escapeHtml(segment.label)}</span>`;
       }
 
