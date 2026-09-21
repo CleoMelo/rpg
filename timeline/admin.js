@@ -1155,11 +1155,14 @@
     }
   }
 
-  function estimateLabelWidth(event, span) {
-    const base = Math.max(165, Math.min(360, 72 + String(event.name || "").length * 6.2));
-    if (span > 500 * YEAR) return Math.min(base, 205);
-    if (span > 50 * YEAR) return Math.min(base, 240);
-    return base;
+  function estimateLabelWidth(event) {
+    // O tamanho natural do rótulo depende do conteúdo, não do nível de zoom.
+    // O recorte por colisão já é feito depois, usando o próximo evento do mesmo track.
+    // Assim, se não houver nada adiante naquela linha, nomes longos podem ocupar
+    // todo o espaço necessário sem serem truncados artificialmente.
+    const text = String(event.name || "");
+    const characterCount = Array.from(text).length;
+    return Math.max(165, 84 + characterCount * 7.2);
   }
 
   function resetStableTrackLayout() {
