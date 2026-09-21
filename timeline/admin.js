@@ -1234,51 +1234,62 @@
 
     const starts = [...groups.keys()].sort((a, b) => a - b);
     const trackById = new Map();
-    const nextStartByTime = new Map();
     let maxTrackCount = 1;
 
-    starts.forEach((start, index) => {
+    // O índice dentro do grupo define a linha vertical. Um horário com um único
+    // acontecimento ocupa somente o track 0 e não interfere nos tracks abaixo.
+    for (const start of starts) {
       const group = groups.get(start) || [];
       maxTrackCount = Math.max(maxTrackCount, group.length);
 
       group.forEach((event, track) => {
         trackById.set(event.id, track);
       });
+    }
 
-      const nextStart = starts[index + 1];
-      if (Number.isFinite(nextStart)) nextStartByTime.set(start, nextStart);
-    });
+    // Calcula o próximo acontecimento separadamente para cada track.
+    // Ex.: se 00:00 possui dois eventos e 06:00 possui apenas um, somente
+    // o evento do track 0 é limitado pelo evento das 06:00.
+    const eventsByTrack = new Map();
+    for (const event of ordered) {
+      const track = trackById.get(event.id) ?? 0;
+      if (!eventsByTrack.has(track)) eventsByTrack.set(track, []);
+      eventsByTrack.get(track).push(event);
+    }
 
-    // O zoom pode reduzir o espaço do texto, mas nunca muda o track vertical.
-    // O próximo instante diferente define onde o rótulo atual deve terminar.
+    const nextStartByEventId = new Map();
+    for (const trackEvents of eventsByTrack.values()) {
+      for (let index = 0; index < trackEvents.length - 1; index += 1) {
+        nextStartByEventId.set(
+          trackEvents[index].id,
+          Number(trackEvents[index + 1].start || 0)
+        );
+      }
+    }
+
+    // O zoom altera apenas o espaço horizontal disponível, nunca o track.
+    // Quando necessário, o item inteiro é recortado antes do próximo evento
+    // do MESMO track: texto, ícone e barra visual. A duração salva não muda.
     for (const geometry of visibleGeometries) {
-      const start = Number(geometry.event.start || 0);
       geometry.track = trackById.get(geometry.event.id) ?? 0;
 
-      const nextStart = nextStartByTime.get(start);
+      const naturalWidth = geometry.kind === "range"
+        ? geometry.outerWidth
+        : geometry.width;
+      const nextStart = nextStartByEventId.get(geometry.event.id);
+
       if (!Number.isFinite(nextStart)) {
-        geometry.renderWidth = geometry.kind === "range"
-          ? geometry.outerWidth
-          : geometry.width;
+        geometry.renderWidth = naturalWidth;
+        geometry.clipped = false;
         continue;
       }
 
       const nextX = ((nextStart - ganttStart) / Math.max(1, span)) * plotWidth;
       const gap = 8;
-      const available = Math.max(0, nextX - geometry.left - gap);
+      const available = Math.max(1, nextX - geometry.left - gap);
 
-      if (geometry.kind === "range") {
-        // A barra continua representando a duração real. Apenas a área do texto
-        // é reduzida quando o próximo marcador estiver muito próximo.
-        const fixedWidth = geometry.barWidth + 40;
-        geometry.renderWidth = Math.max(
-          fixedWidth,
-          Math.min(fixedWidth + estimateLabelWidth(geometry.event, span), available)
-        );
-      } else {
-        // Preserva haste + ícone e corta somente o restante do conteúdo textual.
-        geometry.renderWidth = Math.max(42, Math.min(geometry.width, available));
-      }
+      geometry.renderWidth = Math.min(naturalWidth, available);
+      geometry.clipped = geometry.renderWidth < naturalWidth - 0.5;
     }
 
     return maxTrackCount;
@@ -1389,6 +1400,7 @@
     item.style.top = `${8 + geometry.track * 48}px`;
     item.style.minWidth = "0px";
     item.style.width = `${geometry.renderWidth ?? (range ? geometry.outerWidth : geometry.width)}px`;
+    item.style.overflow = geometry.clipped ? "hidden" : "visible";
 
     if (item.dataset.contentKey !== contentKey) {
       item.dataset.contentKey = contentKey;
