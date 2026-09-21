@@ -384,19 +384,23 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
 .lk-gantt-scroller.panning .lk-track{
   cursor:grabbing;
 }
+.lk-gantt-scroller.smooth-zooming .gantt-rows,
+.lk-gantt-scroller.smooth-zooming .axis-tier{
+  will-change:contents;
+}
 .lk-gantt-scroller.mode-add .lk-track{
   cursor:crosshair;
 }
 .lk-axis-row{
   grid-template-columns:220px minmax(0,1fr)!important;
   min-width:0!important;
-  height:64px;
+  height:72px;
   background:#111015;
   border-bottom:1px solid #403946;
 }
 .lk-corner{
   width:220px!important;
-  height:64px!important;
+  height:72px!important;
   display:flex!important;
   align-items:center!important;
   justify-content:space-between;
@@ -414,28 +418,32 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
 }
 .lk-axis{
   position:relative;
-  height:64px!important;
+  height:72px!important;
   min-width:0!important;
+  overflow:hidden;
   background:#0e0c11!important;
 }
 .axis-tier{
   position:absolute;
   left:0;
   right:0;
+  overflow:hidden;
 }
 .axis-major{
   top:0;
-  height:32px;
+  height:40px;
   border-bottom:1px solid #342f38;
 }
 .axis-minor{
-  top:32px;
+  top:40px;
   height:32px;
 }
 .lk-axis-tick{
   position:absolute;
   top:0;
   bottom:0;
+  box-sizing:border-box;
+  overflow:hidden;
   border-left:1px solid var(--lk-grid);
 }
 .lk-axis-tick.major-tick{
@@ -445,9 +453,13 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
   position:absolute;
   left:8px;
   top:8px;
+  display:block;
+  max-width:calc(100% - 12px);
+  overflow:hidden;
   color:#aaa0ae;
   font-size:10px;
   font-weight:650;
+  text-overflow:ellipsis;
   white-space:nowrap;
 }
 .major-tick span{
@@ -560,6 +572,7 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
 .event-copy{
   min-width:0;
   display:grid;
+  overflow:hidden;
   gap:3px;
   padding-top:0;
 }
@@ -575,6 +588,9 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
   text-shadow:0 1px 1px rgba(0,0,0,.7);
 }
 .event-copy small{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
   color:#9c929f;
   font-size:10px;
   white-space:nowrap;
@@ -1068,7 +1084,8 @@ body.lk16-page{
   height:40px;
 }
 .lk16-page .axis-minor{
-  height:30px;
+  top:40px;
+  height:32px;
 }
 .lk16-page .major-tick span{
   top:11px;

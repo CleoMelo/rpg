@@ -7,10 +7,10 @@
   const YEAR = 525600;
   const HOUR = 60;
   const LANE_WIDTH = 220;
-  const MIN_GANTT_SPAN = 6 * HOUR;
+  const MIN_GANTT_SPAN = 30;
   const MAX_GANTT_SPAN = 10000 * YEAR;
   const ZOOM_LEVELS = [
-    6 * HOUR, 12 * HOUR,
+    30, HOUR, 3 * HOUR, 6 * HOUR, 12 * HOUR,
     DAY, 3 * DAY, 7 * DAY, 14 * DAY, 30 * DAY, 90 * DAY, 180 * DAY,
     YEAR, 2 * YEAR, 3 * YEAR, 5 * YEAR, 10 * YEAR, 20 * YEAR, 30 * YEAR,
     50 * YEAR, 100 * YEAR, 200 * YEAR, 300 * YEAR, 500 * YEAR,
@@ -43,9 +43,8 @@
   let canvasPan = null;
   let overviewPan = null;
   let toastTimer = null;
-  let wheelAccumulator = 0;
-  let wheelResetTimer = null;
-  let lastWheelZoomAt = 0;
+  let smoothWheelZoom = null;
+  let smoothWheelFrame = null;
   let renderFrame = null;
   let editMode = "hand";
   let collapsedLanes = new Set();
@@ -54,6 +53,7 @@
   let redoStack = [];
   let temporaryHandMode = false;
   let lastCursorClientX = null;
+  let currentAxisLayout = { major: [], minor: [] };
 
   // Layout vertical estável por nível de zoom.
   // O antigo renderer reempacotava apenas os eventos dentro da janela visível;
@@ -554,6 +554,7 @@
   }
 
   function setGanttSpan(span) {
+    finishSmoothWheelZoom(false);
     span = clamp(Number(span), MIN_GANTT_SPAN, maximumAllowedSpan());
     const center = (ganttStart + ganttEnd) / 2;
     ganttStart = Math.round(center - span / 2);
@@ -594,7 +595,110 @@
     return rect.left + fraction * rect.width;
   }
 
+  function finishSmoothWheelZoom(commit = true) {
+    if (!smoothWheelZoom) return;
+    const target = smoothWheelZoom;
+    if (smoothWheelFrame) cancelAnimationFrame(smoothWheelFrame);
+    smoothWheelFrame = null;
+    smoothWheelZoom = null;
+    $("ganttScroller").classList.remove("smooth-zooming");
+
+    if (!commit) return;
+    ganttStart = Math.round(target.targetStart);
+    ganttEnd = Math.round(target.targetStart + target.targetSpan);
+    resetStableTrackLayout();
+    syncScalePreset(target.targetSpan);
+    renderGantt();
+    updateCursorDateLabel(target.clientX);
+  }
+
+  function constrainZoomWindow(start, span) {
+    span = clamp(Number(span), MIN_GANTT_SPAN, maximumAllowedSpan());
+    const configured = configuredTimelineBounds();
+    if (!configured) return { start, span };
+
+    const allowedSpan = configured.max - configured.min;
+    if (span >= allowedSpan) return { start: configured.min, span: allowedSpan };
+    return {
+      start: clamp(start, configured.min, configured.max - span),
+      span
+    };
+  }
+
+  function animateSmoothWheelZoom(frameTime) {
+    const state = smoothWheelZoom;
+    if (!state) {
+      smoothWheelFrame = null;
+      return;
+    }
+
+    const elapsed = clamp(frameTime - state.lastFrameTime, 1, 80);
+    state.lastFrameTime = frameTime;
+
+    // Interpolação exponencial baseada no tempo: mantém a mesma sensação em telas
+    // de 60 Hz ou 144 Hz e absorve uma sequência rápida de passos da roda sem saltos.
+    const amount = 1 - Math.exp(-elapsed / 72);
+    state.currentStart += (state.targetStart - state.currentStart) * amount;
+    state.currentSpan = Math.exp(
+      Math.log(Math.max(1, state.currentSpan)) +
+      (Math.log(Math.max(1, state.targetSpan)) - Math.log(Math.max(1, state.currentSpan))) * amount
+    );
+
+    ganttStart = state.currentStart;
+    ganttEnd = state.currentStart + state.currentSpan;
+    renderGantt();
+    updateCursorDateLabel(state.clientX);
+
+    const spanDistance = Math.abs(state.currentSpan - state.targetSpan) / Math.max(1, state.targetSpan);
+    const startDistance = Math.abs(state.currentStart - state.targetStart) / Math.max(1, state.targetSpan);
+    const inputSettled = frameTime - state.lastInputTime >= 72;
+
+    if (inputSettled && spanDistance < 0.0008 && startDistance < 0.0008) {
+      finishSmoothWheelZoom(true);
+      return;
+    }
+
+    smoothWheelFrame = requestAnimationFrame(animateSmoothWheelZoom);
+  }
+
+  function smoothZoomByWheel(delta, clientX) {
+    const rect = axisRect();
+    const fraction = clamp((clientX - rect.left) / Math.max(1, rect.width), 0, 1);
+    const now = performance.now();
+
+    if (!smoothWheelZoom) {
+      const baseSpan = ganttEnd - ganttStart;
+      smoothWheelZoom = {
+        currentStart: ganttStart,
+        currentSpan: baseSpan,
+        targetStart: ganttStart,
+        targetSpan: baseSpan,
+        clientX,
+        lastInputTime: now,
+        lastFrameTime: now
+      };
+      $("ganttScroller").classList.add("smooth-zooming");
+    }
+
+    const state = smoothWheelZoom;
+    const anchorTime = state.targetStart + fraction * state.targetSpan;
+    const zoomFactor = Math.exp(clamp(delta, -240, 240) * 0.0016);
+    const requestedSpan = state.targetSpan * zoomFactor;
+    const requestedStart = anchorTime - fraction * requestedSpan;
+    const constrained = constrainZoomWindow(requestedStart, requestedSpan);
+
+    state.targetStart = constrained.start;
+    state.targetSpan = constrained.span;
+    state.clientX = clientX;
+    state.lastInputTime = now;
+
+    $("liveScaleLabel").textContent = `Janela: ${humanSpan(state.targetSpan)}`;
+    $("zoomResolutionLabel").textContent = zoomResolutionName(state.targetSpan);
+    if (!smoothWheelFrame) smoothWheelFrame = requestAnimationFrame(animateSmoothWheelZoom);
+  }
+
   function zoomToSpanAtClientX(targetSpan, clientX = null) {
+    finishSmoothWheelZoom(false);
     const oldSpan = ganttEnd - ganttStart;
     targetSpan = clamp(Number(targetSpan), MIN_GANTT_SPAN, maximumAllowedSpan());
 
@@ -613,6 +717,7 @@
   }
 
   function stepZoom(direction, clientX = null) {
+    finishSmoothWheelZoom(true);
     const current = ganttEnd - ganttStart;
     zoomToSpanAtClientX(zoomLevelForDirection(current, direction), clientX);
   }
@@ -646,7 +751,10 @@
 
   function snapMinutes() {
     const span = ganttEnd - ganttStart;
-    if (span <= DAY) return 15;
+    if (span <= HOUR) return 1;
+    if (span <= 3 * HOUR) return 5;
+    if (span <= 12 * HOUR) return 15;
+    if (span <= DAY) return 30;
     if (span <= 7 * DAY) return 60;
     if (span <= 30 * DAY) return 6 * HOUR;
     if (span <= YEAR) return DAY;
@@ -671,20 +779,35 @@
     return 4;
   }
 
+  function yearMarkerStep(span) {
+    const target = Math.max(1, span / YEAR / 10);
+    const magnitude = 10 ** Math.floor(Math.log10(target));
+    const normalized = target / magnitude;
+    const factor = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+    return Math.max(1, Math.round(factor * magnitude));
+  }
+
   function axisSpec(span) {
-    if (span > 2200 * YEAR) return { major: 1000 * YEAR, minor: 250 * YEAR };
-    if (span > 900 * YEAR) return { major: 500 * YEAR, minor: 100 * YEAR };
-    if (span > 250 * YEAR) return { major: 100 * YEAR, minor: 20 * YEAR };
-    if (span > 80 * YEAR) return { major: 50 * YEAR, minor: 10 * YEAR };
-    if (span > 20 * YEAR) return { major: 10 * YEAR, minor: 2 * YEAR };
-    if (span > 5 * YEAR) return { major: 5 * YEAR, minor: YEAR };
-    if (span > 18 * 30 * DAY) return { major: YEAR, minor: 90 * DAY };
-    if (span > 180 * DAY) return { major: 90 * DAY, minor: 30 * DAY };
-    if (span > 60 * DAY) return { major: 30 * DAY, minor: 7 * DAY };
-    if (span > 14 * DAY) return { major: 7 * DAY, minor: DAY };
-    if (span > 3 * DAY) return { major: DAY, minor: 6 * HOUR };
-    if (span > DAY) return { major: 12 * HOUR, minor: 3 * HOUR };
-    return { major: 6 * HOUR, minor: HOUR };
+    if (span <= HOUR) return { major: { kind: "day" }, minor: { kind: "fixed", step: 5 } };
+    if (span <= 3 * HOUR) return { major: { kind: "day" }, minor: { kind: "fixed", step: 15 } };
+    if (span <= 6 * HOUR) return { major: { kind: "day" }, minor: { kind: "fixed", step: 30 } };
+    if (span <= 12 * HOUR) return { major: { kind: "day" }, minor: { kind: "fixed", step: HOUR } };
+    if (span <= 2 * DAY) return { major: { kind: "day" }, minor: { kind: "fixed", step: 3 * HOUR } };
+    if (span <= 7 * DAY) return { major: { kind: "day" }, minor: { kind: "fixed", step: 6 * HOUR } };
+    if (span <= 21 * DAY) return { major: { kind: "month" }, minor: { kind: "day" } };
+    if (span <= 60 * DAY) return { major: { kind: "month" }, minor: { kind: "month-days", amount: 4 } };
+    if (span <= 240 * DAY) return { major: { kind: "month" }, minor: { kind: "month-halves" } };
+    if (span <= YEAR) return { major: { kind: "year" }, minor: { kind: "month" } };
+    if (span <= 5 * YEAR) return { major: { kind: "year" }, minor: { kind: "month", amount: 6 } };
+
+    const majorYears = yearMarkerStep(span);
+    const minorYears = majorYears > 1
+      ? (majorYears % 2 === 0 ? majorYears / 2 : 1)
+      : 1;
+    return {
+      major: { kind: "year", amount: majorYears, markersOnly: true },
+      minor: { kind: "year", amount: minorYears, labels: false }
+    };
   }
 
   function shortMonth(month) {
@@ -696,18 +819,155 @@
     return date.era === "before" ? settings.beforeShort : settings.afterShort;
   }
 
-  function formatAxisLabel(minutes, step, major = false) {
-    const date = C.minutesToDate(Math.round(minutes));
+  function astronomicalYear(date) {
+    return date.era === "before" ? 1 - Number(date.year) : Number(date.year);
+  }
 
-    if (step >= YEAR) return `${date.year} ${eraShort(date)}`;
-    if (step >= 30 * DAY) return `${shortMonth(date.month)} ${date.year} ${eraShort(date)}`;
-    if (step >= DAY) return major
-      ? `${date.day} ${shortMonth(date.month)} ${date.year}`
-      : `${date.day} ${shortMonth(date.month)}`;
+  function eraYearFromAstronomical(year) {
+    return year <= 0
+      ? { era: "before", year: 1 - year }
+      : { era: "after", year };
+  }
 
-    return major
-      ? `${date.day} ${shortMonth(date.month)}`
-      : `${String(date.hour).padStart(2, "0")}:${String(date.minute).padStart(2, "0")}`;
+  function monthIndexForDate(date) {
+    return astronomicalYear(date) * 12 + Number(date.month) - 1;
+  }
+
+  function monthPartsFromIndex(index) {
+    const year = Math.floor(index / 12);
+    return { year, month: index - year * 12 + 1 };
+  }
+
+  function monthStartFromIndex(index) {
+    const parts = monthPartsFromIndex(index);
+    const eraYear = eraYearFromAstronomical(parts.year);
+    return C.dateToMinutes({ ...eraYear, month: parts.month, day: 1 });
+  }
+
+  function yearStartFromAstronomical(year) {
+    return C.dateToMinutes({ ...eraYearFromAstronomical(year), month: 1, day: 1 });
+  }
+
+  function fixedAxisSegments(step) {
+    const segments = [];
+    let start = Math.floor(ganttStart / step) * step;
+
+    while (start < ganttEnd && segments.length < 320) {
+      segments.push({ start, end: start + step });
+      start += step;
+    }
+    return segments;
+  }
+
+  function monthAxisSegments(amount = 1) {
+    const segments = [];
+    const currentIndex = monthIndexForDate(C.minutesToDate(ganttStart));
+    let index = Math.floor(currentIndex / amount) * amount;
+
+    while (segments.length < 320) {
+      const start = monthStartFromIndex(index);
+      const end = monthStartFromIndex(index + amount);
+      if (start >= ganttEnd) break;
+      segments.push({ start, end });
+      index += amount;
+    }
+    return segments;
+  }
+
+  function yearAxisSegments(amount = 1) {
+    const segments = [];
+    const currentYear = astronomicalYear(C.minutesToDate(ganttStart));
+    let year = Math.floor(currentYear / amount) * amount;
+
+    while (segments.length < 320) {
+      const start = yearStartFromAstronomical(year);
+      const end = yearStartFromAstronomical(year + amount);
+      if (start >= ganttEnd) break;
+      segments.push({ start, end });
+      year += amount;
+    }
+    return segments;
+  }
+
+  function monthDayAxisSegments(amount = 4, halves = false) {
+    const segments = [];
+    let monthIndex = monthIndexForDate(C.minutesToDate(ganttStart));
+
+    while (segments.length < 320) {
+      const monthStart = monthStartFromIndex(monthIndex);
+      const monthEnd = monthStartFromIndex(monthIndex + 1);
+      if (monthStart >= ganttEnd) break;
+      const startDate = C.minutesToDate(monthStart);
+      const finalDay = C.minutesToDate(monthEnd - 1).day;
+      const starts = halves
+        ? [1, 16].filter(day => day <= finalDay)
+        : Array.from({ length: Math.ceil(finalDay / amount) }, (_, index) => index * amount + 1);
+
+      for (const startDay of starts) {
+        const endDay = halves ? (startDay === 1 ? 16 : finalDay + 1) : Math.min(finalDay + 1, startDay + amount);
+        const start = C.dateToMinutes({ ...startDate, day: startDay, hour: 0, minute: 0 });
+        const end = endDay > finalDay
+          ? monthEnd
+          : C.dateToMinutes({ ...startDate, day: endDay, hour: 0, minute: 0 });
+        segments.push({ start, end, startDay, endDay: endDay - 1 });
+      }
+      monthIndex += 1;
+    }
+    return segments;
+  }
+
+  function axisSegmentLabel(segment, scale, major) {
+    const start = C.minutesToDate(Math.round(segment.start));
+    const end = C.minutesToDate(Math.round(segment.end - 1));
+
+    if (scale.kind === "fixed") {
+      return `${String(start.hour).padStart(2, "0")}:${String(start.minute).padStart(2, "0")}`;
+    }
+    if (scale.kind === "day") {
+      return major
+        ? `${start.day} ${C.PT_MONTHS[start.month - 1]} ${start.year} ${eraShort(start)}`
+        : String(start.day).padStart(2, "0");
+    }
+    if (scale.kind === "month-days" || scale.kind === "month-halves") {
+      return segment.startDay === segment.endDay
+        ? String(segment.startDay).padStart(2, "0")
+        : `${segment.startDay}–${segment.endDay}`;
+    }
+    if (scale.kind === "month") {
+      if (major) return `${C.PT_MONTHS[start.month - 1]} ${start.year} ${eraShort(start)}`;
+      if ((scale.amount || 1) === 1) {
+        return ganttEnd - ganttStart <= YEAR ? C.PT_MONTHS[start.month - 1] : shortMonth(start.month);
+      }
+      return `${shortMonth(start.month)}–${shortMonth(end.month)}`;
+    }
+    if (scale.kind === "year") {
+      if (scale.labels === false) return "";
+      return major ? `${start.year} ${eraShort(start)}` : String(start.year);
+    }
+    return "";
+  }
+
+  function axisSegments(scale, major) {
+    const amount = Math.max(1, Number(scale.amount) || 1);
+    let segments;
+
+    if (scale.kind === "fixed") segments = fixedAxisSegments(scale.step);
+    else if (scale.kind === "day") segments = fixedAxisSegments(DAY);
+    else if (scale.kind === "month") segments = monthAxisSegments(amount);
+    else if (scale.kind === "year") segments = yearAxisSegments(amount);
+    else if (scale.kind === "month-halves") segments = monthDayAxisSegments(15, true);
+    else segments = monthDayAxisSegments(amount, false);
+
+    return segments
+      .filter(segment => segment.end > ganttStart && segment.start < ganttEnd)
+      .map(segment => {
+        let label = axisSegmentLabel(segment, scale, major);
+        if (major && scale.kind === "year" && scale.markersOnly && segment.start < ganttStart) {
+          const visibleStart = C.minutesToDate(ganttStart);
+          label = `${visibleStart.year} ${eraShort(visibleStart)}`;
+        }
+        return { ...segment, label };
+      });
   }
 
   function formatEventDate(minutes, span = ganttEnd - ganttStart) {
@@ -831,17 +1091,34 @@
     renderAll();
   }
 
-  function ticksForStep(step) {
-    const start = Math.floor(ganttStart / step) * step;
-    const ticks = [];
-    for (let value = start; value <= ganttEnd + step; value += step) {
-      if (value < ganttStart - step * 0.02) continue;
-      const pct = ((value - ganttStart) / (ganttEnd - ganttStart)) * 100;
-      if (pct < -1 || pct > 101) continue;
-      ticks.push({ value, pct });
-      if (ticks.length > 160) break;
+  function percentForTime(minutes) {
+    return (Number(minutes) - ganttStart) / Math.max(1, ganttEnd - ganttStart) * 100;
+  }
+
+  function renderAxisTier(container, segments, major) {
+    const axisWidth = Math.max($("ganttAxis").clientWidth, 720);
+
+    for (const segment of segments) {
+      const visibleStart = Math.max(ganttStart, segment.start);
+      const visibleEnd = Math.min(ganttEnd, segment.end);
+      const left = percentForTime(visibleStart);
+      const width = percentForTime(visibleEnd) - left;
+      const widthPixels = width / 100 * axisWidth;
+      const minimumLabelWidth = major ? 58 : 28;
+      const el = document.createElement("div");
+
+      el.className = `lk-axis-tick ${major ? "major-tick" : "minor-tick"}`;
+      el.style.left = `${left}%`;
+      el.style.width = `${Math.max(0, width)}%`;
+      el.dataset.start = String(segment.start);
+      el.dataset.end = String(segment.end);
+
+      if (segment.label && widthPixels >= minimumLabelWidth) {
+        el.innerHTML = `<span title="${C.escapeHtml(segment.label)}">${C.escapeHtml(segment.label)}</span>`;
+      }
+
+      container.appendChild(el);
     }
-    return ticks;
   }
 
   function renderAxis() {
@@ -852,47 +1129,40 @@
     major.innerHTML = "";
     minor.innerHTML = "";
 
-    for (const tick of ticksForStep(spec.major)) {
-      const el = document.createElement("div");
-      el.className = "lk-axis-tick major-tick";
-      el.style.left = `${tick.pct}%`;
-      el.innerHTML = `<span>${C.escapeHtml(formatAxisLabel(tick.value, spec.major, true))}</span>`;
-      major.appendChild(el);
-    }
-
-    for (const tick of ticksForStep(spec.minor)) {
-      const el = document.createElement("div");
-      el.className = "lk-axis-tick minor-tick";
-      el.style.left = `${tick.pct}%`;
-      el.innerHTML = `<span>${C.escapeHtml(formatAxisLabel(tick.value, spec.minor, false))}</span>`;
-      minor.appendChild(el);
-    }
+    currentAxisLayout = {
+      major: axisSegments(spec.major, true),
+      minor: axisSegments(spec.minor, false)
+    };
+    renderAxisTier(major, currentAxisLayout.major, true);
+    renderAxisTier(minor, currentAxisLayout.minor, false);
   }
 
   function addGridLines(track) {
-    const span = ganttEnd - ganttStart;
-    const spec = axisSpec(span);
-
-    for (const tick of ticksForStep(spec.minor)) {
+    for (const segment of currentAxisLayout.minor) {
+      if (segment.start <= ganttStart || segment.start >= ganttEnd) continue;
       const line = document.createElement("i");
       line.className = "gantt-gridline minor-gridline";
-      line.style.left = `${tick.pct}%`;
+      line.style.left = `${percentForTime(segment.start)}%`;
       track.appendChild(line);
     }
 
-    for (const tick of ticksForStep(spec.major)) {
+    for (const segment of currentAxisLayout.major) {
+      if (segment.start <= ganttStart || segment.start >= ganttEnd) continue;
       const line = document.createElement("i");
       line.className = "gantt-gridline major-gridline";
-      line.style.left = `${tick.pct}%`;
+      line.style.left = `${percentForTime(segment.start)}%`;
       track.appendChild(line);
     }
   }
 
-  function estimateLabelWidth(event, span) {
-    const base = Math.max(165, Math.min(360, 72 + String(event.name || "").length * 6.2));
-    if (span > 500 * YEAR) return Math.min(base, 205);
-    if (span > 50 * YEAR) return Math.min(base, 240);
-    return base;
+  function estimateLabelWidth(event) {
+    // O tamanho natural do rótulo depende do conteúdo, não do nível de zoom.
+    // O recorte por colisão já é feito depois, usando o próximo evento do mesmo track.
+    // Assim, se não houver nada adiante naquela linha, nomes longos podem ocupar
+    // todo o espaço necessário sem serem truncados artificialmente.
+    const text = String(event.name || "");
+    const characterCount = Array.from(text).length;
+    return Math.max(165, 84 + characterCount * 7.2);
   }
 
   function resetStableTrackLayout() {
@@ -949,75 +1219,83 @@
   }
 
   function assignStableTracks(laneId, allLaneEvents, visibleGeometries, plotWidth, span) {
-    const state = laneTrackState(laneId, span);
-    const ids = new Set(allLaneEvents.map(event => event.id));
+    // A posição vertical depende somente do instante exato do acontecimento.
+    // Horários diferentes permanecem na mesma linha; somente acontecimentos
+    // com o mesmo timestamp são empilhados de forma determinística.
+    const ordered = [...allLaneEvents].sort((a, b) =>
+      Number(a.start || 0) - Number(b.start || 0) ||
+      String(a.pos || "").localeCompare(String(b.pos || "")) ||
+      String(a.id || "").localeCompare(String(b.id || ""))
+    );
 
-    // Remove entradas de acontecimentos que deixaram de existir ou mudaram de lane.
-    for (const id of [...state.tracks.keys()]) {
-      if (!ids.has(id)) state.tracks.delete(id);
+    const groups = new Map();
+    for (const event of ordered) {
+      const start = Number(event.start || 0);
+      if (!groups.has(start)) groups.set(start, []);
+      groups.get(start).push(event);
     }
 
-    const eventById = new Map(allLaneEvents.map(event => [event.id, event]));
-    const occupancy = new Map();
-    const gapMinutes = 10 * (span / Math.max(1, plotWidth));
+    const starts = [...groups.keys()].sort((a, b) => a - b);
+    const trackById = new Map();
+    let maxTrackCount = 1;
 
-    // Os slots já atribuídos permanecem exatamente onde estavam.
-    for (const [id, track] of state.tracks.entries()) {
-      const event = eventById.get(id);
-      if (!event) continue;
-      if (!occupancy.has(track)) occupancy.set(track, []);
-      occupancy.get(track).push(eventLayoutFootprint(event, plotWidth, span));
+    // O índice dentro do grupo define a linha vertical. Um horário com um único
+    // acontecimento ocupa somente o track 0 e não interfere nos tracks abaixo.
+    for (const start of starts) {
+      const group = groups.get(start) || [];
+      maxTrackCount = Math.max(maxTrackCount, group.length);
+
+      group.forEach((event, track) => {
+        trackById.set(event.id, track);
+      });
     }
 
-    // Pré-carrega também eventos próximos às bordas. Assim eles já possuem um slot
-    // antes de entrarem na tela e não provocam reordenação no primeiro pixel de pan.
-    const preloadStart = ganttStart - span * 0.8;
-    const preloadEnd = ganttEnd + span * 0.8;
-    const candidateIds = new Set(visibleGeometries.map(geometry => geometry.event.id));
-    const candidates = allLaneEvents
-      .filter(event => {
-        const start = Number(event.start || 0);
-        const end = event.end != null ? Number(event.end) : start;
-        return candidateIds.has(event.id) || (end >= preloadStart && start <= preloadEnd);
-      })
-      .sort((a, b) =>
-        Number(a.start || 0) - Number(b.start || 0) ||
-        String(a.pos || '').localeCompare(String(b.pos || '')) ||
-        String(a.id || '').localeCompare(String(b.id || ''))
-      );
+    // Calcula o próximo acontecimento separadamente para cada track.
+    // Ex.: se 00:00 possui dois eventos e 06:00 possui apenas um, somente
+    // o evento do track 0 é limitado pelo evento das 06:00.
+    const eventsByTrack = new Map();
+    for (const event of ordered) {
+      const track = trackById.get(event.id) ?? 0;
+      if (!eventsByTrack.has(track)) eventsByTrack.set(track, []);
+      eventsByTrack.get(track).push(event);
+    }
 
-    for (const event of candidates) {
-      if (state.tracks.has(event.id)) continue;
-
-      const footprint = eventLayoutFootprint(event, plotWidth, span);
-      let track = 0;
-
-      while (true) {
-        const intervals = occupancy.get(track) || [];
-        const collision = intervals.some(interval => footprintsOverlap(footprint, interval, gapMinutes));
-        if (!collision) break;
-        track += 1;
+    const nextStartByEventId = new Map();
+    for (const trackEvents of eventsByTrack.values()) {
+      for (let index = 0; index < trackEvents.length - 1; index += 1) {
+        nextStartByEventId.set(
+          trackEvents[index].id,
+          Number(trackEvents[index + 1].start || 0)
+        );
       }
-
-      state.tracks.set(event.id, track);
-      if (!occupancy.has(track)) occupancy.set(track, []);
-      occupancy.get(track).push(footprint);
-      state.maxTrackSeen = Math.max(state.maxTrackSeen, track);
     }
 
-    // Aplica os slots persistentes às geometrias atualmente desenhadas.
+    // O zoom altera apenas o espaço horizontal disponível, nunca o track.
+    // Quando necessário, o item inteiro é recortado antes do próximo evento
+    // do MESMO track: texto, ícone e barra visual. A duração salva não muda.
     for (const geometry of visibleGeometries) {
-      if (!state.tracks.has(geometry.event.id)) {
-        // Fallback extremamente defensivo; normalmente o evento já entrou em candidates.
-        state.tracks.set(geometry.event.id, 0);
+      geometry.track = trackById.get(geometry.event.id) ?? 0;
+
+      const naturalWidth = geometry.kind === "range"
+        ? geometry.outerWidth
+        : geometry.width;
+      const nextStart = nextStartByEventId.get(geometry.event.id);
+
+      if (!Number.isFinite(nextStart)) {
+        geometry.renderWidth = naturalWidth;
+        geometry.clipped = false;
+        continue;
       }
-      geometry.track = state.tracks.get(geometry.event.id);
-      state.maxTrackSeen = Math.max(state.maxTrackSeen, geometry.track);
+
+      const nextX = ((nextStart - ganttStart) / Math.max(1, span)) * plotWidth;
+      const gap = 8;
+      const available = Math.max(1, nextX - geometry.left - gap);
+
+      geometry.renderWidth = Math.min(naturalWidth, available);
+      geometry.clipped = geometry.renderWidth < naturalWidth - 0.5;
     }
 
-    // A altura não diminui durante o pan. Isso evita que todas as categorias abaixo
-    // subam/desçam quando um evento sai pela borda esquerda.
-    return Math.max(1, state.maxTrackSeen + 1);
+    return maxTrackCount;
   }
 
   function invalidateStableTrackForEvent(eventId) {
@@ -1086,18 +1364,10 @@
     const event = geometry.event;
     const item = document.createElement("button");
     item.type = "button";
-    item.className = `lk-event-item lk-point-event side-right${selectedEventId === event.id ? " selected" : ""}`;
-    item.dataset.eventId = event.id;
-    item.dataset.track = String(geometry.track);
-    item.style.setProperty("--lane-color", color);
-    item.style.left = `${geometry.left}px`;
-    item.style.top = `${8 + geometry.track * 48}px`;
-    item.style.width = `${geometry.width}px`;
-
-    item.innerHTML = `<span class="event-stem"></span>${calendarGlyph()}<span class="event-copy"><strong>${C.escapeHtml(event.name || "Sem nome")}</strong><small>${C.escapeHtml(formatEventDate(event.start))}</small></span>`;
-
-    item.title = `${event.name}\n${C.formatDate(event.start, C.getCalendar(data, doc))}\n${lane.name}`;
+    item.className = "lk-event-item lk-point-event side-right";
+    item.timelineEvent = event;
     installEventInteraction(item, event, geometry);
+    updateEventItem(item, geometry, lane, color);
     return item;
   }
 
@@ -1105,26 +1375,62 @@
     const event = geometry.event;
     const item = document.createElement("button");
     item.type = "button";
-    item.className = `lk-event-item lk-range-event label-outside${selectedEventId === event.id ? " selected" : ""}`;
+    item.className = "lk-event-item lk-range-event label-outside";
+    item.timelineEvent = event;
+    installEventInteraction(item, event, geometry);
+    updateEventItem(item, geometry, lane, color);
+    return item;
+  }
+
+  function updateEventItem(item, geometry, lane, color) {
+    const event = geometry.event;
+    const startLabel = formatEventDate(event.start);
+    const range = geometry.kind === "range";
+    const endLabel = range ? formatEventDate(event.end) : "";
+    const contentKey = [
+      range ? "range" : "point",
+      event.name || "",
+      lane.name || "",
+      startLabel,
+      endLabel,
+    ].join("\u0000");
+
     item.dataset.eventId = event.id;
     item.dataset.track = String(geometry.track);
+    item.classList.toggle("selected", selectedEventId === event.id);
     item.style.setProperty("--lane-color", color);
     item.style.left = `${geometry.left}px`;
     item.style.top = `${8 + geometry.track * 48}px`;
-    item.style.width = `${geometry.outerWidth}px`;
+    item.style.minWidth = "0px";
+    item.style.width = `${geometry.renderWidth ?? (range ? geometry.outerWidth : geometry.width)}px`;
+    item.style.overflow = geometry.clipped ? "hidden" : "visible";
 
-    item.innerHTML = `
-      <span class="range-bar" style="width:${geometry.barWidth}px">
-        <span class="resize-handle left" data-resize="start" aria-hidden="true"></span>
-        <span class="resize-handle right" data-resize="end" aria-hidden="true"></span>
-      </span>
-      ${calendarGlyph()}
-      <span class="event-copy"><strong>${C.escapeHtml(event.name || "Sem nome")}</strong><small>${C.escapeHtml(formatEventDate(event.start))} → ${C.escapeHtml(formatEventDate(event.end))}</small></span>
-    `;
+    if (item.dataset.contentKey !== contentKey) {
+      item.dataset.contentKey = contentKey;
+      item.innerHTML = range
+        ? `
+          <span class="range-bar">
+            <span class="resize-handle left" data-resize="start" aria-hidden="true"></span>
+            <span class="resize-handle right" data-resize="end" aria-hidden="true"></span>
+          </span>
+          ${calendarGlyph()}
+          <span class="event-copy"><strong>${C.escapeHtml(event.name || "Sem nome")}</strong><small>${C.escapeHtml(startLabel)} → ${C.escapeHtml(endLabel)}</small></span>
+        `
+        : `<span class="event-stem"></span>${calendarGlyph()}<span class="event-copy"><strong>${C.escapeHtml(event.name || "Sem nome")}</strong><small>${C.escapeHtml(startLabel)}</small></span>`;
 
-    item.title = `${event.name}\n${C.formatDate(event.start, C.getCalendar(data, doc))} → ${C.formatDate(event.end, C.getCalendar(data, doc))}\n${lane.name}`;
-    installEventInteraction(item, event, geometry);
-    return item;
+      item.title = range
+        ? `${event.name}\n${C.formatDate(event.start, C.getCalendar(data, doc))} → ${C.formatDate(event.end, C.getCalendar(data, doc))}\n${lane.name}`
+        : `${event.name}\n${C.formatDate(event.start, C.getCalendar(data, doc))}\n${lane.name}`;
+    }
+
+    if (range) item.querySelector(".range-bar").style.width = `${geometry.barWidth}px`;
+  }
+
+  function reusableEventItem(item, geometry) {
+    if (!item || item.timelineEvent !== geometry.event) return false;
+    return geometry.kind === "range"
+      ? item.classList.contains("lk-range-event")
+      : item.classList.contains("lk-point-event");
   }
 
   function renderGantt() {
@@ -1196,7 +1502,12 @@
     }
 
     const rows = $("ganttRows");
-    rows.innerHTML = "";
+    const existingRows = new Map(
+      [...rows.children]
+        .filter(row => row.classList.contains("gantt-lane-row"))
+        .map(row => [row.dataset.laneId, row])
+    );
+    const desiredRows = [];
 
     for (const [laneIndex, lane] of laneList.entries()) {
       const globalIndex = doc.content.lanes.findIndex(item => item.id === lane.id);
@@ -1230,31 +1541,43 @@
         : assignStableTracks(lane.id, layoutLaneEvents, geometries, plotWidth, span);
       const rowHeight = collapsed ? 48 : Math.max(72, 20 + Math.max(1, trackCount) * 48);
 
-      const row = document.createElement("div");
-      row.className = `gantt-lane-row lk-lane-row${collapsed ? " collapsed" : ""}`;
-      row.dataset.laneId = lane.id;
+      let row = existingRows.get(String(lane.id));
+      if (!row) {
+        row = document.createElement("div");
+        row.className = "gantt-lane-row lk-lane-row";
+        row.dataset.laneId = lane.id;
+        row.innerHTML = `
+          <div class="gantt-lane-label lk-lane-label">
+            <button class="lane-collapse-btn" type="button"></button>
+            <span class="lane-sigil"></span>
+            <span class="lane-label-text"><strong></strong><small></small></span>
+          </div>
+          <div class="gantt-track lk-track"></div>`;
+
+        row.querySelector(".lane-collapse-btn").addEventListener("click", event => {
+          event.stopPropagation();
+          if (collapsedLanes.has(lane.id)) collapsedLanes.delete(lane.id);
+          else collapsedLanes.add(lane.id);
+          renderGantt();
+        });
+        installTrackInteraction(row.querySelector(".gantt-track"), lane.id);
+      }
+
+      desiredRows.push(row);
+      row.classList.toggle("collapsed", collapsed);
       row.style.minHeight = `${rowHeight}px`;
-      row.innerHTML = `
-        <div class="gantt-lane-label lk-lane-label" style="min-height:${rowHeight}px">
-          <button class="lane-collapse-btn" type="button" aria-label="${collapsed ? "Expandir" : "Recolher"} ${C.escapeHtml(lane.name)}">${collapsed ? "›" : "⌄"}</button>
-          <span class="lane-sigil" style="--lane-color:${color}"></span>
-          <span class="lane-label-text">
-            <strong>${C.escapeHtml(lane.name)}</strong>
-            <small>${laneEvents.length} na tela · ${allLaneEvents.length} no total</small>
-          </span>
-        </div>
-        <div class="gantt-track lk-track" style="min-height:${rowHeight}px"></div>`;
-
-      row.querySelector(".lane-collapse-btn").addEventListener("click", event => {
-        event.stopPropagation();
-        if (collapsedLanes.has(lane.id)) collapsedLanes.delete(lane.id);
-        else collapsedLanes.add(lane.id);
-        renderGantt();
-      });
-
+      const label = row.querySelector(".gantt-lane-label");
+      label.style.minHeight = `${rowHeight}px`;
+      const collapseButton = row.querySelector(".lane-collapse-btn");
+      collapseButton.textContent = collapsed ? "›" : "⌄";
+      collapseButton.setAttribute("aria-label", `${collapsed ? "Expandir" : "Recolher"} ${lane.name}`);
+      row.querySelector(".lane-sigil").style.setProperty("--lane-color", color);
+      row.querySelector(".lane-label-text strong").textContent = lane.name;
+      row.querySelector(".lane-label-text small").textContent = `${laneEvents.length} na tela · ${allLaneEvents.length} no total`;
       const track = row.querySelector(".gantt-track");
+      track.style.minHeight = `${rowHeight}px`;
+      track.querySelectorAll(":scope > .gantt-gridline, :scope > .lk17-offscreen-nav").forEach(element => element.remove());
       addGridLines(track);
-      installTrackInteraction(track, lane.id);
 
       if (!collapsed && previousEvent) {
         const leftNav = document.createElement("button");
@@ -1282,17 +1605,43 @@
         track.appendChild(rightNav);
       }
 
+      const existingItems = new Map(
+        [...track.children]
+          .filter(item => item.classList.contains("lk-event-item"))
+          .map(item => [item.dataset.eventId, item])
+      );
+      const desiredEventIds = new Set();
+
       for (const geometry of geometries) {
-        const item = geometry.kind === "range"
-          ? buildRangeItem(geometry, lane, color)
-          : buildPointItem(geometry, lane, color);
-        track.appendChild(item);
+        const eventId = String(geometry.event.id);
+        desiredEventIds.add(eventId);
+        let item = existingItems.get(eventId);
+        if (!reusableEventItem(item, geometry)) {
+          item?.remove();
+          item = geometry.kind === "range"
+            ? buildRangeItem(geometry, lane, color)
+            : buildPointItem(geometry, lane, color);
+          track.appendChild(item);
+        } else {
+          updateEventItem(item, geometry, lane, color);
+        }
       }
 
-      rows.appendChild(row);
+      for (const [eventId, item] of existingItems) {
+        if (!desiredEventIds.has(eventId)) item.remove();
+      }
     }
 
-    if (!laneList.length) {
+    for (const row of existingRows.values()) {
+      if (!desiredRows.includes(row)) row.remove();
+    }
+
+    if (laneList.length) {
+      rows.querySelector(":scope > .gantt-empty")?.remove();
+      desiredRows.forEach((row, index) => {
+        if (rows.children[index] !== row) rows.insertBefore(row, rows.children[index] || null);
+      });
+    } else {
       rows.innerHTML = `<div class="gantt-empty">Nenhuma categoria corresponde aos filtros atuais.</div>`;
     }
 
@@ -1568,8 +1917,6 @@
   function installCanvasNavigation() {
     const scroller = $("ganttScroller");
     let pan = null;
-    let wheelAccumulator = 0;
-    let wheelResetTimer = null;
 
     scroller.addEventListener("mousemove", event => {
       updateCursorDateLabel(event.clientX);
@@ -1587,22 +1934,15 @@
       if (event.deltaMode === 1) delta *= 16;
       else if (event.deltaMode === 2) delta *= Math.max(600, window.innerHeight);
 
-      wheelAccumulator += clamp(delta, -120, 120);
-      clearTimeout(wheelResetTimer);
-      wheelResetTimer = setTimeout(() => { wheelAccumulator = 0; }, 180);
-
-      const threshold = 78;
-      if (Math.abs(wheelAccumulator) < threshold) return;
-
-      const direction = wheelAccumulator < 0 ? -1 : 1;
-      wheelAccumulator = 0;
-      stepZoom(direction, event.clientX);
+      smoothZoomByWheel(delta, event.clientX);
     }, { passive: false });
 
     scroller.addEventListener("pointerdown", event => {
       const effectiveMode = temporaryHandMode ? "hand" : editMode;
       if (effectiveMode !== "hand" || event.button !== 0) return;
       if (event.target.closest(".lane-collapse-btn")) return;
+
+      finishSmoothWheelZoom(true);
 
       const rect = axisRect();
 
@@ -2071,7 +2411,7 @@
   $("recentBtn").addEventListener("click", focusRecent);
   $("fitBtn").addEventListener("click", fitAll);
   $("zoomIn").addEventListener("click", () => stepZoom(-1, lastCursorClientX));
-  $("zoomOut").addEventListener("click", () => stepZoom(1, lastCursorClientX));
+  $("zoomOut").addEventListener("click", () => stepZoom(1, null));
   $("scalePreset").addEventListener("change", event => setGanttSpan(Number(event.target.value)));
 
   $("modePointer").addEventListener("click", () => setEditMode("pointer"));
