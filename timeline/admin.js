@@ -1216,75 +1216,72 @@
   }
 
   function assignStableTracks(laneId, allLaneEvents, visibleGeometries, plotWidth, span) {
-    const state = laneTrackState(laneId, span);
-    const ids = new Set(allLaneEvents.map(event => event.id));
+    // A posição vertical depende somente do instante exato do acontecimento.
+    // Horários diferentes permanecem na mesma linha; somente acontecimentos
+    // com o mesmo timestamp são empilhados de forma determinística.
+    const ordered = [...allLaneEvents].sort((a, b) =>
+      Number(a.start || 0) - Number(b.start || 0) ||
+      String(a.pos || "").localeCompare(String(b.pos || "")) ||
+      String(a.id || "").localeCompare(String(b.id || ""))
+    );
 
-    // Remove entradas de acontecimentos que deixaram de existir ou mudaram de lane.
-    for (const id of [...state.tracks.keys()]) {
-      if (!ids.has(id)) state.tracks.delete(id);
+    const groups = new Map();
+    for (const event of ordered) {
+      const start = Number(event.start || 0);
+      if (!groups.has(start)) groups.set(start, []);
+      groups.get(start).push(event);
     }
 
-    const eventById = new Map(allLaneEvents.map(event => [event.id, event]));
-    const occupancy = new Map();
-    const gapMinutes = 10 * (span / Math.max(1, plotWidth));
+    const starts = [...groups.keys()].sort((a, b) => a - b);
+    const trackById = new Map();
+    const nextStartByTime = new Map();
+    let maxTrackCount = 1;
 
-    // Os slots já atribuídos permanecem exatamente onde estavam.
-    for (const [id, track] of state.tracks.entries()) {
-      const event = eventById.get(id);
-      if (!event) continue;
-      if (!occupancy.has(track)) occupancy.set(track, []);
-      occupancy.get(track).push(eventLayoutFootprint(event, plotWidth, span));
-    }
+    starts.forEach((start, index) => {
+      const group = groups.get(start) || [];
+      maxTrackCount = Math.max(maxTrackCount, group.length);
 
-    // Pré-carrega também eventos próximos às bordas. Assim eles já possuem um slot
-    // antes de entrarem na tela e não provocam reordenação no primeiro pixel de pan.
-    const preloadStart = ganttStart - span * 0.8;
-    const preloadEnd = ganttEnd + span * 0.8;
-    const candidateIds = new Set(visibleGeometries.map(geometry => geometry.event.id));
-    const candidates = allLaneEvents
-      .filter(event => {
-        const start = Number(event.start || 0);
-        const end = event.end != null ? Number(event.end) : start;
-        return candidateIds.has(event.id) || (end >= preloadStart && start <= preloadEnd);
-      })
-      .sort((a, b) =>
-        Number(a.start || 0) - Number(b.start || 0) ||
-        String(a.pos || '').localeCompare(String(b.pos || '')) ||
-        String(a.id || '').localeCompare(String(b.id || ''))
-      );
+      group.forEach((event, track) => {
+        trackById.set(event.id, track);
+      });
 
-    for (const event of candidates) {
-      if (state.tracks.has(event.id)) continue;
+      const nextStart = starts[index + 1];
+      if (Number.isFinite(nextStart)) nextStartByTime.set(start, nextStart);
+    });
 
-      const footprint = eventLayoutFootprint(event, plotWidth, span);
-      let track = 0;
-
-      while (true) {
-        const intervals = occupancy.get(track) || [];
-        const collision = intervals.some(interval => footprintsOverlap(footprint, interval, gapMinutes));
-        if (!collision) break;
-        track += 1;
-      }
-
-      state.tracks.set(event.id, track);
-      if (!occupancy.has(track)) occupancy.set(track, []);
-      occupancy.get(track).push(footprint);
-      state.maxTrackSeen = Math.max(state.maxTrackSeen, track);
-    }
-
-    // Aplica os slots persistentes às geometrias atualmente desenhadas.
+    // O zoom pode reduzir o espaço do texto, mas nunca muda o track vertical.
+    // O próximo instante diferente define onde o rótulo atual deve terminar.
     for (const geometry of visibleGeometries) {
-      if (!state.tracks.has(geometry.event.id)) {
-        // Fallback extremamente defensivo; normalmente o evento já entrou em candidates.
-        state.tracks.set(geometry.event.id, 0);
+      const start = Number(geometry.event.start || 0);
+      geometry.track = trackById.get(geometry.event.id) ?? 0;
+
+      const nextStart = nextStartByTime.get(start);
+      if (!Number.isFinite(nextStart)) {
+        geometry.renderWidth = geometry.kind === "range"
+          ? geometry.outerWidth
+          : geometry.width;
+        continue;
       }
-      geometry.track = state.tracks.get(geometry.event.id);
-      state.maxTrackSeen = Math.max(state.maxTrackSeen, geometry.track);
+
+      const nextX = ((nextStart - ganttStart) / Math.max(1, span)) * plotWidth;
+      const gap = 8;
+      const available = Math.max(0, nextX - geometry.left - gap);
+
+      if (geometry.kind === "range") {
+        // A barra continua representando a duração real. Apenas a área do texto
+        // é reduzida quando o próximo marcador estiver muito próximo.
+        const fixedWidth = geometry.barWidth + 40;
+        geometry.renderWidth = Math.max(
+          fixedWidth,
+          Math.min(fixedWidth + estimateLabelWidth(geometry.event, span), available)
+        );
+      } else {
+        // Preserva haste + ícone e corta somente o restante do conteúdo textual.
+        geometry.renderWidth = Math.max(42, Math.min(geometry.width, available));
+      }
     }
 
-    // A altura não diminui durante o pan. Isso evita que todas as categorias abaixo
-    // subam/desçam quando um evento sai pela borda esquerda.
-    return Math.max(1, state.maxTrackSeen + 1);
+    return maxTrackCount;
   }
 
   function invalidateStableTrackForEvent(eventId) {
@@ -1390,7 +1387,8 @@
     item.style.setProperty("--lane-color", color);
     item.style.left = `${geometry.left}px`;
     item.style.top = `${8 + geometry.track * 48}px`;
-    item.style.width = `${range ? geometry.outerWidth : geometry.width}px`;
+    item.style.minWidth = "0px";
+    item.style.width = `${geometry.renderWidth ?? (range ? geometry.outerWidth : geometry.width)}px`;
 
     if (item.dataset.contentKey !== contentKey) {
       item.dataset.contentKey = contentKey;

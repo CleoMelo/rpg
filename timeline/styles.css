@@ -572,6 +572,7 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
 .event-copy{
   min-width:0;
   display:grid;
+  overflow:hidden;
   gap:3px;
   padding-top:0;
 }
@@ -587,6 +588,9 @@ dialog::backdrop{background:rgba(3,2,5,.78);backdrop-filter:blur(4px)}
   text-shadow:0 1px 1px rgba(0,0,0,.7);
 }
 .event-copy small{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
   color:#9c929f;
   font-size:10px;
   white-space:nowrap;
