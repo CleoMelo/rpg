@@ -44,7 +44,7 @@
   let overviewPan = null;
   let toastTimer = null;
   let smoothWheelZoom = null;
-  let smoothWheelCommitTimer = null;
+  let smoothWheelFrame = null;
   let renderFrame = null;
   let editMode = "hand";
   let collapsedLanes = new Set();
@@ -595,38 +595,18 @@
     return rect.left + fraction * rect.width;
   }
 
-  function smoothZoomElements(includeTracks = true) {
-    const elements = [
-      $("ganttAxisMajor"),
-      $("ganttAxisMinor")
-    ];
-    if (includeTracks) elements.push(...document.querySelectorAll("#ganttRows .gantt-track"));
-    return elements.filter(Boolean);
-  }
-
-  function clearSmoothWheelPreview() {
-    clearTimeout(smoothWheelCommitTimer);
-    smoothWheelCommitTimer = null;
-    const scroller = $("ganttScroller");
-    scroller.classList.remove("smooth-zooming", "zooming-in", "zooming-out");
-    scroller.style.removeProperty("--zoom-preview-inverse");
-
-    for (const element of smoothWheelZoom?.elements || []) {
-      element.style.removeProperty("transform");
-      element.style.removeProperty("transform-origin");
-    }
-  }
-
   function finishSmoothWheelZoom(commit = true) {
     if (!smoothWheelZoom) return;
     const target = smoothWheelZoom;
-    clearSmoothWheelPreview();
+    if (smoothWheelFrame) cancelAnimationFrame(smoothWheelFrame);
+    smoothWheelFrame = null;
     smoothWheelZoom = null;
+    $("ganttScroller").classList.remove("smooth-zooming");
 
     if (!commit) return;
     ganttStart = Math.round(target.targetStart);
     ganttEnd = Math.round(target.targetStart + target.targetSpan);
-    if (target.targetSpan > target.baseSpan) resetStableTrackLayout();
+    resetStableTrackLayout();
     syncScalePreset(target.targetSpan);
     renderGantt();
     updateCursorDateLabel(target.clientX);
@@ -645,35 +625,59 @@
     };
   }
 
+  function animateSmoothWheelZoom(frameTime) {
+    const state = smoothWheelZoom;
+    if (!state) {
+      smoothWheelFrame = null;
+      return;
+    }
+
+    const elapsed = clamp(frameTime - state.lastFrameTime, 1, 80);
+    state.lastFrameTime = frameTime;
+
+    // Interpolação exponencial baseada no tempo: mantém a mesma sensação em telas
+    // de 60 Hz ou 144 Hz e absorve uma sequência rápida de passos da roda sem saltos.
+    const amount = 1 - Math.exp(-elapsed / 72);
+    state.currentStart += (state.targetStart - state.currentStart) * amount;
+    state.currentSpan = Math.exp(
+      Math.log(Math.max(1, state.currentSpan)) +
+      (Math.log(Math.max(1, state.targetSpan)) - Math.log(Math.max(1, state.currentSpan))) * amount
+    );
+
+    ganttStart = state.currentStart;
+    ganttEnd = state.currentStart + state.currentSpan;
+    renderGantt();
+    updateCursorDateLabel(state.clientX);
+
+    const spanDistance = Math.abs(state.currentSpan - state.targetSpan) / Math.max(1, state.targetSpan);
+    const startDistance = Math.abs(state.currentStart - state.targetStart) / Math.max(1, state.targetSpan);
+    const inputSettled = frameTime - state.lastInputTime >= 72;
+
+    if (inputSettled && spanDistance < 0.0008 && startDistance < 0.0008) {
+      finishSmoothWheelZoom(true);
+      return;
+    }
+
+    smoothWheelFrame = requestAnimationFrame(animateSmoothWheelZoom);
+  }
+
   function smoothZoomByWheel(delta, clientX) {
     const rect = axisRect();
-    const pointerFraction = clamp((clientX - rect.left) / Math.max(1, rect.width), 0, 1);
-    const fraction = delta > 0 ? 0.5 : pointerFraction;
-    const direction = delta < 0 ? -1 : 1;
-
-    if (smoothWheelZoom && smoothWheelZoom.direction !== direction) {
-      finishSmoothWheelZoom(true);
-    }
+    const fraction = clamp((clientX - rect.left) / Math.max(1, rect.width), 0, 1);
+    const now = performance.now();
 
     if (!smoothWheelZoom) {
       const baseSpan = ganttEnd - ganttStart;
       smoothWheelZoom = {
-        baseStart: ganttStart,
-        baseSpan,
+        currentStart: ganttStart,
+        currentSpan: baseSpan,
         targetStart: ganttStart,
         targetSpan: baseSpan,
-        direction,
         clientX,
-        elements: smoothZoomElements(direction < 0)
+        lastInputTime: now,
+        lastFrameTime: now
       };
-
-      const scroller = $("ganttScroller");
-      scroller.classList.add("smooth-zooming", direction < 0 ? "zooming-in" : "zooming-out");
-      for (const element of smoothWheelZoom.elements) {
-        element.style.transformOrigin = "0 50%";
-        element.style.transform = "matrix(1, 0, 0, 1, 0, 0)";
-      }
-      void scroller.offsetWidth;
+      $("ganttScroller").classList.add("smooth-zooming");
     }
 
     const state = smoothWheelZoom;
@@ -686,18 +690,11 @@
     state.targetStart = constrained.start;
     state.targetSpan = constrained.span;
     state.clientX = clientX;
-
-    const scale = state.baseSpan / state.targetSpan;
-    const translation = (state.baseStart - state.targetStart) / state.targetSpan * rect.width;
-    $("ganttScroller").style.setProperty("--zoom-preview-inverse", String(1 / scale));
-    for (const element of state.elements) {
-      element.style.transform = `matrix(${scale}, 0, 0, 1, ${translation}, 0)`;
-    }
+    state.lastInputTime = now;
 
     $("liveScaleLabel").textContent = `Janela: ${humanSpan(state.targetSpan)}`;
     $("zoomResolutionLabel").textContent = zoomResolutionName(state.targetSpan);
-    clearTimeout(smoothWheelCommitTimer);
-    smoothWheelCommitTimer = setTimeout(() => finishSmoothWheelZoom(true), 155);
+    if (!smoothWheelFrame) smoothWheelFrame = requestAnimationFrame(animateSmoothWheelZoom);
   }
 
   function zoomToSpanAtClientX(targetSpan, clientX = null) {
@@ -1398,7 +1395,6 @@
   }
 
   function renderGantt() {
-    if (smoothWheelZoom) finishSmoothWheelZoom(false);
     if (!doc || currentView !== "gantt") return;
     if (!Number.isFinite(ganttStart) || !Number.isFinite(ganttEnd) || ganttEnd <= ganttStart) {
       initializeGanttRange();
