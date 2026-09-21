@@ -1353,18 +1353,10 @@
     const event = geometry.event;
     const item = document.createElement("button");
     item.type = "button";
-    item.className = `lk-event-item lk-point-event side-right${selectedEventId === event.id ? " selected" : ""}`;
-    item.dataset.eventId = event.id;
-    item.dataset.track = String(geometry.track);
-    item.style.setProperty("--lane-color", color);
-    item.style.left = `${geometry.left}px`;
-    item.style.top = `${8 + geometry.track * 48}px`;
-    item.style.width = `${geometry.width}px`;
-
-    item.innerHTML = `<span class="event-stem"></span>${calendarGlyph()}<span class="event-copy"><strong>${C.escapeHtml(event.name || "Sem nome")}</strong><small>${C.escapeHtml(formatEventDate(event.start))}</small></span>`;
-
-    item.title = `${event.name}\n${C.formatDate(event.start, C.getCalendar(data, doc))}\n${lane.name}`;
+    item.className = "lk-event-item lk-point-event side-right";
+    item.timelineEvent = event;
     installEventInteraction(item, event, geometry);
+    updateEventItem(item, geometry, lane, color);
     return item;
   }
 
@@ -1372,26 +1364,60 @@
     const event = geometry.event;
     const item = document.createElement("button");
     item.type = "button";
-    item.className = `lk-event-item lk-range-event label-outside${selectedEventId === event.id ? " selected" : ""}`;
+    item.className = "lk-event-item lk-range-event label-outside";
+    item.timelineEvent = event;
+    installEventInteraction(item, event, geometry);
+    updateEventItem(item, geometry, lane, color);
+    return item;
+  }
+
+  function updateEventItem(item, geometry, lane, color) {
+    const event = geometry.event;
+    const startLabel = formatEventDate(event.start);
+    const range = geometry.kind === "range";
+    const endLabel = range ? formatEventDate(event.end) : "";
+    const contentKey = [
+      range ? "range" : "point",
+      event.name || "",
+      lane.name || "",
+      startLabel,
+      endLabel,
+    ].join("\u0000");
+
     item.dataset.eventId = event.id;
     item.dataset.track = String(geometry.track);
+    item.classList.toggle("selected", selectedEventId === event.id);
     item.style.setProperty("--lane-color", color);
     item.style.left = `${geometry.left}px`;
     item.style.top = `${8 + geometry.track * 48}px`;
-    item.style.width = `${geometry.outerWidth}px`;
+    item.style.width = `${range ? geometry.outerWidth : geometry.width}px`;
 
-    item.innerHTML = `
-      <span class="range-bar" style="width:${geometry.barWidth}px">
-        <span class="resize-handle left" data-resize="start" aria-hidden="true"></span>
-        <span class="resize-handle right" data-resize="end" aria-hidden="true"></span>
-      </span>
-      ${calendarGlyph()}
-      <span class="event-copy"><strong>${C.escapeHtml(event.name || "Sem nome")}</strong><small>${C.escapeHtml(formatEventDate(event.start))} → ${C.escapeHtml(formatEventDate(event.end))}</small></span>
-    `;
+    if (item.dataset.contentKey !== contentKey) {
+      item.dataset.contentKey = contentKey;
+      item.innerHTML = range
+        ? `
+          <span class="range-bar">
+            <span class="resize-handle left" data-resize="start" aria-hidden="true"></span>
+            <span class="resize-handle right" data-resize="end" aria-hidden="true"></span>
+          </span>
+          ${calendarGlyph()}
+          <span class="event-copy"><strong>${C.escapeHtml(event.name || "Sem nome")}</strong><small>${C.escapeHtml(startLabel)} → ${C.escapeHtml(endLabel)}</small></span>
+        `
+        : `<span class="event-stem"></span>${calendarGlyph()}<span class="event-copy"><strong>${C.escapeHtml(event.name || "Sem nome")}</strong><small>${C.escapeHtml(startLabel)}</small></span>`;
 
-    item.title = `${event.name}\n${C.formatDate(event.start, C.getCalendar(data, doc))} → ${C.formatDate(event.end, C.getCalendar(data, doc))}\n${lane.name}`;
-    installEventInteraction(item, event, geometry);
-    return item;
+      item.title = range
+        ? `${event.name}\n${C.formatDate(event.start, C.getCalendar(data, doc))} → ${C.formatDate(event.end, C.getCalendar(data, doc))}\n${lane.name}`
+        : `${event.name}\n${C.formatDate(event.start, C.getCalendar(data, doc))}\n${lane.name}`;
+    }
+
+    if (range) item.querySelector(".range-bar").style.width = `${geometry.barWidth}px`;
+  }
+
+  function reusableEventItem(item, geometry) {
+    if (!item || item.timelineEvent !== geometry.event) return false;
+    return geometry.kind === "range"
+      ? item.classList.contains("lk-range-event")
+      : item.classList.contains("lk-point-event");
   }
 
   function renderGantt() {
@@ -1463,7 +1489,12 @@
     }
 
     const rows = $("ganttRows");
-    rows.innerHTML = "";
+    const existingRows = new Map(
+      [...rows.children]
+        .filter(row => row.classList.contains("gantt-lane-row"))
+        .map(row => [row.dataset.laneId, row])
+    );
+    const desiredRows = [];
 
     for (const [laneIndex, lane] of laneList.entries()) {
       const globalIndex = doc.content.lanes.findIndex(item => item.id === lane.id);
@@ -1497,31 +1528,43 @@
         : assignStableTracks(lane.id, layoutLaneEvents, geometries, plotWidth, span);
       const rowHeight = collapsed ? 48 : Math.max(72, 20 + Math.max(1, trackCount) * 48);
 
-      const row = document.createElement("div");
-      row.className = `gantt-lane-row lk-lane-row${collapsed ? " collapsed" : ""}`;
-      row.dataset.laneId = lane.id;
+      let row = existingRows.get(String(lane.id));
+      if (!row) {
+        row = document.createElement("div");
+        row.className = "gantt-lane-row lk-lane-row";
+        row.dataset.laneId = lane.id;
+        row.innerHTML = `
+          <div class="gantt-lane-label lk-lane-label">
+            <button class="lane-collapse-btn" type="button"></button>
+            <span class="lane-sigil"></span>
+            <span class="lane-label-text"><strong></strong><small></small></span>
+          </div>
+          <div class="gantt-track lk-track"></div>`;
+
+        row.querySelector(".lane-collapse-btn").addEventListener("click", event => {
+          event.stopPropagation();
+          if (collapsedLanes.has(lane.id)) collapsedLanes.delete(lane.id);
+          else collapsedLanes.add(lane.id);
+          renderGantt();
+        });
+        installTrackInteraction(row.querySelector(".gantt-track"), lane.id);
+      }
+
+      desiredRows.push(row);
+      row.classList.toggle("collapsed", collapsed);
       row.style.minHeight = `${rowHeight}px`;
-      row.innerHTML = `
-        <div class="gantt-lane-label lk-lane-label" style="min-height:${rowHeight}px">
-          <button class="lane-collapse-btn" type="button" aria-label="${collapsed ? "Expandir" : "Recolher"} ${C.escapeHtml(lane.name)}">${collapsed ? "›" : "⌄"}</button>
-          <span class="lane-sigil" style="--lane-color:${color}"></span>
-          <span class="lane-label-text">
-            <strong>${C.escapeHtml(lane.name)}</strong>
-            <small>${laneEvents.length} na tela · ${allLaneEvents.length} no total</small>
-          </span>
-        </div>
-        <div class="gantt-track lk-track" style="min-height:${rowHeight}px"></div>`;
-
-      row.querySelector(".lane-collapse-btn").addEventListener("click", event => {
-        event.stopPropagation();
-        if (collapsedLanes.has(lane.id)) collapsedLanes.delete(lane.id);
-        else collapsedLanes.add(lane.id);
-        renderGantt();
-      });
-
+      const label = row.querySelector(".gantt-lane-label");
+      label.style.minHeight = `${rowHeight}px`;
+      const collapseButton = row.querySelector(".lane-collapse-btn");
+      collapseButton.textContent = collapsed ? "›" : "⌄";
+      collapseButton.setAttribute("aria-label", `${collapsed ? "Expandir" : "Recolher"} ${lane.name}`);
+      row.querySelector(".lane-sigil").style.setProperty("--lane-color", color);
+      row.querySelector(".lane-label-text strong").textContent = lane.name;
+      row.querySelector(".lane-label-text small").textContent = `${laneEvents.length} na tela · ${allLaneEvents.length} no total`;
       const track = row.querySelector(".gantt-track");
+      track.style.minHeight = `${rowHeight}px`;
+      track.querySelectorAll(":scope > .gantt-gridline, :scope > .lk17-offscreen-nav").forEach(element => element.remove());
       addGridLines(track);
-      installTrackInteraction(track, lane.id);
 
       if (!collapsed && previousEvent) {
         const leftNav = document.createElement("button");
@@ -1549,17 +1592,43 @@
         track.appendChild(rightNav);
       }
 
+      const existingItems = new Map(
+        [...track.children]
+          .filter(item => item.classList.contains("lk-event-item"))
+          .map(item => [item.dataset.eventId, item])
+      );
+      const desiredEventIds = new Set();
+
       for (const geometry of geometries) {
-        const item = geometry.kind === "range"
-          ? buildRangeItem(geometry, lane, color)
-          : buildPointItem(geometry, lane, color);
-        track.appendChild(item);
+        const eventId = String(geometry.event.id);
+        desiredEventIds.add(eventId);
+        let item = existingItems.get(eventId);
+        if (!reusableEventItem(item, geometry)) {
+          item?.remove();
+          item = geometry.kind === "range"
+            ? buildRangeItem(geometry, lane, color)
+            : buildPointItem(geometry, lane, color);
+          track.appendChild(item);
+        } else {
+          updateEventItem(item, geometry, lane, color);
+        }
       }
 
-      rows.appendChild(row);
+      for (const [eventId, item] of existingItems) {
+        if (!desiredEventIds.has(eventId)) item.remove();
+      }
     }
 
-    if (!laneList.length) {
+    for (const row of existingRows.values()) {
+      if (!desiredRows.includes(row)) row.remove();
+    }
+
+    if (laneList.length) {
+      rows.querySelector(":scope > .gantt-empty")?.remove();
+      desiredRows.forEach((row, index) => {
+        if (rows.children[index] !== row) rows.insertBefore(row, rows.children[index] || null);
+      });
+    } else {
       rows.innerHTML = `<div class="gantt-empty">Nenhuma categoria corresponde aos filtros atuais.</div>`;
     }
 
