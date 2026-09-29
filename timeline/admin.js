@@ -1218,15 +1218,21 @@
     return a.start < b.end + gapMinutes && b.start < a.end + gapMinutes;
   }
 
+  function sortEventsByStartPreservingInsertion(events) {
+    return events
+      .map((event, index) => ({ event, index }))
+      .sort((a, b) =>
+        Number(a.event.start || 0) - Number(b.event.start || 0) ||
+        a.index - b.index
+      )
+      .map(item => item.event);
+  }
+
   function assignStableTracks(laneId, allLaneEvents, visibleGeometries, plotWidth, span) {
     // A posição vertical depende somente do instante exato do acontecimento.
     // Horários diferentes permanecem na mesma linha; somente acontecimentos
     // com o mesmo timestamp são empilhados de forma determinística.
-    const ordered = [...allLaneEvents].sort((a, b) =>
-      Number(a.start || 0) - Number(b.start || 0) ||
-      String(a.pos || "").localeCompare(String(b.pos || "")) ||
-      String(a.id || "").localeCompare(String(b.id || ""))
-    );
+    const ordered = sortEventsByStartPreservingInsertion(allLaneEvents);
 
     const groups = new Map();
     for (const event of ordered) {
@@ -1512,9 +1518,9 @@
     for (const [laneIndex, lane] of laneList.entries()) {
       const globalIndex = doc.content.lanes.findIndex(item => item.id === lane.id);
       const color = laneColor(lane, globalIndex >= 0 ? globalIndex : laneIndex);
-      const allLaneEvents = filtered
-        .filter(event => event.laneId === lane.id)
-        .sort((a, b) => Number(a.start) - Number(b.start));
+      const allLaneEvents = sortEventsByStartPreservingInsertion(
+        filtered.filter(event => event.laneId === lane.id)
+      );
       const laneEvents = shown.filter(event => event.laneId === lane.id);
       const previousEvents = allLaneEvents.filter(event => {
         const start = Number(event.start || 0);
@@ -1533,9 +1539,9 @@
           : pointGeometry(event, plotWidth, span)
       );
 
-      const layoutLaneEvents = doc.content.events
-        .filter(event => event.laneId === lane.id)
-        .sort((a, b) => Number(a.start) - Number(b.start));
+      const layoutLaneEvents = sortEventsByStartPreservingInsertion(
+        doc.content.events.filter(event => event.laneId === lane.id)
+      );
       const trackCount = collapsed
         ? 0
         : assignStableTracks(lane.id, layoutLaneEvents, geometries, plotWidth, span);
